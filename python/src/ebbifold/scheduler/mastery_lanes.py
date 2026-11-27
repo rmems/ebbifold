@@ -220,17 +220,26 @@ def _reserve_surplus_question(context: SurplusReservationContext, question: dict
     return context.build.add_item(_surplus_question_item(question, concept, planned))
 
 
+def _reserve_planned_card(context: SurplusReservationContext, key: str, planned: dict[str, Any]) -> bool:
+    card = context.cards.get(key[5:])
+    if card is None:
+        return False
+    return _reserve_surplus_card(context, card, planned)
+
+
+def _reserve_planned_question(context: SurplusReservationContext, key: str, planned: dict[str, Any]) -> bool:
+    question = context.bulk["questionMap"].get(key[9:])
+    if question is None:
+        return False
+    return _reserve_surplus_question(context, question, planned)
+
+
 def _reserve_planned_surplus(context: SurplusReservationContext, planned: dict[str, Any]) -> bool:
     key = planned["itemKey"]
     if key.startswith("card:"):
-        card = context.cards.get(key[5:])
-        if card is not None:
-            return _reserve_surplus_card(context, card, planned)
-        return False
+        return _reserve_planned_card(context, key, planned)
     if key.startswith("question:"):
-        question = context.bulk["questionMap"].get(key[9:])
-        if question is not None:
-            return _reserve_surplus_question(context, question, planned)
+        return _reserve_planned_question(context, key, planned)
     return False
 
 
