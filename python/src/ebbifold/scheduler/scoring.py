@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass
 from typing import Any
 
 from .topics import js_trim
@@ -123,10 +124,24 @@ def _teaching_cap_removals(
             removed.add(index)
             excess -= 1
 
-    remove_where(lambda i: i not in scaffold and i not in mastery_core and items[i]["id"] not in protected_ids and not (preserve and preserve(items[i])))
-    remove_where(lambda i: i in scaffold)
-    remove_where(lambda i: i not in mastery_core)
-    remove_where(lambda i: True)
+    def preserved(index: int) -> bool:
+        return bool(preserve and preserve(items[index]))
+
+    def ordinary_removable(index: int) -> bool:
+        if index in scaffold or index in mastery_core:
+            return False
+        if items[index]["id"] in protected_ids or preserved(index):
+            return False
+        return True
+
+    removal_stages = (
+        ordinary_removable,
+        lambda index: index in scaffold,
+        lambda index: index not in mastery_core,
+        lambda _index: True,
+    )
+    for stage in removal_stages:
+        remove_where(stage)
     return removed
 
 
@@ -147,19 +162,22 @@ def enforce_concept_teaching_caps(
     return [item for index, item in enumerate(items) if index not in removed]
 
 
-def resolve_intervention_reason(
-    concept_id: str,
-    recall_on_exam_day: float,
-    base_reason: str,
-    recent_failure_concept_ids: set[str] | frozenset[str],
-    concept_has_pristine: set[str] | frozenset[str],
-    target_recall: float,
-) -> str:
-    if concept_id in recent_failure_concept_ids:
+@dataclass(frozen=True)
+class InterventionReasonContext:
+    concept_id: str
+    recall_on_exam_day: float
+    base_reason: str
+    recent_failure_concept_ids: set[str] | frozenset[str]
+    concept_has_pristine: set[str] | frozenset[str]
+    target_recall: float
+
+
+def resolve_intervention_reason(context: InterventionReasonContext) -> str:
+    if context.concept_id in context.recent_failure_concept_ids:
         return "failure_escalation"
-    if recall_on_exam_day >= target_recall and concept_id in concept_has_pristine:
+    if context.recall_on_exam_day >= context.target_recall and context.concept_id in context.concept_has_pristine:
         return "strong_pristine"
-    return base_reason
+    return context.base_reason
 
 
 TEACHING_ARC_TARGET_ITEMS = {"naive": 2, "learning": 3, "consolidating": 3, "mastered": 1}

@@ -6,12 +6,19 @@ import math
 from dataclasses import dataclass
 from typing import Any
 
-from .build_state import SessionBuildState
+from .build_state import SessionBuildConfig, SessionBuildState
 from .config import DEFAULTS
 from .policies import has_demonstrated_learning_gap
 from .exam_target import active_targets
-from .ranking import get_cards_from_bulk, get_questions_from_bulk
-from .scoring import build_cluster_round_robin, normalize_review_challenge_level
+from .ranking import (
+    CardPoolQuery,
+    CardRankingOptions,
+    QuestionPoolQuery,
+    QuestionRankingOptions,
+    get_cards_from_bulk,
+    get_questions_from_bulk,
+)
+from .scoring import InterventionReasonContext, build_cluster_round_robin, normalize_review_challenge_level
 from .scoring import resolve_intervention_reason as _resolve_reason
 from .topics import expand_topic_set
 
@@ -56,10 +63,12 @@ class CardCommitRequest:
 
 
 def resolve_reason(request: ReasonRequest) -> str:
-    return _resolve_reason(
-        request.concept_id, request.recall, request.base, request.inputs["recentFailureConceptIds"],
-        request.plan["conceptHasPristine"], DEFAULTS["target_recall"],
+    context = InterventionReasonContext(
+        concept_id=request.concept_id, recall_on_exam_day=request.recall, base_reason=request.base,
+        recent_failure_concept_ids=request.inputs["recentFailureConceptIds"],
+        concept_has_pristine=request.plan["conceptHasPristine"], target_recall=DEFAULTS["target_recall"],
     )
+    return _resolve_reason(context)
 
 
 def demonstrated_gap(inputs: dict[str, Any], concept_id: str) -> bool:
@@ -80,14 +89,20 @@ def card_pool(request: CardPoolRequest):
     options = inputs["options"]
     challenge = (options.get("reviewChallenge") or 0) if request.apply_review_challenge else 0
     active = active_targets(inputs)
-    return get_cards_from_bulk(
-        request.concept_id, request.concept, 20, inputs["bulk"], request.build.selected_card_ids,
-        inputs.get("penaltyContext"), request.recall,
-        options.get("currentTeachingWeek"), active["card"] if inputs.get("applyExamTarget") else None,
-        active["rankMove"], options.get("topicTeachingWeeks"),
-        options.get("recentFigureExposures"), inputs["nowMs"], challenge,
-        options.get("topicRecencyDays"),
+    ranking_options = CardRankingOptions(
+        selected_card_ids=request.build.selected_card_ids,
+        penalty_context=inputs.get("penaltyContext"),
+        concept_recall=request.recall,
+        current_teaching_week=options.get("currentTeachingWeek"),
+        exam_target_scores=active["card"] if inputs.get("applyExamTarget") else None,
+        exam_target_max_rank_move=active["rankMove"],
+        topic_teaching_weeks=options.get("topicTeachingWeeks"),
+        recent_figure_exposures=options.get("recentFigureExposures"),
+        figure_now_ms=inputs["nowMs"],
+        review_challenge=challenge,
+        topic_recency_days=options.get("topicRecencyDays"),
     )
+    return get_cards_from_bulk(CardPoolQuery(request.concept_id, request.concept, 20, inputs["bulk"], ranking_options))
 
 
 def question_pool(request: QuestionPoolRequest) -> list[dict[str, Any]]:
@@ -101,8 +116,7 @@ def question_pool(request: QuestionPoolRequest) -> list[dict[str, Any]]:
     matcher = request.build.available_concept_thread_matcher() if request.allow_concept_thread else None
     if matcher is not None:
         bulk["conceptThreadMatcher"] = matcher
-    return get_questions_from_bulk(
-        request.concept_id, request.concept, 1, bulk,
+    ranking_options = QuestionRankingOptions(
         selected_question_ids=request.build.selected_question_ids,
         selected_question_variant_groups=request.build.selected_question_variant_groups,
         difficulty_plan=[request.difficulty],
@@ -114,8 +128,10 @@ def question_pool(request: QuestionPoolRequest) -> list[dict[str, Any]]:
         topic_recency_days=options.get("topicRecencyDays"),
         mastered_reentry_counter=request.build.mastered_reentry_counter,
         recent_formats_by_concept=inputs.get("recentFormatsByConcept"),
-        **exam,
+        exam_target_scores=exam.get("exam_target_scores"),
+        exam_target_max_rank_move=exam.get("exam_target_max_rank_move"),
     )
+    return get_questions_from_bulk(QuestionPoolQuery(request.concept_id, request.concept, 1, bulk, ranking_options))
 
 
 def card_item(picked: dict[str, Any], **fields: Any) -> dict[str, Any]:
@@ -155,7 +171,7 @@ def _block_items_without_mastery_evidence(bulk: dict[str, Any], build: SessionBu
 
 
 def _initial_build_state(inputs: dict[str, Any], plan: dict[str, Any], size: int, bulk: dict[str, Any]) -> SessionBuildState:
-    return SessionBuildState(
+    config = SessionBuildConfig(
         size=size, min_first_sight_items=_minimum_first_sight_items(size, inputs["options"]),
         max_new_cards=plan["maxNewCards"],
         max_cross_source_items=plan["maxCrossSourceItems"], unseen_card_ids=plan["unseenCardIds"],
@@ -164,6 +180,7 @@ def _initial_build_state(inputs: dict[str, Any], plan: dict[str, Any], size: int
         excluded_question_ids=inputs["excludedQuestionIds"], excluded_video_ids=inputs["excludedVideoIds"],
         weak_concepts=plan["weakConcepts"], concept_thread_anchors=inputs.get("conceptThreadAnchors") or [],
     )
+    return SessionBuildState(config)
 
 
 def _missing_required_mastery_evidence(inputs: dict[str, Any], requirement: int) -> bool:

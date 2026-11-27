@@ -7,7 +7,7 @@ from typing import Any
 
 from .cluster_eligibility import eligible_rows
 from .deck_strand_mix import deck_strand_of, strand_seat_targets
-from .prep_allocation import prep_modality_budgets
+from .prep_allocation import PrepModalityBudgetRequest, prep_modality_budgets
 
 
 def _configured_prep_clusters(plan: dict[str, Any], prep_ids: set[str]) -> dict[str, list[str]]:
@@ -64,9 +64,11 @@ def _redistribute_seats(mix: dict[str, Any], available: set[str], remaining: int
 def _prep_budget(inputs: dict[str, Any], target_cards: int, prep_ids: set[str]) -> int:
     plan = inputs["options"].get("sessionPrepBlend") or {}
     supply = sum(1 for key in prep_ids if key.startswith("card:"))
-    return prep_modality_budgets(
-        float(plan.get("share") or 0), target_cards, inputs["size"] - target_cards, supply, 0,
-    )["cards"]
+    request = PrepModalityBudgetRequest(
+        share=float(plan.get("share") or 0), card_seats=target_cards,
+        question_seats=inputs["size"] - target_cards, card_supply=supply, question_supply=0,
+    )
+    return prep_modality_budgets(request)["cards"]
 
 
 @dataclass

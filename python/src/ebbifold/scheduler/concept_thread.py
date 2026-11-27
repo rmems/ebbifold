@@ -107,11 +107,20 @@ def infer_clinical_facet(item: dict[str, Any]) -> str:
     )
 
 
+def _thread_age_in_window(age_ms: float) -> bool:
+    return math.isfinite(age_ms) and CONCEPT_THREAD_MIN_AGE_MS <= age_ms <= CONCEPT_THREAD_MAX_AGE_MS
+
+
+def _thread_spacing_is_mature(anchor: dict[str, Any], age_ms: float) -> bool:
+    return (
+        age_ms >= CONCEPT_THREAD_NATURAL_BREAK_MS
+        or anchor["interveningExposures"] >= CONCEPT_THREAD_MIN_INTERVENING_EXPOSURES
+    )
+
+
 def concept_thread_anchor_is_mature(anchor: dict[str, Any], now_ms: float) -> bool:
     age = now_ms - anchor["answeredAtMs"]
-    if not math.isfinite(age) or age < CONCEPT_THREAD_MIN_AGE_MS or age > CONCEPT_THREAD_MAX_AGE_MS:
-        return False
-    return age >= CONCEPT_THREAD_NATURAL_BREAK_MS or anchor["interveningExposures"] >= CONCEPT_THREAD_MIN_INTERVENING_EXPOSURES
+    return _thread_age_in_window(age) and _thread_spacing_is_mature(anchor, age)
 
 
 def _text_contains_topic(text: str, topic: str) -> bool:
@@ -127,17 +136,32 @@ def _text_phrases(normalized_text: str) -> set[str]:
     return phrases
 
 
-def _prepare_item(item: dict[str, Any]) -> dict[str, Any]:
-    text = item.get("text") or ""
-    normalized_text = normalize_clinical_thread_text(text)
+def _combined_item_text(item: dict[str, Any]) -> tuple[str, str]:
+    normalized_text = normalize_clinical_thread_text(item.get("text") or "")
     normalized_format = normalize_clinical_thread_text(item.get("format") or "")
-    combined = " ".join(part for part in (normalized_text, normalized_format) if part)
+    return normalized_text, " ".join(part for part in (normalized_text, normalized_format) if part)
+
+
+def _prepared_concept_ids(item: dict[str, Any]) -> set[str]:
+    return {str(value).strip() for value in (item.get("conceptIds") or []) if str(value).strip()}
+
+
+def _prepared_specific_topics(item: dict[str, Any]) -> set[str]:
+    return {
+        topic for topic in (_normalized_topic(value) for value in (item.get("topics") or []))
+        if topic
+    }
+
+
+def _prepare_item(item: dict[str, Any]) -> dict[str, Any]:
+    normalized_text, combined = _combined_item_text(item)
+    question_type = normalize_clinical_thread_text(item.get("questionType") or "")
     return {
         "id": item["id"],
         "variantGroupId": item.get("variantGroupId"),
-        "facet": _infer_facet(normalize_clinical_thread_text(item.get("questionType") or ""), combined),
-        "conceptIds": {str(x).strip() for x in (item.get("conceptIds") or []) if str(x).strip()},
-        "specificTopics": {t for t in (_normalized_topic(x) for x in (item.get("topics") or [])) if t},
+        "facet": _infer_facet(question_type, combined),
+        "conceptIds": _prepared_concept_ids(item),
+        "specificTopics": _prepared_specific_topics(item),
         "normalizedText": normalized_text,
         "textPhrases": _text_phrases(normalized_text),
     }
@@ -195,30 +219,40 @@ class PreparedConceptThreadMatcher:
         for entries in self._by_target.values():
             entries.sort(key=_anchor_key)
 
+    @staticmethod
+    def _blocked_pair(prepared: dict[str, Any], anchor: dict[str, Any]) -> bool:
+        if prepared["id"] == anchor["id"] or prepared["facet"] == anchor["facet"]:
+            return True
+        candidate_group = prepared["variantGroupId"]
+        return bool(
+            candidate_group and anchor["variantGroupId"] and candidate_group == anchor["variantGroupId"]
+        )
+
+    @staticmethod
+    def _match_result(prepared: dict[str, Any], anchor: dict[str, Any], shared: str, preference: int) -> dict[str, Any]:
+        return {
+            "policyVersion": CONCEPT_THREAD_POLICY_VERSION,
+            "anchorEventId": anchor["anchorEventId"],
+            "anchorItemId": anchor["id"],
+            "anchorFacet": anchor["facet"],
+            "targetFacet": prepared["facet"],
+            "sharedTopic": shared,
+            "ageMs": anchor["ageMs"],
+            "interveningExposures": anchor["interveningExposures"],
+            "targetPreference": preference,
+        }
+
     def find_match(self, candidate: dict[str, Any]) -> dict[str, Any] | None:
         prepared = _prepare_item(candidate)
         if prepared["facet"] == "unknown":
             return None
         for entry in self._by_target.get(prepared["facet"], []):
             anchor = entry["anchor"]
-            if prepared["id"] == anchor["id"] or prepared["facet"] == anchor["facet"]:
-                continue
-            if prepared["variantGroupId"] and anchor["variantGroupId"] and prepared["variantGroupId"] == anchor["variantGroupId"]:
+            if self._blocked_pair(prepared, anchor):
                 continue
             shared = _shared_topic(anchor, prepared)
-            if not shared:
-                continue
-            return {
-                "policyVersion": CONCEPT_THREAD_POLICY_VERSION,
-                "anchorEventId": anchor["anchorEventId"],
-                "anchorItemId": anchor["id"],
-                "anchorFacet": anchor["facet"],
-                "targetFacet": prepared["facet"],
-                "sharedTopic": shared,
-                "ageMs": anchor["ageMs"],
-                "interveningExposures": anchor["interveningExposures"],
-                "targetPreference": entry["targetPreference"],
-            }
+            if shared:
+                return self._match_result(prepared, anchor, shared, entry["targetPreference"])
         return None
 
 

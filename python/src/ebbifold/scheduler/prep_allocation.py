@@ -2,7 +2,25 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, Callable
+
+
+@dataclass(frozen=True)
+class PrepModalityBudgetRequest:
+    share: float
+    card_seats: int
+    question_seats: int
+    card_supply: int
+    question_supply: int
+
+
+@dataclass(frozen=True)
+class PrepOrderOptions:
+    size: int
+    key: Callable[[dict[str, Any]], str]
+    protected: Callable[[dict[str, Any]], bool] | None = None
+    prep_seats: int | None = None
 
 
 def _interleave_keys(pool: list[str], weak: set[str], unseen: set[str], share: float) -> list[str]:
@@ -61,14 +79,37 @@ def order_prep_keys(keys: list[str], plan: dict[str, Any]) -> list[str]:
     return out + [key for key in keys if key not in used]
 
 
-def prep_modality_budgets(share: float, card_seats: int, question_seats: int, card_supply: int, question_supply: int) -> dict[str, int]:
-    capped = max(0.0, min(0.5, share))
-    total = int((card_seats + question_seats) * capped)
-    cards = min(card_supply, card_seats, int(card_seats * capped))
-    questions = min(question_supply, question_seats, total - cards)
-    cards += min(max(0, card_supply - cards), max(0, card_seats - cards), total - cards - questions)
-    questions += min(max(0, question_supply - questions), max(0, question_seats - questions), total - cards - questions)
+def _budget_headroom(request: PrepModalityBudgetRequest, cards: int, questions: int) -> tuple[int, int, int]:
+    return (
+        max(0, request.card_supply - cards),
+        max(0, request.card_seats - cards),
+        int((request.card_seats + request.question_seats) * max(0.0, min(0.5, request.share))) - cards - questions,
+    )
+
+
+def prep_modality_budgets(request: PrepModalityBudgetRequest) -> dict[str, int]:
+    capped = max(0.0, min(0.5, request.share))
+    total = int((request.card_seats + request.question_seats) * capped)
+    cards = min(request.card_supply, request.card_seats, int(request.card_seats * capped))
+    questions = min(request.question_supply, request.question_seats, total - cards)
+    card_headroom, seat_headroom, total_headroom = _budget_headroom(request, cards, questions)
+    cards += min(card_headroom, seat_headroom, total_headroom)
+    questions += min(
+        max(0, request.question_supply - questions),
+        max(0, request.question_seats - questions),
+        total - cards - questions,
+    )
     return {"cards": cards, "questions": questions}
+
+
+def _prep_group(item_key: str, prep_keys: set[str], weak_keys: set[str], unseen_keys: set[str]) -> str:
+    if item_key not in prep_keys:
+        return "ordinary"
+    if item_key in weak_keys:
+        return "weak"
+    if item_key in unseen_keys:
+        return "unseen"
+    return "other"
 
 
 def _partition_prep_items(items, plan, key, protected):
@@ -77,17 +118,8 @@ def _partition_prep_items(items, plan, key, protected):
     weak_keys = set(plan.get("weakItemIds") or [])
     unseen_keys = set(plan.get("unseenItemIds") or [])
     for item in items:
-        item_key = key(item)
-        if protected and protected(item):
-            groups["protected"].append(item)
-        elif item_key not in prep_keys:
-            groups["ordinary"].append(item)
-        elif item_key in weak_keys:
-            groups["weak"].append(item)
-        elif item_key in unseen_keys:
-            groups["unseen"].append(item)
-        else:
-            groups["other"].append(item)
+        group = "protected" if protected and protected(item) else _prep_group(key(item), prep_keys, weak_keys, unseen_keys)
+        groups[group].append(item)
     return groups
 
 
@@ -111,35 +143,47 @@ def _session_order_prep(prep: list[dict[str, Any]], plan: dict[str, Any], key) -
     return [by_key[item_key] for item_key in order_prep_keys([key(item) for item in prep], plan)]
 
 
-def _spread_prep(protected_items, ordinary, prep, seats, wanted):
-    prefix = list(protected_items)
+@dataclass(frozen=True)
+class PrepSpreadRequest:
+    protected_items: list[dict[str, Any]]
+    ordinary: list[dict[str, Any]]
+    prep: list[dict[str, Any]]
+    seats: int
+    wanted: int
+
+
+def _spread_prep(request: PrepSpreadRequest):
+    prefix = list(request.protected_items)
     prep_at = ordinary_at = 0
-    for slot in range(seats):
-        prep_due = int((slot + 1) * wanted / seats) > prep_at
-        if (prep_due or ordinary_at >= len(ordinary)) and prep_at < len(prep):
-            prefix.append(prep[prep_at])
+    for slot in range(request.seats):
+        prep_due = int((slot + 1) * request.wanted / request.seats) > prep_at
+        if (prep_due or ordinary_at >= len(request.ordinary)) and prep_at < len(request.prep):
+            prefix.append(request.prep[prep_at])
             prep_at += 1
-        elif ordinary_at < len(ordinary):
-            prefix.append(ordinary[ordinary_at])
+        elif ordinary_at < len(request.ordinary):
+            prefix.append(request.ordinary[ordinary_at])
             ordinary_at += 1
         else:
             break
     return prefix, ordinary_at, prep_at
 
 
+def _prep_seat_count(plan: dict[str, Any], options: PrepOrderOptions, prep_count: int, seats: int) -> int:
+    default_prep_seats = seats * min(0.5, float(plan["share"]))
+    requested = options.prep_seats if options.prep_seats is not None else default_prep_seats
+    return min(prep_count, seats, max(0, int(requested)))
+
+
 def order_session_prep_candidates(
-    items: list[dict[str, Any]], plan: dict[str, Any] | None, *, size: int,
-    key: Callable[[dict[str, Any]], str], protected: Callable[[dict[str, Any]], bool] | None = None,
-    prep_seats: int | None = None,
+    items: list[dict[str, Any]], plan: dict[str, Any] | None, options: PrepOrderOptions,
 ) -> list[dict[str, Any]]:
     if not plan or not isinstance(plan.get("share"), (int, float)) or plan["share"] <= 0:
         return items
-    groups = _partition_prep_items(items, plan, key, protected)
-    share = float(plan["share"])
-    prep = _session_order_prep(_ordered_prep_items(groups, share), plan, key)
+    groups = _partition_prep_items(items, plan, options.key, options.protected)
+    prep = _session_order_prep(_ordered_prep_items(groups, float(plan["share"])), plan, options.key)
     ordinary = groups["ordinary"]
-    seats = max(0, int(size) - len(groups["protected"]))
-    default_prep_seats = seats * min(0.5, share)
-    wanted = min(len(prep), seats, max(0, int(prep_seats if prep_seats is not None else default_prep_seats)))
-    prefix, ordinary_at, prep_at = _spread_prep(groups["protected"], ordinary, prep, seats, wanted)
+    seats = max(0, int(options.size) - len(groups["protected"]))
+    wanted = _prep_seat_count(plan, options, len(prep), seats)
+    spread = PrepSpreadRequest(groups["protected"], ordinary, prep, seats, wanted)
+    prefix, ordinary_at, prep_at = _spread_prep(spread)
     return prefix + ordinary[ordinary_at:] + prep[prep_at:]

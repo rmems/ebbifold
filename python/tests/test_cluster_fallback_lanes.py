@@ -6,7 +6,7 @@ import copy
 import json
 from pathlib import Path
 
-from ebbifold.scheduler.deck_strand_mix import order_by_deck_strands
+from ebbifold.scheduler.deck_strand_mix import DeckStrandOrderOptions, order_by_deck_strands
 from ebbifold.scheduler.pipeline import run_session
 
 SESSIONS = json.loads((Path(__file__).parent / "fixtures" / "unified-scheduler-session.cases.json").read_text(encoding="utf-8"))["sessions"]
@@ -30,20 +30,20 @@ def test_cluster_media_lane_filters_cards_and_questions() -> None:
     assert not any(item["type"] == "question" for item in result["items"])
 
 
+def _mark_rot_other(rows: list[dict], eligible: set[str]) -> None:
+    for row in rows:
+        if row["id"] in eligible:
+            row.update({"rotation": "rot-other", "week": 2})
+
+
 def test_cluster_cross_source_and_week_lanes_filter_candidates() -> None:
     snapshot = _cluster_snapshot()
     snapshot["week"] = 2
     snapshot["options"] = {**snapshot["options"], "crossSourceRotations": ["rot-other"]}
     eligible = {"k-renal-1", "k-card-1", "cq-1"}
     for rows in snapshot["clusterCards"].values():
-        for row in rows:
-            if row["id"] in eligible:
-                row["rotation"] = "rot-other"
-                row["week"] = 2
-    for row in snapshot["clusterQuestions"]:
-        if row["id"] in eligible:
-            row["rotation"] = "rot-other"
-            row["week"] = 2
+        _mark_rot_other(rows, eligible)
+    _mark_rot_other(snapshot["clusterQuestions"], eligible)
     result = run_session(snapshot)["result"]
     assert result["items"]
     assert {item["id"] for item in result["items"]} <= eligible
@@ -59,10 +59,11 @@ def test_deck_strand_ordering_preserves_items_and_spreads_strands() -> None:
         {"id": "anatomy", "share": 0.5, "matchRotations": ["anatomy"]},
         {"id": "clinical", "share": 0.5},
     ]}
-    ordered = order_by_deck_strands(
-        items, mix, seed="test", share_basis="target",
+    options = DeckStrandOrderOptions(
+        seed="test", share_basis="target",
         identify=lambda item: {"rotation": item["rotation"], "sourceFile": None},
     )
+    ordered = order_by_deck_strands(items, mix, options)
     assert sorted(item["id"] for item in ordered) == sorted(item["id"] for item in items)
     assert len(ordered) == len(items)
     assert ordered is not items
