@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/rmems/ebbifold/schemas/attempt-record-v1.json",
+  "title": "ebbifold question attempt record v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "attemptId",
+    "sessionId",
+    "questionId",
+    "selectedLabel",
+    "isCorrect",
+    "attemptNumber",
+    "answeredAt"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "attemptId": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "sessionId": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "questionId": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "selectedLabel": { "type": ["string", "null"], "minLength": 1, "maxLength": 20 },
+    "isCorrect": { "type": "boolean" },
+    "attemptNumber": { "type": "integer", "minimum": 1 },
+    "answeredAt": { "type": "string", "format": "date-time" },
+    "timeToAnswerMs": { "type": "integer", "minimum": 0 },
+    "difficultyAtAttempt": { "type": "string", "minLength": 1 },
+    "domainAtAttempt": { "type": "string", "minLength": 1 }
+  }
+}
