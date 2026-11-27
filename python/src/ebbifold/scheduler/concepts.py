@@ -309,8 +309,8 @@ class ConceptSelection:
     cardRatio: float
     maintenanceShift: float
     allocatedConceptRanks: dict[str, int] | None = None
-    allocationChangedConceptMembershipCount: int = 0
-    allocationCoverageDebtDomainCodes: list[str] | None = None
+    allocation_changed_concept_membership_count: int = 0
+    allocation_coverage_debt_domain_codes: list[str] | None = None
 
 
 def select_weak_concepts(
@@ -374,8 +374,8 @@ def select_weak_concepts(
             card_ratio = min(0.9, card_ratio + shift)
     return ConceptSelection(weakConcepts=weak, cardRatio=card_ratio, maintenanceShift=shift,
                             allocatedConceptRanks=allocated_ranks,
-                            allocationChangedConceptMembershipCount=allocation_changed,
-                            allocationCoverageDebtDomainCodes=coverage_debt)
+                            allocation_changed_concept_membership_count=allocation_changed,
+                            allocation_coverage_debt_domain_codes=coverage_debt)
 
 
 def plan_card_quota(inputs: dict[str, Any], card_ratio: float) -> dict[str, int]:

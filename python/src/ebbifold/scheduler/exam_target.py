@@ -120,10 +120,11 @@ def allocate_exam_target_seats(*, requested_size: int, candidates: list[dict[str
         ]
         chosen = None
         if feasible:
-            def deficit(domain: str) -> float:
-                return desired_shares.get(domain, 0) * next_window_size - counts.get(domain, 0)
-
-            chosen_domain = min(feasible, key=lambda domain: (-deficit(domain), domain))
+            deficits = {
+                domain: desired_shares.get(domain, 0) * next_window_size - counts.get(domain, 0)
+                for domain in feasible
+            }
+            chosen_domain = min(feasible, key=lambda domain, deficits=deficits: (-deficits[domain], domain))
             chosen = min((candidate for candidate in remaining if candidate.get("domainCode") == chosen_domain),
                          key=_target_key(max_item_rank_move), default=None)
         if chosen is None:
