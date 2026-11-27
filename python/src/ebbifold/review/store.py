@@ -87,6 +87,7 @@ class SQLiteReviewStore:
                 );
                 CREATE INDEX IF NOT EXISTS attempts_session_idx ON attempts(session_id, answered_at);
                 CREATE INDEX IF NOT EXISTS attempts_item_idx ON attempts(item_id, answered_at);
+                CREATE UNIQUE INDEX IF NOT EXISTS attempts_session_item_unique ON attempts(session_id, item_id);
                 """
             )
             conn.execute(
@@ -140,6 +141,13 @@ class SQLiteReviewStore:
                 ),
             )
         return attempt_id
+
+    def complete_session(self, session_id: str) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE review_sessions SET status = 'completed' WHERE session_id = ?",
+                (session_id,),
+            )
 
     def attempts(self, session_id: str | None = None) -> list[sqlite3.Row]:
         sql = "SELECT * FROM attempts"

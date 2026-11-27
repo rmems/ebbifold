@@ -51,8 +51,19 @@ def test_api_rejects_unknown_session_and_stale_item(tmp_path):
     current = client.get(f"/sessions/{session_id}/current").json()["item"]
     stale = client.post(f"/sessions/{session_id}/answers", json={"item_id": "not-current", "selected_label": "A"})
     invalid = client.post(f"/sessions/{session_id}/answers", json={"item_id": current["item_id"], "selected_label": "not-a-label"})
+    missing_item = client.post(f"/sessions/{session_id}/answers", json={"selected_label": "A"})
     assert stale.status_code == 409
     assert invalid.status_code == 422
+    assert missing_item.status_code == 422
+
+
+def test_api_serves_corpus_figures_and_rejects_traversal(tmp_path):
+    client = _client(tmp_path / "review.sqlite3")
+    figure = client.get("/figures/usmle/step1/ecg-case-6r3t9x.svg")
+    assert figure.status_code == 200
+    assert figure.headers["content-type"].startswith("image/svg+xml")
+    assert client.get("/figures/usmle/step1/..").status_code in {404, 422}
+    assert client.get("/figures/usmle/step1/missing.svg").status_code == 404
 
 
 def test_default_memory_path_is_outside_repository():

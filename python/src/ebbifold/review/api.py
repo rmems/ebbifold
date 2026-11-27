@@ -8,11 +8,13 @@ to the user data directory, outside version control.
 from __future__ import annotations
 
 import argparse
+import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from ebbifold.corpus import load_corpus
@@ -24,7 +26,7 @@ from .store import AttemptInput, SQLiteReviewStore, default_store_path
 
 class AnswerIn(BaseModel):
     selected_label: str = Field(min_length=1)
-    item_id: str | None = None
+    item_id: str = Field(min_length=1)
     time_to_answer_ms: int | None = Field(default=None, ge=0)
 
 
@@ -93,8 +95,11 @@ class ReviewApi:
             raise HTTPException(status_code=404, detail="unknown review session")
         return row
 
+    def fresh_engine(self) -> ReviewEngine:
+        return ReviewEngine(self.engine.snapshot, days_to_exam=self.engine.days_to_exam)
+
     def current_question(self, session_id: str) -> ReviewQuestion | None:
-        return self.engine.next_question(self.store.attempts(session_id), self.store.attempts())
+        return self.fresh_engine().next_question(self.store.attempts(session_id), self.store.attempts())
 
     def health(self) -> dict[str, str]:
         return {"status": "ok"}
@@ -117,7 +122,7 @@ class ReviewApi:
     def validate_answer_target(self, answer: AnswerIn, question: ReviewQuestion | None) -> ReviewQuestion:
         if question is None:
             raise HTTPException(status_code=409, detail="no unanswered items remain")
-        if answer.item_id is not None and answer.item_id != question.id:
+        if answer.item_id != question.id:
             raise HTTPException(status_code=409, detail="answer item does not match the current item")
         if not _valid_label(question, answer.selected_label):
             raise HTTPException(status_code=422, detail="answer must be one of the displayed labels")
@@ -127,23 +132,39 @@ class ReviewApi:
         self.session_row(session_id)
         question = self.validate_answer_target(answer, self.current_question(session_id))
         correct = ReviewEngine.grade(question, answer.selected_label)
-        attempt_id = self.store.record_attempt(
-            AttemptInput(
-                session_id=session_id,
-                item_id=question.id,
-                selected_label=answer.selected_label.strip().upper(),
-                is_correct=correct,
-                answered_at=datetime.now(UTC),
-                time_to_answer_ms=answer.time_to_answer_ms,
-                difficulty_at_attempt=question.difficulty,
-                concept_at_attempt=question.concept_id,
+        try:
+            attempt_id = self.store.record_attempt(
+                AttemptInput(
+                    session_id=session_id,
+                    item_id=question.id,
+                    selected_label=answer.selected_label.strip().upper(),
+                    is_correct=correct,
+                    answered_at=datetime.now(UTC),
+                    time_to_answer_ms=answer.time_to_answer_ms,
+                    difficulty_at_attempt=question.difficulty,
+                    concept_at_attempt=question.concept_id,
+                )
             )
-        )
+        except sqlite3.IntegrityError as exc:
+            raise HTTPException(status_code=409, detail="current item was already answered") from exc
+        next_question = self.current_question(session_id)
+        if next_question is None:
+            self.store.complete_session(session_id)
         return {
             "attempt_id": attempt_id,
             "correct": correct,
-            "next_item": _question_payload(self.current_question(session_id)),
+            "next_item": _question_payload(next_question),
         }
+
+    def figure(self, domain: str, dataset: str, filename: str) -> FileResponse:
+        parts = (domain, dataset, filename)
+        if any(part in {"", ".", ".."} or "/" in part or "\\" in part for part in parts):
+            raise HTTPException(status_code=404, detail="unknown figure")
+        media_root = (self.content_root / domain / dataset / "media").resolve()
+        path = (media_root / filename).resolve()
+        if media_root not in path.parents or not path.is_file():
+            raise HTTPException(status_code=404, detail="unknown figure")
+        return FileResponse(path)
 
 
 def create_app(content: str | Path | None = None, db: str | Path | None = None) -> FastAPI:
@@ -155,6 +176,10 @@ def create_app(content: str | Path | None = None, db: str | Path | None = None) 
     missing_session = {404: {"description": "Unknown review session"}}
     app.get("/sessions/{session_id}", responses=missing_session)(api.inspect_session)
     app.get("/sessions/{session_id}/current", responses=missing_session)(api.inspect_current)
+    app.get(
+        "/figures/{domain}/{dataset}/{filename}",
+        responses={404: {"description": "Unknown corpus figure"}},
+    )(api.figure)
     app.post(
         "/sessions/{session_id}/answers",
         status_code=201,
