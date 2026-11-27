@@ -158,6 +158,16 @@ def test_ties_break_by_concept_id_deterministically() -> None:
     ]
 
 
+def test_distinct_vectors_with_equal_cosine_keep_input_order_independent_ties() -> None:
+    ids = ["zeta", "alpha"]
+    vectors = np.array([[1.0, 1.0], [1.0, -1.0]])
+    query = np.array([1.0, 0.0])
+    forward = ConceptManifold(ids, vectors, dimensions=2)
+    backward = ConceptManifold(ids[::-1], vectors[::-1].copy(), dimensions=2)
+    assert [n.concept_id for n in forward.neighbours(query, 2)] == ["alpha", "zeta"]
+    assert [n.concept_id for n in backward.neighbours(query, 2)] == ["alpha", "zeta"]
+
+
 def test_manifold_accessors(manifold_data) -> None:
     ids, vectors = manifold_data
     manifold = ConceptManifold(ids, vectors)
@@ -277,7 +287,8 @@ def test_cache_key_separates_models_dimensions_and_texts() -> None:
         cache_key(MODEL, 3072, "y"),
     }
     assert len(keys) == 4
-    assert cache_key(MODEL, 3072, "x") == cache_key(MODEL, 3072, "x")
+    first = cache_key(MODEL, 3072, "x")
+    assert first == cache_key(MODEL, 3072, "x")
 
 
 def test_cache_spaces_are_isolated(tmp_path: Path) -> None:
