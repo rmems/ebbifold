@@ -6,6 +6,7 @@ import sqlite3
 
 from ebbifold.corpus import load_corpus
 from ebbifold.review.cli import CliContext, _read_answer, run
+import ebbifold.review.engine as engine_module
 from ebbifold.review.engine import ReviewEngine
 from ebbifold.review.store import AttemptInput, SQLiteReviewStore
 
@@ -36,11 +37,19 @@ def test_review_store_persists_attempts_across_restarts(tmp_path):
     assert attempts[0]["is_correct"] == 1
 
 
-def test_review_engine_uses_persisted_attempts_for_next_item(tmp_path):
+def test_review_engine_uses_persisted_attempts_for_next_item(tmp_path, monkeypatch):
     snapshot = load_corpus()
     engine = ReviewEngine(snapshot, now_ms=1_700_000_000_000)
     store = SQLiteReviewStore(tmp_path / "review.sqlite3")
     session_id = store.create_session("validation-corpus")
+    rank_inputs = []
+    real_rank_adaptive = engine_module.rank_adaptive
+
+    def spy_rank_adaptive(questions, history, size):
+        rank_inputs.append({question.id: question.preference_rank for question in questions})
+        return real_rank_adaptive(questions, history, size)
+
+    monkeypatch.setattr(engine_module, "rank_adaptive", spy_rank_adaptive)
 
     first = engine.next_question([], [])
     assert first is not None
@@ -53,6 +62,7 @@ def test_review_engine_uses_persisted_attempts_for_next_item(tmp_path):
     second = engine.next_question(session_attempts, persisted_attempts)
 
     assert persisted_priority != baseline_priority
+    assert rank_inputs[1][first.id] != rank_inputs[0][first.id]
     assert second is not None
     assert second.id != first.id
 
