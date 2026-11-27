@@ -110,9 +110,9 @@ def test_scalar_scoring_parity() -> None:
     for row in UNITS["calibratedReviewItem"]:
         assert scoring.is_calibrated_review_item(row["type"], row["complexity"]) is row["value"]
     for row in UNITS["interventionReason"]:
-        actual = scoring.resolve_intervention_reason(
-            row["conceptId"], row["recall"], row["base"], {"c-f"}, {"c-p", "c-f"}, 0.8
-        )
+        actual = scoring.resolve_intervention_reason(scoring.InterventionReasonContext(
+            row["conceptId"], row["recall"], row["base"], {"c-f"}, {"c-p", "c-f"}, 0.8,
+        ))
         assert actual == row["value"]
     for row in UNITS["teachingState"]:
         assert scoring.classify_teaching_state(row["exposureCount"], row["recall"], row["confidence"]) == row["value"]
@@ -201,12 +201,12 @@ def test_unported_lanes_fail_closed(lane: str) -> None:
 
 
 def test_concept_thread_anchors_are_accepted() -> None:
-    from ebbifold.scheduler.build_state import SessionBuildState
+    from ebbifold.scheduler.build_state import SessionBuildConfig, SessionBuildState
 
-    build = SessionBuildState(
+    build = SessionBuildState(SessionBuildConfig(
         size=1, min_first_sight_items=0, max_new_cards=0, max_cross_source_items=0,
         unseen_card_ids=[], concept_thread_anchors=[],
-    )
+    ))
     assert build.prepared_concept_thread_matcher.anchor_count == 0
 
 

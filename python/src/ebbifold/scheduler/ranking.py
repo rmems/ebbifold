@@ -9,7 +9,8 @@ normalized by :func:`normalize_bulk`.
 from __future__ import annotations
 
 import math
-from collections.abc import Mapping
+from collections.abc import Mapping, Set as AbstractSet
+from dataclasses import dataclass, field
 from typing import Any
 
 from .concept_thread_ranking import attach_thread_matches, find_thread_matches, promote_thread_matches
@@ -95,28 +96,25 @@ def _card_candidate(card: Mapping[str, Any]) -> dict[str, Any]:
 
 
 class _CardRanker:
-    def __init__(
-        self, concept_id: str, bulk: Mapping[str, Any], penalty_context: Mapping[str, Any] | None,
-        current_teaching_week: int | None, exam_target_scores: Mapping[str, float] | None,
-        exam_target_max_rank_move: float, topic_teaching_weeks: Mapping[str, int] | None,
-        recent_figure_exposures: Mapping[str, Any] | None, figure_now_ms: float,
-        topic_recency_days: Mapping[str, float] | None, matching_seen: list[dict[str, Any]],
-    ) -> None:
+    def __init__(self, query: CardPoolQuery, matching_seen: list[dict[str, Any]]) -> None:
+        options = query.options
+        concept_id, bulk = query.concept_id, query.bulk
         self.concept_id = concept_id
         self.bulk = bulk
-        self.current_teaching_week = current_teaching_week
-        self.exam_target_max_rank_move = exam_target_max_rank_move
-        self.topic_teaching_weeks = topic_teaching_weeks
-        self.recent_figure_exposures = recent_figure_exposures
-        self.figure_now_ms = figure_now_ms
-        self.topic_recency_days = topic_recency_days
+        self.current_teaching_week = options.current_teaching_week
+        self.exam_target_max_rank_move = options.exam_target_max_rank_move
+        self.topic_teaching_weeks = options.topic_teaching_weeks
+        self.recent_figure_exposures = options.recent_figure_exposures
+        self.figure_now_ms = options.figure_now_ms
+        self.topic_recency_days = options.topic_recency_days
         self.vector_rank = build_rank_from_scores(bulk["cardScores"].get(concept_id), 200)
-        self.exam_scores = exam_target_scores if exam_target_scores is not None else bulk["cardExamRelevance"]
+        self.exam_scores = options.exam_target_scores if options.exam_target_scores is not None else bulk["cardExamRelevance"]
         self.history = bulk["cardVariantGroupHistory"]
         failed = bulk["failedStretchCardIds"]
-        self.step_down = bool(failed) and any(c["id"] in failed for c in matching_seen)
-        self.recent_ids = (penalty_context or {}).get("recentCardIds") or set()
-        self.recent_failures = (penalty_context or {}).get("recentFailureConceptIds") or set()
+        self.step_down = bool(failed) and any(card["id"] in failed for card in matching_seen)
+        penalty_context = options.penalty_context or {}
+        self.recent_ids = penalty_context.get("recentCardIds") or set()
+        self.recent_failures = penalty_context.get("recentFailureConceptIds") or set()
 
     @staticmethod
     def importance_boost(importance: Any) -> float:
@@ -267,32 +265,41 @@ def _unique_limited(cards: list[dict[str, Any]], max_candidates: int) -> list[di
     return out
 
 
-def get_cards_from_bulk(
-    concept_id: str,
-    concept: Mapping[str, Any],
-    max_candidates: int,
-    bulk: Mapping[str, Any],
-    selected_card_ids: set[str],
-    penalty_context: Mapping[str, Any] | None = None,
-    concept_recall: float | None = None,
-    current_teaching_week: int | None = None,
-    exam_target_scores: Mapping[str, float] | None = None,
-    exam_target_max_rank_move: float = EXAM_RELEVANCE_BOOST_FACTOR,
-    topic_teaching_weeks: Mapping[str, int] | None = None,
-    recent_figure_exposures: Mapping[str, Any] | None = None,
-    figure_now_ms: float = 0,
-    review_challenge: int = 0,
-    topic_recency_days: Mapping[str, float] | None = None,
-) -> list[dict[str, Any]]:
+@dataclass(frozen=True)
+class CardRankingOptions:
+    selected_card_ids: set[str] = field(default_factory=set)
+    penalty_context: Mapping[str, Any] | None = None
+    concept_recall: float | None = None
+    current_teaching_week: int | None = None
+    exam_target_scores: Mapping[str, float] | None = None
+    exam_target_max_rank_move: float = EXAM_RELEVANCE_BOOST_FACTOR
+    topic_teaching_weeks: Mapping[str, int] | None = None
+    recent_figure_exposures: Mapping[str, Any] | None = None
+    figure_now_ms: float = 0
+    review_challenge: int = 0
+    topic_recency_days: Mapping[str, float] | None = None
+
+
+@dataclass(frozen=True)
+class CardPoolQuery:
+    concept_id: str
+    concept: Mapping[str, Any]
+    max_candidates: int
+    bulk: Mapping[str, Any]
+    options: CardRankingOptions = field(default_factory=CardRankingOptions)
+
+
+def get_cards_from_bulk(query: CardPoolQuery) -> list[dict[str, Any]]:
+    concept, max_candidates = query.concept, query.max_candidates
+    bulk, options = query.bulk, query.options
+    selected_card_ids = options.selected_card_ids
+    penalty_context = options.penalty_context
+    review_challenge = options.review_challenge
     topic_set = set(expand_topic_set(concept["topics"]))
     if not topic_set:
         return []
     matching_unseen, matching_seen = _matching_cards(bulk, topic_set, selected_card_ids, review_challenge)
-    ranker = _CardRanker(
-        concept_id, bulk, penalty_context, current_teaching_week, exam_target_scores,
-        exam_target_max_rank_move, topic_teaching_weeks, recent_figure_exposures, figure_now_ms,
-        topic_recency_days, matching_seen,
-    )
+    ranker = _CardRanker(query, matching_seen)
     passed_ids = bulk["passedScaffoldCardIds"]
     passed = [c for c in matching_seen if c["id"] in passed_ids] if passed_ids else []
 
@@ -319,9 +326,16 @@ def get_cards_from_bulk(
         combined = _apply_review_challenge_card_order(combined, matching_seen, bulk, review_challenge)
     return _unique_limited(combined, max_candidates)
 
-def get_videos_from_bulk(
-    concept_id: str, concept: Mapping[str, Any], limit: int, bulk: Mapping[str, Any], exclude_video_ids: set[str]
-) -> list[dict[str, Any]]:
+@dataclass(frozen=True)
+class VideoPoolQuery:
+    concept_id: str
+    concept: Mapping[str, Any]
+    limit: int
+    bulk: Mapping[str, Any]
+    exclude_video_ids: set[str] = field(default_factory=set)
+
+
+def _linked_videos(bulk: Mapping[str, Any], concept_id: str, exclude_video_ids: set[str]) -> list[dict[str, Any]]:
     linked: list[dict[str, Any]] = []
     for link in bulk["videoConceptLinks"]:
         if link["conceptId"] != concept_id or link["videoId"] in exclude_video_ids:
@@ -329,15 +343,26 @@ def get_videos_from_bulk(
         video = bulk["videoMap"].get(link["videoId"])
         if video:
             linked.append(video)
+    return linked
+
+
+def _topic_matched_videos(query: VideoPoolQuery, linked: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if not expand_topic_set(query.concept["topics"]):
+        return []
+    linked_ids = {v["id"] for v in linked}
     topic_matched: list[dict[str, Any]] = []
-    if expand_topic_set(concept["topics"]):
-        linked_ids = {v["id"] for v in linked}
-        for video in bulk["rotationVideos"]:
-            if video["id"] in exclude_video_ids or video["id"] in linked_ids:
-                continue
-            if concept_id in video["id"]:
-                topic_matched.append(video)
-    vector_rank = build_rank_from_scores(bulk["videoScores"].get(concept_id), 100)
+    for video in query.bulk["rotationVideos"]:
+        if video["id"] in query.exclude_video_ids or video["id"] in linked_ids:
+            continue
+        if query.concept_id in video["id"]:
+            topic_matched.append(video)
+    return topic_matched
+
+
+def _ordered_video_candidates(query: VideoPoolQuery) -> list[dict[str, Any]]:
+    linked = _linked_videos(query.bulk, query.concept_id, query.exclude_video_ids)
+    topic_matched = _topic_matched_videos(query, linked)
+    vector_rank = build_rank_from_scores(query.bulk["videoScores"].get(query.concept_id), 100)
 
     def by_vector(videos: list[dict[str, Any]]) -> list[dict[str, Any]]:
         if vector_rank is None or len(videos) <= 1:
@@ -345,16 +370,47 @@ def get_videos_from_bulk(
         ranked = sorted((r for r in ((vector_rank.get(v["id"]), v) for v in videos) if r[0] is not None), key=lambda r: r[0])
         return [v for _, v in ranked] + [v for v in videos if vector_rank.get(v["id"]) is None]
 
+    return by_vector(linked) + by_vector(topic_matched)
+
+
+def get_videos_from_bulk(query: VideoPoolQuery) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for video in by_vector(linked) + by_vector(topic_matched):
-        if len(out) >= limit:
+    for video in _ordered_video_candidates(query):
+        if len(out) >= query.limit:
             break
         if video["id"] in seen:
             continue
         seen.add(video["id"])
         out.append(video)
     return out
+
+
+@dataclass(frozen=True)
+class QuestionRankingOptions:
+    selected_question_ids: AbstractSet[str] = field(default_factory=frozenset)
+    selected_question_variant_groups: AbstractSet[str] = field(default_factory=frozenset)
+    difficulty_plan: list[str] | None = None
+    recent_formats_by_concept: Mapping[str, Any] | None = None
+    concept_thread_anchors: list[Any] | None = None
+    exam_target_scores: Mapping[str, float] | None = None
+    exam_target_max_rank_move: float | None = None
+    mastered_reentry_counter: dict[str, int] | None = None
+    current_teaching_week: int | None = None
+    topic_teaching_weeks: Mapping[str, int] | None = None
+    review_challenge: int | None = None
+    topic_recency_days: Mapping[str, float] | None = None
+    review_challenge_gap: bool | None = None
+    challenge_slot_index: int = 0
+
+
+@dataclass(frozen=True)
+class QuestionPoolQuery:
+    concept_id: str
+    concept: Mapping[str, Any]
+    limit: int
+    bulk: Mapping[str, Any]
+    options: QuestionRankingOptions = field(default_factory=QuestionRankingOptions)
 
 
 def _suppression_key(q: Mapping[str, Any]) -> str | None:
@@ -394,34 +450,138 @@ def _question_pool(concept_id: str, concept: Mapping[str, Any], bulk: Mapping[st
     return primary, linked, topic_matched
 
 
-def get_questions_from_bulk(
-    concept_id: str,
-    concept: Mapping[str, Any],
-    limit: int,
-    bulk: Mapping[str, Any],
-    *,
-    selected_question_ids: set[str],
-    selected_question_variant_groups: set[str],
-    difficulty_plan: list[str] | None = None,
-    recent_formats_by_concept: Mapping[str, Any] | None = None,
-    concept_thread_anchors: list[Any] | None = None,
-    exam_target_scores: Mapping[str, float] | None = None,
-    exam_target_max_rank_move: float | None = None,
-    mastered_reentry_counter: dict[str, int] | None = None,
-    current_teaching_week: int | None = None,
-    topic_teaching_weeks: Mapping[str, int] | None = None,
-    review_challenge: int | None = None,
-    topic_recency_days: Mapping[str, float] | None = None,
-    review_challenge_gap: bool | None = None,
-    challenge_slot_index: int = 0,
-) -> list[dict[str, Any]]:
-    if concept_thread_anchors and not bulk.get("conceptThreadMatcher"):
-        now_ms = bulk.get("conceptThreadNowMs")
-        if now_ms is None:
-            raise UnsupportedSchedulerInput("raw concept-thread anchors require a prepared matcher or conceptThreadNowMs")
-        from .concept_thread import prepare_concept_thread_matcher
+@dataclass(frozen=True)
+class QuestionOrderContext:
+    bulk: Mapping[str, Any]
+    vector_rank: dict[str, int] | None
+    exam_scores: Mapping[str, float]
+    max_rank_move: float
+    current_teaching_week: int | None
+    topic_teaching_weeks: Mapping[str, int] | None
+    topic_recency_days: Mapping[str, float] | None
 
-        bulk = {**bulk, "conceptThreadMatcher": prepare_concept_thread_matcher(concept_thread_anchors, now_ms)}
+
+def _prepared_question_bulk(bulk: Mapping[str, Any], anchors: list[Any] | None) -> Mapping[str, Any]:
+    if not anchors or bulk.get("conceptThreadMatcher"):
+        return bulk
+    now_ms = bulk.get("conceptThreadNowMs")
+    if now_ms is None:
+        raise UnsupportedSchedulerInput("raw concept-thread anchors require a prepared matcher or conceptThreadNowMs")
+    from .concept_thread import prepare_concept_thread_matcher
+
+    return {**bulk, "conceptThreadMatcher": prepare_concept_thread_matcher(anchors, now_ms)}
+
+
+def _question_order_context(query: QuestionPoolQuery, bulk: Mapping[str, Any]) -> QuestionOrderContext:
+    options = query.options
+    return QuestionOrderContext(
+        bulk=bulk,
+        vector_rank=build_rank_from_scores(bulk["questionScores"].get(query.concept_id), 200),
+        exam_scores=options.exam_target_scores if options.exam_target_scores is not None else bulk["questionExamRelevance"],
+        max_rank_move=EXAM_RELEVANCE_BOOST_FACTOR if options.exam_target_max_rank_move is None else options.exam_target_max_rank_move,
+        current_teaching_week=options.current_teaching_week,
+        topic_teaching_weeks=options.topic_teaching_weeks,
+        topic_recency_days=options.topic_recency_days,
+    )
+
+
+def _question_pacing(context: QuestionOrderContext, row: Mapping[str, Any]) -> float:
+    week = item_teaching_week(context.bulk["rotation"], None, row["topics"], context.topic_teaching_weeks)
+    return curriculum_pacing_boost(week, context.current_teaching_week) + min(
+        curriculum_recency_boost(week, context.current_teaching_week),
+        dated_topic_recency_boost(row["topics"], context.topic_recency_days),
+    )
+
+
+def _nudge_questions(context: QuestionOrderContext, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return apply_bounded_exam_target_nudge(rows, lambda candidate: context.exam_scores.get(candidate["id"]), context.max_rank_move)
+
+
+def _questions_by_vector(context: QuestionOrderContext, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    by_pacing = sorted(rows, key=lambda row: _question_pacing(context, row))
+    if context.vector_rank is None or len(rows) <= 1:
+        return _nudge_questions(context, by_pacing)
+    ranked = [
+        (context.vector_rank[row["id"]] + _question_pacing(context, row), row)
+        for row in rows if row["id"] in context.vector_rank
+    ]
+    ranked.sort(key=lambda pair: pair[0])
+    unranked = sorted((row for row in rows if row["id"] not in context.vector_rank), key=lambda row: _question_pacing(context, row))
+    return _nudge_questions(context, [row for _, row in ranked]) + _nudge_questions(context, unranked)
+
+
+def _ordered_question_rows(context: QuestionOrderContext, pools: tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]) -> list[dict[str, Any]]:
+    primary, linked, topic_matched = pools
+    ordered = _questions_by_vector(context, primary) + _questions_by_vector(context, linked) + _questions_by_vector(context, topic_matched)
+    return [row for row in ordered if row.get("source") == "bank"] + [row for row in ordered if row.get("source") != "bank"]
+
+
+def _effective_difficulty(row: Mapping[str, Any], review_challenge: int | None) -> str:
+    if review_challenge == 2 and row.get("difficulty") == "hard":
+        return "hard"
+    return get_effective_question_difficulty(row.get("difficulty"), row.get("facilityIndex"), row.get("totalAttempts"))
+
+
+def _group_questions_by_difficulty(rows: list[dict[str, Any]], review_challenge: int | None) -> dict[str, list[dict[str, Any]]]:
+    grouped: dict[str, list[dict[str, Any]]] = {difficulty: [] for difficulty in QUESTION_DIFFICULTIES}
+    for row in rows:
+        grouped[_effective_difficulty(row, review_challenge)].append(row)
+    return grouped
+
+
+def _format_seen(row: Mapping[str, Any], seen_formats: Any) -> bool:
+    return bool(row.get("format") and row["format"] in seen_formats)
+
+
+def _deprioritize_seen_formats(grouped: dict[str, list[dict[str, Any]]], seen_formats: Any) -> None:
+    if not seen_formats:
+        return
+    for difficulty, rows in grouped.items():
+        grouped[difficulty] = [row for row in rows if not _format_seen(row, seen_formats)] + [
+            row for row in rows if _format_seen(row, seen_formats)
+        ]
+
+
+def _apply_familiarity_order(grouped: dict[str, list[dict[str, Any]]], familiarity: Mapping[str, Any]) -> None:
+    if not familiarity:
+        return
+    for difficulty, rows in grouped.items():
+        fresh = partition_by_freshness(rows, lambda row: row["id"], familiarity)
+        grouped[difficulty] = prioritize_least_recently_served_contrast_siblings(fresh, lambda row: row["id"], familiarity)
+
+
+def _challenge_quality_rank(index: int, candidate: Mapping[str, Any], review_challenge: int) -> tuple[float, int, Mapping[str, Any]]:
+    quality = shrunk_facility(candidate.get("facilityIndex"), candidate.get("totalAttempts"))
+    adjustment = 0 if quality is None else 2 * review_challenge * (quality - 0.5)
+    return index + adjustment, index, candidate
+
+
+def _apply_challenge_quality_order(grouped: dict[str, list[dict[str, Any]]], familiarity: Mapping[str, Any], review_challenge: int | None) -> None:
+    if not review_challenge:
+        return
+    for difficulty, rows in grouped.items():
+        unseen = [row for row in rows if row["id"] not in familiarity]
+        preferred = sorted(
+            (_challenge_quality_rank(index, row, review_challenge) for index, row in enumerate(unseen)),
+            key=lambda row: (row[0], row[1]),
+        )
+        replacements = iter(preferred)
+        grouped[difficulty] = [row if row["id"] in familiarity else next(replacements)[2] for row in rows]
+
+
+def get_questions_from_bulk(query: QuestionPoolQuery) -> list[dict[str, Any]]:
+    concept_id, concept, limit = query.concept_id, query.concept, query.limit
+    bulk, options = query.bulk, query.options
+    selected_question_ids = options.selected_question_ids
+    selected_question_variant_groups = options.selected_question_variant_groups
+    difficulty_plan = options.difficulty_plan
+    recent_formats_by_concept = options.recent_formats_by_concept
+    concept_thread_anchors = options.concept_thread_anchors
+    mastered_reentry_counter = options.mastered_reentry_counter
+    review_challenge = options.review_challenge
+    review_challenge_gap = options.review_challenge_gap
+    challenge_slot_index = options.challenge_slot_index
+    bulk = _prepared_question_bulk(bulk, concept_thread_anchors)
     if not question_eligible_for_review_learning(
         review_challenge, demonstrated_gap=review_challenge_gap, difficulty="hard" if review_challenge == 2 else None
     ):
@@ -429,125 +589,146 @@ def get_questions_from_bulk(
     plan = build_difficulty_plan(difficulty_plan if difficulty_plan is not None else ["medium"], limit)
     endpoint_plan = build_difficulty_plan(["hard"], limit) if review_challenge == 2 else plan
     primary, linked, topic_matched = _question_pool(concept_id, concept, bulk, selected_question_ids)
-    vector_rank = build_rank_from_scores(bulk["questionScores"].get(concept_id), 200)
-    exam_scores = exam_target_scores if exam_target_scores is not None else bulk["questionExamRelevance"]
-    move = EXAM_RELEVANCE_BOOST_FACTOR if exam_target_max_rank_move is None else exam_target_max_rank_move
-
-    def q_pacing(row: Mapping[str, Any]) -> float:
-        week = item_teaching_week(bulk["rotation"], None, row["topics"], topic_teaching_weeks)
-        return curriculum_pacing_boost(week, current_teaching_week) + min(
-            curriculum_recency_boost(week, current_teaching_week),
-            dated_topic_recency_boost(row["topics"], topic_recency_days),
-        )
-
-    def nudge(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        return apply_bounded_exam_target_nudge(rows, lambda c: exam_scores.get(c["id"]), move)
-
-    def by_vector(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        by_pacing = sorted(rows, key=q_pacing)
-        if vector_rank is None or len(rows) <= 1:
-            return nudge(by_pacing)
-        ranked = [(vector_rank[q["id"]] + q_pacing(q), q) for q in rows if q["id"] in vector_rank]
-        ranked.sort(key=lambda r: r[0])
-        return nudge([q for _, q in ranked]) + nudge(sorted((q for q in rows if q["id"] not in vector_rank), key=q_pacing))
-
-    ordered = by_vector(primary) + by_vector(linked) + by_vector(topic_matched)
-    bank_preferred = [c for c in ordered if c.get("source") == "bank"] + [c for c in ordered if c.get("source") != "bank"]
-    by_difficulty: dict[str, list[dict[str, Any]]] = {d: [] for d in QUESTION_DIFFICULTIES}
-    for cand in bank_preferred:
-        if review_challenge == 2 and cand.get("difficulty") == "hard":
-            effective = "hard"
-        else:
-            effective = get_effective_question_difficulty(
-                cand.get("difficulty"), cand.get("facilityIndex"), cand.get("totalAttempts")
-            )
-        by_difficulty[effective].append(cand)
+    order_context = _question_order_context(query, bulk)
+    ordered = _ordered_question_rows(order_context, (primary, linked, topic_matched))
+    by_difficulty = _group_questions_by_difficulty(ordered, review_challenge)
 
     seen_formats = (recent_formats_by_concept or {}).get(concept_id)
-    if seen_formats:
-        for d, rows in by_difficulty.items():
-            by_difficulty[d] = [c for c in rows if not (c.get("format") and c["format"] in seen_formats)] + [
-                c for c in rows if c.get("format") and c["format"] in seen_formats
-            ]
+    _deprioritize_seen_formats(by_difficulty, seen_formats)
     thread_matches = find_thread_matches(by_difficulty, bulk.get("conceptThreadMatcher"), concept_id)
 
     familiarity = bulk["questionFamiliarity"]
-    if familiarity:
-        for d, rows in by_difficulty.items():
-            fresh = partition_by_freshness(rows, lambda c: c["id"], familiarity)
-            by_difficulty[d] = prioritize_least_recently_served_contrast_siblings(fresh, lambda c: c["id"], familiarity)
+    _apply_familiarity_order(by_difficulty, familiarity)
     promote_thread_matches(by_difficulty, thread_matches, familiarity)
-    if review_challenge:
-        for d, rows in by_difficulty.items():
-            unseen = [c for c in rows if c["id"] not in familiarity]
-            pref = []
-            for index, cand in enumerate(unseen):
-                quality = shrunk_facility(cand.get("facilityIndex"), cand.get("totalAttempts"))
-                pref.append((index + (0 if quality is None else 2 * review_challenge * (quality - 0.5)), index, cand))
-            pref.sort(key=lambda r: (r[0], r[1]))
-            it = iter(pref)
-            by_difficulty[d] = [c if c["id"] in familiarity else next(it)[2] for c in rows]
-    selected = _take_questions(
-        by_difficulty, endpoint_plan, limit, familiarity, selected_question_ids, selected_question_variant_groups,
-        mastered_reentry_counter, review_challenge, challenge_slot_index, thread_matches,
+    _apply_challenge_quality_order(by_difficulty, familiarity, review_challenge)
+    take_request = QuestionTakeRequest(
+        by_difficulty=by_difficulty, endpoint_plan=endpoint_plan, limit=limit, familiarity=familiarity,
+        selected_ids=selected_question_ids, selected_groups=selected_question_variant_groups,
+        counter=mastered_reentry_counter, level=review_challenge, slot=challenge_slot_index,
+        thread_matches=thread_matches,
     )
+    selected = _take_questions(take_request)
     return attach_thread_matches(selected, thread_matches)
 
 
-def _take_questions(by_difficulty, endpoint_plan, limit, familiarity, selected_ids, selected_groups, counter, level, slot, thread_matches=None):
-    def take_next(difficulty: str, unseen_only: bool = False) -> dict[str, Any] | None:
-        rows = by_difficulty.get(difficulty)
-        if not rows:
-            return None
+@dataclass(frozen=True)
+class QuestionTakeRequest:
+    by_difficulty: dict[str, list[dict[str, Any]]]
+    endpoint_plan: list[str]
+    limit: int
+    familiarity: Mapping[str, Any]
+    selected_ids: AbstractSet[str]
+    selected_groups: AbstractSet[str]
+    counter: dict[str, int] | None
+    level: int | None
+    slot: int
+    thread_matches: Mapping[str, Any] | None = None
+
+
+class _QuestionTaker:
+    def __init__(self, request: QuestionTakeRequest) -> None:
+        self.request = request
+        self.selected: list[dict[str, Any]] = []
+        self.selected_ids = set(request.selected_ids)
+        self.selected_groups = set(request.selected_groups)
+
+    def rows(self, difficulty: str) -> list[dict[str, Any]]:
+        return self.request.by_difficulty.get(difficulty) or []
+
+    @staticmethod
+    def _candidate_index(rows: list[dict[str, Any]], familiarity: Mapping[str, Any], unseen_only: bool) -> int:
+        if not unseen_only:
+            return 0
+        return next((index for index, candidate in enumerate(rows) if candidate["id"] not in familiarity), -1)
+
+    def _blocked(self, candidate: Mapping[str, Any]) -> bool:
+        if candidate["id"] in self.selected_ids:
+            return True
+        key = _suppression_key(candidate)
+        if key and key in self.selected_groups:
+            return True
+        counter = self.request.counter
+        return counter is not None and not take_with_reentry_cap(candidate["id"], self.request.familiarity, counter)
+
+    @staticmethod
+    def _record_reservation(reservations: AbstractSet[str], value: str) -> None:
+        if isinstance(reservations, set):
+            reservations.add(value)
+
+    def _mark_selected(self, candidate: Mapping[str, Any]) -> dict[str, Any]:
+        item_id = candidate["id"]
+        self.selected_ids.add(item_id)
+        self._record_reservation(self.request.selected_ids, item_id)
+        key = _suppression_key(candidate)
+        if key:
+            self.selected_groups.add(key)
+            self._record_reservation(self.request.selected_groups, key)
+        return {
+            "id": candidate["id"], "variantGroupId": candidate.get("variantGroupId"),
+            "variantType": candidate.get("variantType"),
+        }
+
+    def take_next(self, difficulty: str, unseen_only: bool = False) -> dict[str, Any] | None:
+        rows = self.rows(difficulty)
         while rows:
-            if unseen_only:
-                idx = next((k for k, c in enumerate(rows) if c["id"] not in familiarity), -1)
-                if idx < 0:
-                    break
-            else:
-                idx = 0
-            cand = rows.pop(idx)
-            if cand["id"] in selected_ids:
+            index = self._candidate_index(rows, self.request.familiarity, unseen_only)
+            if index < 0:
+                break
+            candidate = rows.pop(index)
+            if self._blocked(candidate):
                 continue
-            key = _suppression_key(cand)
-            if key and key in selected_groups:
-                continue
-            if counter is not None and not take_with_reentry_cap(cand["id"], familiarity, counter):
-                continue
-            selected_ids.add(cand["id"])
-            if key:
-                selected_groups.add(key)
-            return {"id": cand["id"], "variantGroupId": cand.get("variantGroupId"), "variantType": cand.get("variantType")}
+            return self._mark_selected(candidate)
         return None
 
-    selected: list[dict[str, Any]] = []
-    for difficulty in endpoint_plan:
-        if len(selected) >= limit:
-            break
-        baseline = next((
-            c for c in by_difficulty.get(difficulty, [])
-            if c["id"] not in selected_ids and not ((g := _suppression_key(c)) and g in selected_groups)
-        ), None)
-        shifted = shift_question_difficulty(difficulty, level or 0, slot + len(selected))
-        may_shift = (
-            baseline is not None and baseline["id"] not in familiarity
-            and baseline["id"] not in (thread_matches or {})
+    def baseline(self, difficulty: str) -> dict[str, Any] | None:
+        return next((candidate for candidate in self.rows(difficulty) if not self._already_reserved(candidate)), None)
+
+    def _already_reserved(self, candidate: Mapping[str, Any]) -> bool:
+        key = _suppression_key(candidate)
+        return candidate["id"] in self.selected_ids or bool(key and key in self.selected_groups)
+
+    def _may_shift(self, baseline: dict[str, Any] | None) -> bool:
+        return (
+            baseline is not None and baseline["id"] not in self.request.familiarity
+            and baseline["id"] not in (self.request.thread_matches or {})
         )
+
+    def _pick_planned(self, difficulty: str) -> dict[str, Any] | None:
+        level = self.request.level
+        shifted = shift_question_difficulty(difficulty, level or 0, self.request.slot + len(self.selected))
         if level == 2:
-            picked = take_next(shifted, True) or take_next(shifted)
-        elif may_shift and shifted != difficulty:
-            picked = take_next(shifted, True) or take_next(difficulty)
-        else:
-            picked = take_next(difficulty)
-        if picked:
-            selected.append(picked)
-    if len(selected) < limit:
-        for difficulty in (["hard"] if level == 2 else ["easy", "medium", "hard"]):
-            while len(selected) < limit:
-                picked = take_next(difficulty)
+            return self.take_next(shifted, True) or self.take_next(shifted)
+        if self._may_shift(self.baseline(difficulty)) and shifted != difficulty:
+            return self.take_next(shifted, True) or self.take_next(difficulty)
+        return self.take_next(difficulty)
+
+    def take_planned(self) -> None:
+        for difficulty in self.request.endpoint_plan:
+            if len(self.selected) >= self.request.limit:
+                break
+            picked = self._pick_planned(difficulty)
+            if picked:
+                self.selected.append(picked)
+
+    def fallback_difficulties(self) -> list[str]:
+        return ["hard"] if self.request.level == 2 else ["easy", "medium", "hard"]
+
+    def take_fallback(self) -> None:
+        for difficulty in self.fallback_difficulties():
+            while len(self.selected) < self.request.limit:
+                picked = self.take_next(difficulty)
                 if not picked:
                     break
-                selected.append(picked)
-            if len(selected) >= limit:
+                self.selected.append(picked)
+            if len(self.selected) >= self.request.limit:
                 break
-    return selected
+
+    def take(self) -> list[dict[str, Any]]:
+        self.take_planned()
+        if len(self.selected) < self.request.limit:
+            self.take_fallback()
+        return self.selected
+
+
+def _take_questions(request: QuestionTakeRequest):
+    return _QuestionTaker(request).take()

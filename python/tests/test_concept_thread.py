@@ -13,7 +13,7 @@ from ebbifold.scheduler.concept_thread import (
     prepare_concept_thread_matcher,
 )
 from ebbifold.scheduler.pipeline import run_session
-from ebbifold.scheduler.ranking import get_questions_from_bulk
+from ebbifold.scheduler.ranking import QuestionPoolQuery, QuestionRankingOptions, get_questions_from_bulk
 
 SESSIONS = json.loads((Path(__file__).parent / "fixtures" / "unified-scheduler-session.cases.json").read_text(encoding="utf-8"))["sessions"]
 
@@ -32,6 +32,10 @@ def _anchor(now_ms: int) -> dict:
         "anchorEventId": "event-anchor", "answeredAtMs": now_ms - CONCEPT_THREAD_NATURAL_BREAK_MS,
         "interveningExposures": 0,
     }
+
+
+def _question_query(concept: dict, bulk: dict, **overrides) -> QuestionPoolQuery:
+    return QuestionPoolQuery("c-renal", concept, 1, bulk, QuestionRankingOptions(**overrides))
 
 
 def test_concept_thread_matcher_requires_different_facet_and_shared_specific_topic() -> None:
@@ -73,11 +77,11 @@ def test_concept_thread_reserves_inside_existing_freshness_tier() -> None:
     bulk["questionMap"] = {q["id"]: q for q in bulk["rotationQuestions"]}
     bulk["conceptThreadMatcher"] = prepare_concept_thread_matcher([_anchor(now)], now)
     concept = {"topics": ["Renal Tubular Acidosis"]}
-    picked = get_questions_from_bulk(
-        "c-renal", concept, 1, bulk, selected_question_ids=set(), selected_question_variant_groups=set(),
-    )
+    query = _question_query(concept, bulk)
+    picked = get_questions_from_bulk(query)
     assert picked[0]["id"] == "followup"
     assert picked[0]["conceptThreadMatch"]["anchorEventId"] == "event-anchor"
+    assert [row["id"] for row in get_questions_from_bulk(query)] == [row["id"] for row in picked]
     assert all("_conceptThreadMatch" not in row for row in bulk["rotationQuestions"])
 
 
@@ -99,16 +103,10 @@ def test_concept_thread_match_blocks_review_challenge_difficulty_shift() -> None
     }
     concept = {"topics": ["Renal Tubular Acidosis"]}
     matched_bulk = {**bulk, "conceptThreadMatcher": prepare_concept_thread_matcher([_anchor(now)], now)}
-    matched = get_questions_from_bulk(
-        "c-renal", concept, 1, matched_bulk, selected_question_ids=set(), selected_question_variant_groups=set(),
-        review_challenge=1, challenge_slot_index=2,
-    )
+    matched = get_questions_from_bulk(_question_query(concept, matched_bulk, review_challenge=1, challenge_slot_index=2))
     assert [row["id"] for row in matched] == ["followup"]
 
-    unmatched = get_questions_from_bulk(
-        "c-renal", concept, 1, bulk, selected_question_ids=set(), selected_question_variant_groups=set(),
-        review_challenge=1, challenge_slot_index=2,
-    )
+    unmatched = get_questions_from_bulk(_question_query(concept, bulk, review_challenge=1, challenge_slot_index=2))
     assert [row["id"] for row in unmatched] == ["shifted-hard"]
 
 

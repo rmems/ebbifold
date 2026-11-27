@@ -14,7 +14,7 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from .build_state import SessionBuildState
+from .build_state import SessionBuildConfig, SessionBuildState
 from .concepts import (
     ConceptState,
     _json_number,
@@ -84,7 +84,7 @@ def _concept_state(raw: dict[str, Any]) -> ConceptState:
 def run_build_script(script: dict[str, Any]) -> dict[str, Any]:
     weak = [_concept_state(w) for w in script["weakConcepts"]]
     max_new = script.get("maxNewCards")
-    build = SessionBuildState(
+    build = SessionBuildState(SessionBuildConfig(
         size=script["size"],
         min_first_sight_items=script["minFirstSightItems"],
         max_new_cards=math.inf if max_new is None else max_new,
@@ -97,7 +97,7 @@ def run_build_script(script: dict[str, Any]) -> dict[str, Any]:
         excluded_question_ids=script.get("excludedQuestionIds", []),
         excluded_video_ids=script.get("excludedVideoIds", []),
         weak_concepts=weak,
-    )
+    ))
     results: list[dict[str, Any]] = []
     for op in script["ops"]:
         if op["op"] == "add":

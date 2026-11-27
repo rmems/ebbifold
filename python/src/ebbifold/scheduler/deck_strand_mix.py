@@ -2,7 +2,16 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, Callable
+
+
+@dataclass(frozen=True)
+class DeckStrandOrderOptions:
+    seed: str
+    identify: Callable[[dict[str, Any]], dict[str, Any]]
+    keep_with_previous: Callable[[dict[str, Any]], bool] | None = None
+    share_basis: str = "target"
 
 
 def hash_string(value: str) -> int:
@@ -70,67 +79,98 @@ def _present_counts(strands, units):
     return present
 
 
-def _choose_strand(strands, shares, emitted, total, available):
+@dataclass(frozen=True)
+class StrandChoiceRequest:
+    strands: list[dict[str, Any]]
+    shares: Callable[[str], float]
+    emitted: dict[str, int]
+    total: int
+    available: Callable[[str], bool]
+
+
+def _choose_strand(request: StrandChoiceRequest):
     best, best_score = None, float("-inf")
-    for strand in strands:
+    for strand in request.strands:
         sid = strand["id"]
-        if not available(sid):
+        if not request.available(sid):
             continue
-        score = shares(sid) * (total + 1) - emitted.get(sid, 0)
+        score = request.shares(sid) * (request.total + 1) - request.emitted.get(sid, 0)
         if score > best_score + 1e-9:
             best, best_score = sid, score
     return best
 
 
-def _apply_phase(strands, shares, emitted, seed):
-    total = 0
-    for _ in range(hash_string(f"{seed}\0deck-strand-phase") % 10):
-        strand = _choose_strand(strands, shares, emitted, total, lambda _sid: True)
+class _DeckStrandOrdering:
+    def __init__(self, items: list[dict[str, Any]], mix: dict[str, Any], options: DeckStrandOrderOptions) -> None:
+        self.items = items
+        self.mix = mix
+        self.options = options
+        self.strands = mix.get("strands") or []
+        self.units = _strand_units(items, mix, options.identify, options.keep_with_previous)
+        self.queues = _queues(self.strands, self.units)
+        self.present = _present_counts(self.strands, self.units)
+        self.emitted = {strand["id"]: 0 for strand in self.strands}
+        self.cursor = {strand["id"]: 0 for strand in self.strands}
+        self.total = 0
+        self.out: list[dict[str, Any]] = []
+
+    def has_multiple_strands(self) -> bool:
+        return sum(1 for queue in self.queues.values() if queue) >= 2
+
+    def share(self, sid: str) -> float:
+        if self.options.share_basis == "present":
+            return self.present.get(sid, 0) / len(self.items)
+        strand = next(s for s in self.strands if s["id"] == sid)
+        return float(strand.get("share") or 0)
+
+    def available(self, sid: str) -> bool:
+        return self.cursor.get(sid, 0) < len(self.queues.get(sid, []))
+
+    def choose(self, available=None) -> str | None:
+        request = StrandChoiceRequest(
+            self.strands, self.share, self.emitted, self.total, available or (lambda _sid: True),
+        )
+        return _choose_strand(request)
+
+    def apply_seed_phase(self) -> None:
+        for _ in range(hash_string(f"{self.options.seed}\0deck-strand-phase") % 10):
+            strand = self.choose()
+            if strand is None:
+                break
+            self.emitted[strand] = self.emitted.get(strand, 0) + 1
+            self.total += 1
+
+    def emit_unit(self, unit: dict[str, Any]) -> None:
+        for item in unit["items"]:
+            self.out.append(item)
+            item_strand = deck_strand_of(self.mix, self.options.identify(item))
+            self.emitted[item_strand] = self.emitted.get(item_strand, 0) + 1
+            self.total += 1
+
+    def emit_next(self) -> bool:
+        strand = self.choose(self.available)
         if strand is None:
-            break
-        emitted[strand] = emitted.get(strand, 0) + 1
-        total += 1
-    return total
+            return False
+        position = self.cursor.get(strand, 0)
+        self.cursor[strand] = position + 1
+        self.emit_unit(self.queues[strand][position])
+        return True
+
+    def run(self) -> list[dict[str, Any]]:
+        self.apply_seed_phase()
+        while len(self.out) < len(self.items):
+            if not self.emit_next():
+                break
+        return self.out
 
 
 def order_by_deck_strands(
-    items: list[dict[str, Any]], mix: dict[str, Any] | None, *, seed: str,
-    identify: Callable[[dict[str, Any]], dict[str, Any]],
-    keep_with_previous: Callable[[dict[str, Any]], bool] | None = None,
-    share_basis: str = "target",
+    items: list[dict[str, Any]], mix: dict[str, Any] | None, options: DeckStrandOrderOptions,
 ) -> list[dict[str, Any]]:
     strands = (mix or {}).get("strands") or []
     if len(items) < 2 or not strands:
         return items
-    units = _strand_units(items, mix, identify, keep_with_previous)
-    queues = _queues(strands, units)
-    if sum(1 for queue in queues.values() if queue) < 2:
+    ordering = _DeckStrandOrdering(items, mix or {}, options)
+    if not ordering.has_multiple_strands():
         return items
-    present = _present_counts(strands, units)
-    emitted = {strand["id"]: 0 for strand in strands}
-
-    def shares(sid: str) -> float:
-        if share_basis == "present":
-            return present.get(sid, 0) / len(items)
-        strand = next(s for s in strands if s["id"] == sid)
-        return float(strand.get("share") or 0)
-
-    total = _apply_phase(strands, shares, emitted, seed)
-    out: list[dict[str, Any]] = []
-    cursor = {strand["id"]: 0 for strand in strands}
-    def available(sid: str) -> bool:
-        return cursor.get(sid, 0) < len(queues.get(sid, []))
-
-    while len(out) < len(items):
-        strand = _choose_strand(strands, shares, emitted, total, available)
-        if strand is None:
-            break
-        pos = cursor.get(strand, 0)
-        unit = queues[strand][pos]
-        cursor[strand] = pos + 1
-        for item in unit["items"]:
-            out.append(item)
-            item_strand = deck_strand_of(mix, identify(item))
-            emitted[item_strand] = emitted.get(item_strand, 0) + 1
-            total += 1
-    return out
+    return ordering.run()

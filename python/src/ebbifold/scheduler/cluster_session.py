@@ -10,14 +10,15 @@ are rejected."""
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 from typing import Any
 
 from .build_state import TEACHING_ARC_TARGET_ITEMS, question_suppression_key
 from .cluster_card_selection import select_cluster_cards
 from .cluster_eligibility import eligible_rows, restricted
-from .deck_strand_mix import order_by_deck_strands
+from .deck_strand_mix import DeckStrandOrderOptions, order_by_deck_strands
 from .lane_utils import thread_trace
-from .prep_allocation import order_session_prep_candidates
+from .prep_allocation import PrepOrderOptions, order_session_prep_candidates
 from .queue import break_modality_runs, compute_concept_pairing_rate, order_by_manifold_walk
 from .scoring import classify_teaching_state, enforce_concept_teaching_caps
 
@@ -83,12 +84,19 @@ def _cluster_pairing_limit(items: list[dict[str, Any]]) -> int:
     return max(2, min(max(2, sum(1 for i in items if _cluster_anchor(i))), max(2, len(items) // 3)))
 
 
+@dataclass
+class ClusterScaffoldFilter:
+    used: set[str]
+    present: set[str]
+    groups: set[str]
+
+
 def _cluster_scaffold_candidate(
-    candidates: list[dict[str, Any]], used: set[str], present: set[str], groups: set[str], anchor: dict[str, Any]
+    filter_state: ClusterScaffoldFilter, candidates: list[dict[str, Any]], anchor: dict[str, Any]
 ) -> dict[str, Any] | None:
     return next(
-        (c for c in candidates if c["id"] not in used and c["id"] not in present
-         and (not c.get("variantGroupId") or c["variantGroupId"] not in groups)
+        (c for c in candidates if c["id"] not in filter_state.used and c["id"] not in filter_state.present
+         and (not c.get("variantGroupId") or c["variantGroupId"] not in filter_state.groups)
          and c.get("clusterId") is not None and c["clusterId"] == anchor["clusterId"]),
         None,
     )
@@ -111,37 +119,57 @@ def _insert_after_positions(items: list[dict[str, Any]], inserts: dict[int, dict
     return out
 
 
-def _cluster_scaffolds(items: list[dict[str, Any]], pool: list[dict[str, Any]], rotation: str, seed: str,
-                       max_pairings: int | None) -> list[dict[str, Any]]:
+@dataclass(frozen=True)
+class ClusterScaffoldOptions:
+    rotation: str
+    seed: str
+    max_pairings: int | None
+
+
+def _cluster_scaffold_filter(items: list[dict[str, Any]]) -> ClusterScaffoldFilter:
+    return ClusterScaffoldFilter(
+        used=set(), present={item["id"] for item in items},
+        groups={item["variantGroupId"] for item in items if item["type"] == "card" and item.get("variantGroupId")},
+    )
+
+
+def _next_item_is_scaffold(items: list[dict[str, Any]], index: int) -> bool:
+    next_item = items[index + 1] if index + 1 < len(items) else None
+    return bool(next_item and next_item["type"] == "card" and next_item.get("complexity") == 1)
+
+
+def _record_scaffold_pick(filter_state: ClusterScaffoldFilter, card: dict[str, Any]) -> None:
+    filter_state.used.add(card["id"])
+    if card.get("variantGroupId"):
+        filter_state.groups.add(card["variantGroupId"])
+
+
+def _cluster_scaffolds(
+    items: list[dict[str, Any]], pool: list[dict[str, Any]], options: ClusterScaffoldOptions,
+) -> list[dict[str, Any]]:
     from .queue import shuffle_with_seed
 
+    max_pairings = options.max_pairings
     if max_pairings is None:
         max_pairings = _cluster_pairing_limit(items)
     if max_pairings <= 0 or not items or not pool:
         return items
-    scaffolds = [c for c in pool if c.get("complexity") == 1]
+    scaffolds = [card for card in pool if card.get("complexity") == 1]
     if not scaffolds:
         return items
-    candidates = shuffle_with_seed(scaffolds, seed)
-    used: set[str] = set()
-    present = {i["id"] for i in items}
-    groups = {i["variantGroupId"] for i in items if i["type"] == "card" and i.get("variantGroupId")}
+    candidates = shuffle_with_seed(scaffolds, options.seed)
+    filter_state = _cluster_scaffold_filter(items)
     inserts: dict[int, dict[str, Any]] = {}
-    for idx, it in enumerate(items):
+    for index, item in enumerate(items):
         if len(inserts) >= max_pairings:
             break
-        if not _cluster_anchor(it):
+        if not _cluster_anchor(item) or _next_item_is_scaffold(items, index):
             continue
-        nxt = items[idx + 1] if idx + 1 < len(items) else None
-        if nxt and nxt["type"] == "card" and nxt.get("complexity") == 1:
-            continue
-        card = _cluster_scaffold_candidate(candidates, used, present, groups, it)
+        card = _cluster_scaffold_candidate(filter_state, candidates, item)
         if card is None:
             continue
-        used.add(card["id"])
-        if card.get("variantGroupId"):
-            groups.add(card["variantGroupId"])
-        inserts[idx] = _cluster_scaffold_item(it, card, rotation)
+        _record_scaffold_pick(filter_state, card)
+        inserts[index] = _cluster_scaffold_item(item, card, options.rotation)
     if not inserts:
         return items
     return _insert_after_positions(items, inserts)
@@ -193,29 +221,50 @@ def _remove_non_first_sight(reconciled: list[dict[str, Any]], keys: set[tuple[st
     return True
 
 
-def _reconcile_first_sight_quota(
-    reconciled: list[dict[str, Any]], quota_candidates: list[dict[str, Any]], required: int, size: int,
+@dataclass(frozen=True)
+class FirstSightQuotaRule:
+    required: int
+    size: int
     caps: dict[str, int]
+
+
+def _concept_counts(items: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for item in items:
+        counts[item["conceptId"]] = counts.get(item["conceptId"], 0) + 1
+    return counts
+
+
+def _quota_candidate_allowed(candidate: dict[str, Any], key: tuple[str, str], state: dict[str, Any], rule: FirstSightQuotaRule) -> bool:
+    if not candidate["firstSightAtSelection"] or key in state["keys"]:
+        return False
+    return state["per_concept"].get(candidate["conceptId"], 0) < rule.caps.get(candidate["conceptId"], 3)
+
+
+def _add_quota_candidate(reconciled: list[dict[str, Any]], candidate: dict[str, Any], state: dict[str, Any]) -> None:
+    reconciled.append(candidate)
+    state["keys"].add((candidate["type"], candidate["id"]))
+    state["per_concept"][candidate["conceptId"]] = state["per_concept"].get(candidate["conceptId"], 0) + 1
+    state["first_sight"] += 1
+
+
+def _reconcile_first_sight_quota(
+    reconciled: list[dict[str, Any]], quota_candidates: list[dict[str, Any]], rule: FirstSightQuotaRule,
 ) -> None:
-    keys = {(i["type"], i["id"]) for i in reconciled}
-    per_concept: dict[str, int] = {}
-    for i in reconciled:
-        per_concept[i["conceptId"]] = per_concept.get(i["conceptId"], 0) + 1
-    fs = sum(1 for i in reconciled if i.get("firstSightAtSelection"))
-    for cand in quota_candidates:
-        if fs >= required:
+    state = {
+        "keys": {(item["type"], item["id"]) for item in reconciled},
+        "per_concept": _concept_counts(reconciled),
+        "first_sight": sum(1 for item in reconciled if item.get("firstSightAtSelection")),
+    }
+    for candidate in quota_candidates:
+        if state["first_sight"] >= rule.required:
             break
-        key = (cand["type"], cand["id"])
-        if not cand["firstSightAtSelection"] or key in keys:
+        key = (candidate["type"], candidate["id"])
+        if not _quota_candidate_allowed(candidate, key, state, rule):
             continue
-        if per_concept.get(cand["conceptId"], 0) >= caps.get(cand["conceptId"], 3):
-            continue
-        if len(reconciled) >= size and not _remove_non_first_sight(reconciled, keys, per_concept):
+        if len(reconciled) >= rule.size and not _remove_non_first_sight(reconciled, state["keys"], state["per_concept"]):
             break
-        reconciled.append(cand)
-        keys.add(key)
-        per_concept[cand["conceptId"]] = per_concept.get(cand["conceptId"], 0) + 1
-        fs += 1
+        _add_quota_candidate(reconciled, candidate, state)
 
 
 def _strand_identity_map(inputs: dict[str, Any]) -> dict[tuple[str, str], dict[str, Any]]:
@@ -241,56 +290,96 @@ def _order_cluster_strands(inputs: dict[str, Any], items: list[dict[str, Any]]) 
             "rotation": item.get("rotation") or inputs["rotation"], "sourceFile": None,
         }
 
-    return order_by_deck_strands(
-        items, mix, seed=inputs["servingRotationSeed"], identify=identify,
+    options = DeckStrandOrderOptions(
+        seed=inputs["servingRotationSeed"], identify=identify,
         keep_with_previous=lambda item: item.get("interventionReason") == "preemptive_scaffold",
         share_basis="present",
     )
+    return order_by_deck_strands(items, mix, options)
+
+
+def _cluster_scaffold_rows(inputs: dict[str, Any], ctx: dict[str, Any]) -> list[dict[str, Any]]:
+    if ctx["maxNew"] == 0:
+        return []
+    return [
+        row for row in eligible_rows(inputs, inputs.get("clusterScaffolds") or [])
+        if row["id"] not in ctx["selCards"] and row.get("clusterId") in ctx["selectedClusters"]
+    ]
+
+
+def _cluster_teaching_caps(states: list[dict[str, Any]]) -> dict[str, int]:
+    return {
+        state["clusterId"]: TEACHING_ARC_TARGET_ITEMS[
+            classify_teaching_state(state["cardsReviewed"], state["mastery"], state["mastery"])
+        ]
+        for state in states
+    }
+
+
+def _apply_cluster_caps_and_quota(inputs: dict[str, Any], ctx: dict[str, Any], paired: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    caps = _cluster_teaching_caps(ctx["states"])
+    prep_keys = set((inputs["options"].get("sessionPrepBlend") or {}).get("itemIds") or [])
+    reconciled = list(enforce_concept_teaching_caps(
+        paired, lambda concept_id: caps.get(concept_id, 3),
+        preserve=lambda item: f"{item['type']}:{item['id']}" in prep_keys,
+    ))
+    quota_rule = FirstSightQuotaRule(required=ctx["required"], size=ctx["size"], caps=caps)
+    _reconcile_first_sight_quota(reconciled, ctx["quotaCandidates"], quota_rule)
+    return reconciled
+
+
+def _tag_cluster_first_sight(items: list[dict[str, Any]], unseen_scaffolds: set[str]) -> list[dict[str, Any]]:
+    return [
+        {**item, "firstSightAtSelection": item["firstSightAtSelection"] if item.get("firstSightAtSelection") is not None
+         else item["id"] in unseen_scaffolds}
+        for item in items
+    ]
+
+
+def _order_cluster_prep(inputs: dict[str, Any], items: list[dict[str, Any]], size: int) -> list[dict[str, Any]]:
+    options = PrepOrderOptions(
+        size=size, key=lambda item: f"{item['type']}:{item['id']}",
+        protected=lambda item: item.get("interventionReason") in {"failure_escalation", "needs_retest"},
+    )
+    return order_session_prep_candidates(items, inputs["options"].get("sessionPrepBlend"), options)
+
+
+def _cluster_session_result(ctx: dict[str, Any], items: list[dict[str, Any]]) -> dict[str, Any]:
+    average = sum(item["priority"] for item in items) / len(items) if items else 0
+    return {
+        "items": items,
+        "noveltyQuota": {
+            "required": ctx["required"],
+            "selected": sum(1 for item in items if item["firstSightAtSelection"]),
+        },
+        "stats": {
+            "totalConcepts": len(ctx["states"]),
+            "weakConcepts": sum(1 for state in ctx["states"] if state["priority"] > 0),
+            "selectedConcepts": len(ctx["selectedClusters"]),
+            "cardCount": sum(1 for item in items if item["type"] == "card"),
+            "questionCount": sum(1 for item in items if item["type"] == "question"),
+            "averagePriority": math.floor(average * 1000 + 0.5) / 1000,
+            "conceptPairingRate": compute_concept_pairing_rate(items),
+        },
+    }
 
 
 def _finish_cluster_session(inputs: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
     items, required, size = ctx["items"], ctx["required"], ctx["size"]
     first_sight_q: set[str] = set()
     _append_cluster_questions(inputs, ctx, first_sight_q)
-    quota_candidates = list(items)
+    ctx["quotaCandidates"] = list(items)
     _trim_to_first_sight_quota(items, required, size)
     ordered = order_by_manifold_walk(items, inputs.get("itemEmbeddings") or {})
-    scaffolds = [] if ctx["maxNew"] == 0 else [
-        c for c in eligible_rows(inputs, inputs.get("clusterScaffolds") or [])
-        if c["id"] not in ctx["selCards"] and c.get("clusterId") in ctx["selectedClusters"]
-    ]
-    paired = _cluster_scaffolds(
-        ordered, scaffolds, inputs["rotation"], inputs["servingRotationSeed"], 0 if ctx["maxNew"] == 0 else None
+    scaffolds = _cluster_scaffold_rows(inputs, ctx)
+    scaffold_options = ClusterScaffoldOptions(
+        rotation=inputs["rotation"], seed=inputs["servingRotationSeed"],
+        max_pairings=0 if ctx["maxNew"] == 0 else None,
     )
+    paired = _cluster_scaffolds(ordered, scaffolds, scaffold_options)
     _copy_scaffold_metadata(paired, scaffolds)
-    caps = {
-        s["clusterId"]: TEACHING_ARC_TARGET_ITEMS[classify_teaching_state(s["cardsReviewed"], s["mastery"], s["mastery"])]
-        for s in ctx["states"]
-    }
-    prep_keys = set((inputs["options"].get("sessionPrepBlend") or {}).get("itemIds") or [])
-    reconciled = list(enforce_concept_teaching_caps(
-        paired, lambda cid: caps.get(cid, 3),
-        preserve=lambda item: f"{item['type']}:{item['id']}" in prep_keys,
-    ))
-    _reconcile_first_sight_quota(reconciled, quota_candidates, required, size, caps)
+    reconciled = _apply_cluster_caps_and_quota(inputs, ctx, paired)
     final = break_modality_runs(_order_cluster_strands(inputs, reconciled))
-    unseen_scaffolds = {c["id"] for c in scaffolds}
-    tagged = [
-        {**i, "firstSightAtSelection": i["firstSightAtSelection"] if i.get("firstSightAtSelection") is not None
-         else i["id"] in unseen_scaffolds}
-        for i in final
-    ]
-    tagged = order_session_prep_candidates(
-        tagged, inputs["options"].get("sessionPrepBlend"), size=size,
-        key=lambda item: f"{item['type']}:{item['id']}",
-        protected=lambda item: item.get("interventionReason") in {"failure_escalation", "needs_retest"},
-    )
-    avg = sum(i["priority"] for i in tagged) / len(tagged) if tagged else 0
-    return {"items": tagged, "noveltyQuota": {"required": required,
-                                              "selected": sum(1 for i in tagged if i["firstSightAtSelection"])},
-            "stats": {"totalConcepts": len(ctx["states"]), "weakConcepts": sum(1 for s in ctx["states"] if s["priority"] > 0),
-                      "selectedConcepts": len(ctx["selectedClusters"]),
-                      "cardCount": sum(1 for i in tagged if i["type"] == "card"),
-                      "questionCount": sum(1 for i in tagged if i["type"] == "question"),
-                      "averagePriority": math.floor(avg * 1000 + 0.5) / 1000,
-                      "conceptPairingRate": compute_concept_pairing_rate(tagged)}}
+    tagged = _tag_cluster_first_sight(final, {row["id"] for row in scaffolds})
+    tagged = _order_cluster_prep(inputs, tagged, size)
+    return _cluster_session_result(ctx, tagged)

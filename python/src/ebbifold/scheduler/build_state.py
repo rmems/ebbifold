@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass
 from typing import Any
 
 from .errors import UnsupportedSchedulerInput
@@ -41,25 +42,40 @@ def question_suppression_key(item: Mapping[str, Any]) -> str | None:
     return group if variant_type in SUPPRESSIBLE_VARIANT_TYPES else None
 
 
+@dataclass(frozen=True)
+class SessionBuildConfig:
+    size: int
+    min_first_sight_items: int
+    max_new_cards: float
+    max_cross_source_items: int
+    unseen_card_ids: Iterable[str]
+    cross_source_card_ids: Iterable[str] = ()
+    cross_source_question_ids: Iterable[str] = ()
+    question_familiarity: Iterable[str] = ()
+    excluded_card_ids: Iterable[str] = ()
+    excluded_question_ids: Iterable[str] = ()
+    excluded_video_ids: Iterable[str] = ()
+    weak_concepts: Sequence[Any] = ()
+    concept_thread_anchors: Sequence[Any] = ()
+
+
 class SessionBuildState:
-    def __init__(
-        self,
-        *,
-        size: int,
-        min_first_sight_items: int,
-        max_new_cards: float,
-        max_cross_source_items: int,
-        unseen_card_ids: Iterable[str],
-        cross_source_card_ids: Iterable[str] = (),
-        cross_source_question_ids: Iterable[str] = (),
-        question_familiarity: Iterable[str] = (),
-        excluded_card_ids: Iterable[str] = (),
-        excluded_question_ids: Iterable[str] = (),
-        excluded_video_ids: Iterable[str] = (),
-        weak_concepts: Sequence[Any] = (),
-        concept_thread_anchors: Sequence[Any] = (),
-    ) -> None:
+    def __init__(self, config: SessionBuildConfig) -> None:
         from .concept_thread import prepare_concept_thread_matcher
+
+        size = config.size
+        min_first_sight_items = config.min_first_sight_items
+        max_new_cards = config.max_new_cards
+        max_cross_source_items = config.max_cross_source_items
+        unseen_card_ids = config.unseen_card_ids
+        cross_source_card_ids = config.cross_source_card_ids
+        cross_source_question_ids = config.cross_source_question_ids
+        question_familiarity = config.question_familiarity
+        excluded_card_ids = config.excluded_card_ids
+        excluded_question_ids = config.excluded_question_ids
+        excluded_video_ids = config.excluded_video_ids
+        weak_concepts = config.weak_concepts
+        concept_thread_anchors = config.concept_thread_anchors
 
         self.size = size
         self.min_first_sight_items = min_first_sight_items
@@ -224,15 +240,19 @@ class SessionBuildState:
             self._reject("pick", cid, reason)
         return None
 
+    def _release_deferred_item(self, item: dict[str, Any]) -> None:
+        is_thread_followup = item.get("interventionReason") == "concept_followup"
+        if is_thread_followup and self.concept_thread_followup_selected:
+            return
+        if self.add_item(item) and is_thread_followup:
+            self.concept_thread_followup_selected = True
+
     def release_first_sight_reservation(self) -> None:
         """Phase 8d (releaseFirstSightReservation): backfill with deferred review work."""
-        if len(self.selected_items) < self.size and self.deferred_for_novelty:
-            self.enforce_first_sight_reservation = False
-            for item in list(self.deferred_for_novelty.values()):
-                if len(self.selected_items) >= self.size:
-                    break
-                is_thread_followup = item.get("interventionReason") == "concept_followup"
-                if is_thread_followup and self.concept_thread_followup_selected:
-                    continue
-                if self.add_item(item) and is_thread_followup:
-                    self.concept_thread_followup_selected = True
+        if len(self.selected_items) >= self.size or not self.deferred_for_novelty:
+            return
+        self.enforce_first_sight_reservation = False
+        for item in list(self.deferred_for_novelty.values()):
+            if len(self.selected_items) >= self.size:
+                break
+            self._release_deferred_item(item)

@@ -8,11 +8,12 @@ snapshot adapters.
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 from typing import Any
 
 from .build_state import SessionBuildState
 from .config import DEFAULTS
-from .ranking import get_videos_from_bulk
+from .ranking import VideoPoolQuery, get_videos_from_bulk
 from .scoring import classify_teaching_state
 from .simulation import prefer_reviewed_simulation_cards
 from .lane_utils import (
@@ -54,7 +55,8 @@ def pre_teach_videos(inputs: dict[str, Any], plan: dict[str, Any], build: Sessio
         data = inputs["conceptMap"].get(concept.conceptId)
         if not data:
             continue
-        videos = get_videos_from_bulk(concept.conceptId, data, 1, inputs["bulk"], build.selected_video_ids)
+        video_query = VideoPoolQuery(concept.conceptId, data, 1, inputs["bulk"], build.selected_video_ids)
+        videos = get_videos_from_bulk(video_query)
         if videos:
             v = videos[0]
             item = {"type": "video", "id": v["id"], "conceptId": concept.conceptId, "conceptName": concept.conceptName,
@@ -74,28 +76,36 @@ def _topics_overlap(a: list[str] | None, b: list[str]) -> bool:
     return any(t.lower() in lower for t in a)
 
 
-def pick_naive_pre_teach_cards(naive: list[dict[str, Any]], bulk: dict[str, Any], max_pre_teach: float,
-                               already: set[str], prefer_card: Any = None) -> list[dict[str, Any]]:
-    if max_pre_teach <= 0 or not naive or not bulk["unseenCards"]:
+@dataclass(frozen=True)
+class NaivePreTeachRequest:
+    naive: list[dict[str, Any]]
+    bulk: dict[str, Any]
+    max_pre_teach: float
+    already: set[str]
+    prefer_card: Any = None
+
+
+def pick_naive_pre_teach_cards(request: NaivePreTeachRequest) -> list[dict[str, Any]]:
+    if request.max_pre_teach <= 0 or not request.naive or not request.bulk["unseenCards"]:
         return []
-    used = set(already)
-    scaffolds = [c for c in bulk["unseenCards"] if c.get("complexity") == 1]
+    used = set(request.already)
+    scaffolds = [card for card in request.bulk["unseenCards"] if card.get("complexity") == 1]
     if not scaffolds:
         return []
-    ordered = sorted(naive, key=lambda c: (-c["priority"], c["conceptName"]))
-    if prefer_card is not None:
-        scaffolds.sort(key=lambda c: not prefer_card(c))
-        preferred = [c for c in scaffolds if c["id"] not in used and prefer_card(c)]
-        ordered.sort(key=lambda concept: not any(_topics_overlap(concept["topics"], c["topics"]) for c in preferred))
+    ordered = sorted(request.naive, key=lambda concept: (-concept["priority"], concept["conceptName"]))
+    if request.prefer_card is not None:
+        scaffolds.sort(key=lambda card: not request.prefer_card(card))
+        preferred = [card for card in scaffolds if card["id"] not in used and request.prefer_card(card)]
+        ordered.sort(key=lambda concept: not any(_topics_overlap(concept["topics"], card["topics"]) for card in preferred))
     picks: list[dict[str, Any]] = []
     for concept in ordered:
-        if len(picks) >= max_pre_teach:
+        if len(picks) >= request.max_pre_teach:
             break
-        card = next((c for c in scaffolds if c["id"] not in used and _topics_overlap(concept["topics"], c["topics"])), None)
+        card = next((row for row in scaffolds if row["id"] not in used and _topics_overlap(concept["topics"], row["topics"])), None)
         if card is None:
             continue
         used.add(card["id"])
-        picks.append({**{k: concept[k] for k in ("conceptId", "conceptName", "priority")}, "card": card})
+        picks.append({**{key: concept[key] for key in ("conceptId", "conceptName", "priority")}, "card": card})
     return picks
 
 
@@ -115,8 +125,10 @@ def pre_teach_naive_concepts(inputs: dict[str, Any], plan: dict[str, Any], build
         focus = inputs["options"].get("simulationFocus")
         registry = _simulation_registry(inputs)
         prefer = (lambda c: registry.evidence(c.get("stableId"), focus) is not None) if focus else None
-        picks = pick_naive_pre_teach_cards(naive, inputs["bulk"], min(3, target - build.selected_card_count, budget),
-                                           build.selected_card_ids, prefer)
+        naive_request = NaivePreTeachRequest(
+            naive, inputs["bulk"], min(3, target - build.selected_card_count, budget), build.selected_card_ids, prefer,
+        )
+        picks = pick_naive_pre_teach_cards(naive_request)
         for pick in picks:
             if build.selected_card_count >= target:
                 break
@@ -144,9 +156,62 @@ def fill_simulation_preparation(inputs: dict[str, Any], plan: dict[str, Any], bu
         }, bypass_novelty_reservation=True)
 
 
-def fill_questions(inputs: dict[str, Any], plan: dict[str, Any], build: SessionBuildState) -> None:
+def _question_base_reason(concept: Any) -> str:
+    if concept.intervention == "probe":
+        low = concept.confidence < DEFAULTS["confidence_threshold"] or concept.exposureCount < 3
+        return "low_confidence" if low else "needs_retest"
+    return "needs_retest" if concept.intervention == "remediate" else "reinforcement"
+
+
+def _question_capacity_available(build: SessionBuildState, concept: Any, allowed: int) -> bool:
+    already = build.questions_per_concept.get(concept.conceptId, 0)
+    return already < allowed and build.concept_items_so_far(concept.conceptId) < build.teaching_cap_for(concept.conceptId)
+
+
+def _question_item(concept: Any, question: dict[str, Any], reason: str) -> dict[str, Any]:
+    return {
+        "type": "question", "id": question["id"], "conceptId": concept.conceptId,
+        "conceptName": concept.conceptName, "priority": concept.priority,
+        **question_thread_fields(question, reason),
+        "variantGroupId": question.get("variantGroupId"), "variantType": question.get("variantType"),
+    }
+
+
+@dataclass(frozen=True)
+class QuestionFillRequest:
+    inputs: dict[str, Any]
+    plan: dict[str, Any]
+    build: SessionBuildState
+    concept: Any
+    allowed: int
+
+
+def _fill_concept_question(request: QuestionFillRequest) -> bool:
     from .difficulty import question_request_difficulty
 
+    inputs, plan, build, concept = request.inputs, request.plan, request.build, request.concept
+    if not _question_capacity_available(build, concept, request.allowed):
+        return False
+    data = inputs["conceptMap"].get(concept.conceptId)
+    if not data:
+        return False
+    base = _question_base_reason(concept)
+    reason = resolve_reason(ReasonRequest(inputs, plan, concept.conceptId, concept.recallOnExamDay, base))
+    already = build.questions_per_concept.get(concept.conceptId, 0)
+    difficulty = question_request_difficulty(inputs["examPressure"], base, already)
+    questions = question_pool(QuestionPoolRequest(
+        inputs, build, concept.conceptId, data, difficulty, build.selected_question_count,
+        reason != "failure_escalation",
+    ))
+    if not questions:
+        return False
+    question = questions[0]
+    added = build.add_item(_question_item(concept, question, reason))
+    record_question_thread_selection(build, question, added)
+    return added
+
+
+def fill_questions(inputs: dict[str, Any], plan: dict[str, Any], build: SessionBuildState) -> None:
     target = plan["targetQuestionCount"]
     if target <= 0:
         return
@@ -158,35 +223,7 @@ def fill_questions(inputs: dict[str, Any], plan: dict[str, Any], build: SessionB
         for concept in concepts:
             if build.selected_question_count >= target:
                 break
-            already = build.questions_per_concept.get(concept.conceptId, 0)
-            if already >= allowed:
-                continue
-            if build.concept_items_so_far(concept.conceptId) >= build.teaching_cap_for(concept.conceptId):
-                continue
-            if concept.intervention == "probe":
-                low = concept.confidence < DEFAULTS["confidence_threshold"] or concept.exposureCount < 3
-                base = "low_confidence" if low else "needs_retest"
-            else:
-                base = "needs_retest" if concept.intervention == "remediate" else "reinforcement"
-            reason = resolve_reason(ReasonRequest(inputs, plan, concept.conceptId, concept.recallOnExamDay, base))
-            difficulty = question_request_difficulty(inputs["examPressure"], base, already)
-            data = inputs["conceptMap"].get(concept.conceptId)
-            if not data:
-                continue
-            questions = question_pool(QuestionPoolRequest(
-                inputs, build, concept.conceptId, data, difficulty, build.selected_question_count,
-                reason != "failure_escalation",
-            ))
-            if not questions:
-                continue
-            q = questions[0]
-            added = build.add_item({"type": "question", "id": q["id"], "conceptId": concept.conceptId,
-                                    "conceptName": concept.conceptName, "priority": concept.priority,
-                                    **question_thread_fields(q, reason),
-                                    "variantGroupId": q.get("variantGroupId"), "variantType": q.get("variantType")})
-            record_question_thread_selection(build, q, added)
-            if added:
-                added_this_pass += 1
+            added_this_pass += int(_fill_concept_question(QuestionFillRequest(inputs, plan, build, concept, allowed)))
         if added_this_pass == 0:
             break
         pass_no += 1

@@ -1,6 +1,12 @@
 """Direct coverage for session-prep allocation helpers."""
 
-from ebbifold.scheduler.prep_allocation import order_prep_keys, order_session_prep_candidates, prep_modality_budgets
+from ebbifold.scheduler.prep_allocation import (
+    PrepModalityBudgetRequest,
+    PrepOrderOptions,
+    order_prep_keys,
+    order_session_prep_candidates,
+    prep_modality_budgets,
+)
 
 
 def test_order_prep_keys_low_share_puts_unseen_before_weak() -> None:
@@ -27,9 +33,9 @@ def test_order_prep_keys_high_share_and_overlapping_sessions_are_stable() -> Non
 
 
 def test_prep_modality_budgets_caps_share_and_supply() -> None:
-    assert prep_modality_budgets(0.5, 6, 4, 20, 20) == {"cards": 3, "questions": 2}
-    assert prep_modality_budgets(0.5, 6, 4, 1, 20)["cards"] == 1
-    assert prep_modality_budgets(0, 6, 4, 20, 20) == {"cards": 0, "questions": 0}
+    assert prep_modality_budgets(PrepModalityBudgetRequest(0.5, 6, 4, 20, 20)) == {"cards": 3, "questions": 2}
+    assert prep_modality_budgets(PrepModalityBudgetRequest(0.5, 6, 4, 1, 20))["cards"] == 1
+    assert prep_modality_budgets(PrepModalityBudgetRequest(0, 6, 4, 20, 20)) == {"cards": 0, "questions": 0}
 
 
 def test_order_session_prep_candidates_partitions_and_preserves_membership() -> None:
@@ -42,20 +48,22 @@ def test_order_session_prep_candidates_partitions_and_preserves_membership() -> 
     ]
     prep_ids = ["card:weak", "card:unseen", "card:otherprep"]
     plan = {"share": 0.5, "itemIds": prep_ids, "weakItemIds": ["card:weak"], "unseenItemIds": ["card:unseen"]}
-    ordered = order_session_prep_candidates(
-        items, plan, size=5, key=lambda row: f"{row['type']}:{row['id'].split(':', 1)[1]}",
+    options = PrepOrderOptions(
+        size=5, key=lambda row: f"{row['type']}:{row['id'].split(':', 1)[1]}",
         protected=lambda row: row["interventionReason"] == "failure_escalation",
     )
+    ordered = order_session_prep_candidates(items, plan, options)
     assert sorted(row["id"] for row in ordered) == sorted(row["id"] for row in items)
     assert ordered[0]["id"] == "card:protected"
 
 
 def test_order_session_prep_candidates_noop_and_multi_session_paths() -> None:
     items = [{"type": "card", "id": "a"}, {"type": "card", "id": "b"}]
-    assert order_session_prep_candidates(items, None, size=2, key=lambda row: f"card:{row['id']}") is items
+    options = PrepOrderOptions(size=2, key=lambda row: f"card:{row['id']}")
+    assert order_session_prep_candidates(items, None, options) is items
     plan = {
         "share": 0.4, "itemIds": ["card:a", "card:b"], "weakItemIds": [], "unseenItemIds": [],
         "sessions": [{"share": 0.6, "itemIds": ["card:a"]}, {"share": 0.4, "itemIds": ["card:b"]}],
     }
-    ordered = order_session_prep_candidates(items, plan, size=2, key=lambda row: f"card:{row['id']}")
+    ordered = order_session_prep_candidates(items, plan, options)
     assert sorted(row["id"] for row in ordered) == ["a", "b"]
