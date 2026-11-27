@@ -16,7 +16,6 @@ from typing import Any
 from .scoring import normalize_review_challenge_level
 from .topics import (
     BLOCK_WEEKS,
-    normalize_curriculum_topic,
     normalize_topic,
     teaching_week_for_topics,
 )

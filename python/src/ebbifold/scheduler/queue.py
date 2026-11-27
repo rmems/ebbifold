@@ -394,7 +394,7 @@ def order_session_items(inputs: dict[str, Any], plan: dict[str, Any], build: Any
     options, bulk, rotation = inputs["options"], inputs["bulk"], inputs["rotation"]
     level = normalize_review_challenge_level(options.get("reviewChallenge"))
     policy = review_learning_policy(options.get("reviewChallenge"))
-    hard_gap = {l["questionId"] for l in bulk["questionConceptLinks"] if l["questionId"] in bulk["questionMap"]} \
+    hard_gap = {link["questionId"] for link in bulk["questionConceptLinks"] if link["questionId"] in bulk["questionMap"]} \
         if policy["questionsOnly"] else set()
     cards = bulk["unseenCards"] + bulk["seenCards"]
     complexity = {c["id"]: c.get("complexity") for c in cards}

@@ -50,7 +50,10 @@ def plan_concepts(snapshot: dict[str, Any]) -> dict[str, Any]:
     allocated_ranks = selection.allocatedConceptRanks
     target_rank = None
     if allocated_ranks is not None:
-        target_rank = lambda concept: allocated_ranks.get(concept.conceptId)
+        def target_rank_for(concept: ConceptState) -> int | None:
+            return allocated_ranks.get(concept.conceptId)
+
+        target_rank = target_rank_for
     round_robin = build_cluster_round_robin(
         selection.weakConcepts, ranking.getConceptCluster, target_rank
     )
