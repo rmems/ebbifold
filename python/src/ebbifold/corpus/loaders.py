@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
 
 from .audit import CorpusAudit, CorpusCounts, audit_answer_key
@@ -80,24 +81,47 @@ def _count_errors(counts: CorpusCounts) -> list[str]:
     ]
 
 
+@dataclass(frozen=True)
+class _CorpusParts:
+    step1: Step1Corpus
+    modules: ModuleCorpus
+    cards: ClozeCardCorpus
+
+
+def _require_corpus_parts(parts: tuple, loader_errors: list[str]) -> _CorpusParts:
+    step1, modules, cards = parts
+    missing = []
+    if step1 is None:
+        missing.append("Step 1 corpus")
+    if modules is None:
+        missing.append("module corpus")
+    if cards is None:
+        missing.append("cloze-card corpus")
+    if loader_errors or missing:
+        errors = list(loader_errors)
+        errors.extend(f"{name} did not load" for name in missing if not loader_errors)
+        raise CorpusAdmissionError(errors)
+    return _CorpusParts(step1=step1, modules=modules, cards=cards)
+
+
 def _baseline_questions(step1) -> tuple:
     step1_by_id = {question.id: question for question in step1.questions}
     return tuple(step1_by_id[question_id] for question_id in step1.baseline_question_ids)
 
 
-def _corpus_counts(json_files: list[Path], step1, modules, cards, baseline_questions: tuple) -> CorpusCounts:
+def _corpus_counts(parts: _CorpusParts, baseline_questions: tuple, json_count: int) -> CorpusCounts:
     return CorpusCounts(
-        json_files=len(json_files),
-        step1_questions=len(step1.questions),
+        json_files=json_count,
+        step1_questions=len(parts.step1.questions),
         baseline_questions=len(baseline_questions),
-        module_questions=len(modules.questions),
-        original_module_questions=len(modules.original_questions),
-        cloze_cards=len(cards.cards),
+        module_questions=len(parts.modules.questions),
+        original_module_questions=len(parts.modules.original_questions),
+        cloze_cards=len(parts.cards.cards),
     )
 
 
-def _corpus_audit(step1, modules, cards, baseline_questions: tuple, counts: CorpusCounts) -> CorpusAudit:
-    step1_answer_key = audit_answer_key(list(step1.questions))
+def _corpus_audit(parts: _CorpusParts, baseline_questions: tuple, counts: CorpusCounts) -> CorpusAudit:
+    step1_answer_key = audit_answer_key(list(parts.step1.questions))
     baseline_answer_key = audit_answer_key(list(baseline_questions))
     audit_errors = [
         *_answer_key_errors(step1_answer_key, baseline_answer_key),
@@ -107,22 +131,24 @@ def _corpus_audit(step1, modules, cards, baseline_questions: tuple, counts: Corp
         counts=counts,
         step1_answer_key=step1_answer_key,
         baseline_answer_key=baseline_answer_key,
-        citations_checked=len(step1.questions) + len(modules.questions) + len(modules.original_questions),
-        release_members_checked=len(step1.questions)
-        + len(modules.questions)
-        + len(modules.original_questions)
-        + len(cards.cards),
+        citations_checked=len(parts.step1.questions)
+        + len(parts.modules.questions)
+        + len(parts.modules.original_questions),
+        release_members_checked=len(parts.step1.questions)
+        + len(parts.modules.questions)
+        + len(parts.modules.original_questions)
+        + len(parts.cards.cards),
         errors=audit_errors,
     )
 
 
-def _snapshot(step1, modules, cards, baseline_questions: tuple, audit: CorpusAudit) -> CorpusSnapshot:
+def _snapshot(parts: _CorpusParts, baseline_questions: tuple, audit: CorpusAudit) -> CorpusSnapshot:
     return CorpusSnapshot(
-        step1_questions=step1.questions,
+        step1_questions=parts.step1.questions,
         baseline_questions=baseline_questions,
-        module_questions=modules.questions,
-        original_module_questions=modules.original_questions,
-        cloze_cards=cards.cards,
+        module_questions=parts.modules.questions,
+        original_module_questions=parts.modules.original_questions,
+        cloze_cards=parts.cards.cards,
         audit=audit,
     )
 
@@ -140,13 +166,12 @@ def load_corpus(root: str | Path | None = None) -> CorpusSnapshot:
     if parse_errors:
         raise CorpusAdmissionError(parse_errors)
 
-    (step1, modules, cards), loader_errors = _load_corpus_parts(content_root)
-    if loader_errors or step1 is None or modules is None or cards is None:
-        raise CorpusAdmissionError(loader_errors)
+    raw_parts, loader_errors = _load_corpus_parts(content_root)
+    parts = _require_corpus_parts(raw_parts, loader_errors)
 
-    baseline_questions = _baseline_questions(step1)
-    counts = _corpus_counts(json_files, step1, modules, cards, baseline_questions)
-    audit = _corpus_audit(step1, modules, cards, baseline_questions, counts)
+    baseline_questions = _baseline_questions(parts.step1)
+    counts = _corpus_counts(parts, baseline_questions, len(json_files))
+    audit = _corpus_audit(parts, baseline_questions, counts)
     if audit.errors:
         raise CorpusAdmissionError(audit.errors)
-    return _snapshot(step1, modules, cards, baseline_questions, audit)
+    return _snapshot(parts, baseline_questions, audit)

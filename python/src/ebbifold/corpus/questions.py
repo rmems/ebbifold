@@ -25,22 +25,25 @@ from .schema import (
 )
 from .validation import _read_json, _repo_relative, _validation_error_messages, JSON_GLOB
 
-def _schema_errors(payload: dict[str, Any], source: str, repo_root: Path | None) -> list[str]:
+def _validate_question_schema(payload: dict[str, Any], source: str, repo_root: Path | None) -> None:
     try:
         validate_against_schema(payload, QUESTION_SCHEMA, repo_root=repo_root, source=source)
     except CorpusSchemaError as error:
-        return str(error).splitlines()
-    return []
+        raise CorpusAdmissionError(str(error).splitlines()) from error
 
 
-def _validated_question_model(
-    payload: dict[str, Any], source: str
-) -> tuple[CorpusQuestion | None, list[str]]:
+def _validated_question_model(payload: dict[str, Any], source: str) -> CorpusQuestion:
     model = Step1QuestionRecord if "publicUsmle" in payload else ModuleQuestionRecord
     try:
-        return model.model_validate(payload), []
+        return model.model_validate(payload)
     except ValidationError as error:
-        return None, _validation_error_messages(source, error)
+        raise CorpusAdmissionError(_validation_error_messages(source, error)) from error
+
+
+def _validate_question_audit(record: CorpusQuestion, payload: dict[str, Any], source: str) -> None:
+    errors = _question_audit_errors(record, payload, source)
+    if errors:
+        raise CorpusAdmissionError(errors)
 
 
 def admit_question_payload(
@@ -55,19 +58,9 @@ def admit_question_payload(
     every layer accepts the exact bytes-shaped document. Any failure raises
     ``CorpusAdmissionError``; there is no partial or best-effort admission.
     """
-    schema_errors = _schema_errors(payload, source, repo_root)
-    if schema_errors:
-        raise CorpusAdmissionError(schema_errors)
-
-    record, errors = _validated_question_model(payload, source)
-    if errors:
-        raise CorpusAdmissionError(errors)
-    if record is None:
-        raise CorpusAdmissionError([f"{source}: question admission failed before model construction"])
-
-    audit_errors = _question_audit_errors(record, payload, source)
-    if audit_errors:
-        raise CorpusAdmissionError(audit_errors)
+    _validate_question_schema(payload, source, repo_root)
+    record = _validated_question_model(payload, source)
+    _validate_question_audit(record, payload, source)
     return record
 
 def admit_attempt_payload(
