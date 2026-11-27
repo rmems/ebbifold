@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from ebbifold.corpus import load_corpus
@@ -81,57 +81,53 @@ def _valid_label(question: ReviewQuestion, answer: str) -> bool:
     return any(option.label.upper() == wanted for option in question.options)
 
 
-def create_app(content: str | Path | None = None, db: str | Path | None = None) -> FastAPI:
-    content_root = open_content_root(Path(content).resolve() if content else Path.cwd())
-    engine = ReviewEngine(load_corpus(content_root))
-    store = SQLiteReviewStore(db)
-    app = FastAPI(title="ebbifold local review API")
+class ReviewApi:
+    def __init__(self, engine: ReviewEngine, store: SQLiteReviewStore, content_root: Path) -> None:
+        self.engine = engine
+        self.store = store
+        self.content_root = content_root
 
-    def get_store() -> SQLiteReviewStore:
-        return store
-
-    def require_session(session_id: str, review_store: SQLiteReviewStore = Depends(get_store)) -> Any:
-        row = review_store.session(session_id)
+    def session_row(self, session_id: str) -> Any:
+        row = self.store.session(session_id)
         if row is None:
             raise HTTPException(status_code=404, detail="unknown review session")
         return row
 
-    def current_question(session_id: str) -> ReviewQuestion | None:
-        return engine.next_question(store.attempts(session_id), store.attempts())
+    def current_question(self, session_id: str) -> ReviewQuestion | None:
+        return self.engine.next_question(self.store.attempts(session_id), self.store.attempts())
 
-    @app.get("/health")
-    def health() -> dict[str, str]:
+    def health(self) -> dict[str, str]:
         return {"status": "ok"}
 
-    @app.post("/sessions", status_code=201)
-    def create_session(_: SessionIn | None = None, review_store: SQLiteReviewStore = Depends(get_store)) -> dict[str, Any]:
-        session_id = review_store.create_session(str(content_root))
-        row = review_store.session(session_id)
+    def create_session(self, _: SessionIn | None = None) -> dict[str, Any]:
+        session_id = self.store.create_session(str(self.content_root))
         return {
-            "session": _session_payload(row, []),
-            "current_item": _question_payload(current_question(session_id)),
+            "session": _session_payload(self.store.session(session_id), []),
+            "current_item": _question_payload(self.current_question(session_id)),
         }
 
-    @app.get("/sessions/{session_id}")
-    def inspect_session(row: Any = Depends(require_session), review_store: SQLiteReviewStore = Depends(get_store)) -> dict[str, Any]:
-        return _session_payload(row, review_store.attempts(row["session_id"]))
+    def inspect_session(self, session_id: str) -> dict[str, Any]:
+        row = self.session_row(session_id)
+        return _session_payload(row, self.store.attempts(session_id))
 
-    @app.get("/sessions/{session_id}/current")
-    def inspect_current(row: Any = Depends(require_session)) -> dict[str, Any]:
-        return {"item": _question_payload(current_question(row["session_id"]))}
+    def inspect_current(self, session_id: str) -> dict[str, Any]:
+        self.session_row(session_id)
+        return {"item": _question_payload(self.current_question(session_id))}
 
-    @app.post("/sessions/{session_id}/answers", status_code=201)
-    def submit_answer(answer: AnswerIn, row: Any = Depends(require_session), review_store: SQLiteReviewStore = Depends(get_store)) -> dict[str, Any]:
-        session_id = row["session_id"]
-        question = current_question(session_id)
+    def validate_answer_target(self, answer: AnswerIn, question: ReviewQuestion | None) -> ReviewQuestion:
         if question is None:
             raise HTTPException(status_code=409, detail="no unanswered items remain")
         if answer.item_id is not None and answer.item_id != question.id:
             raise HTTPException(status_code=409, detail="answer item does not match the current item")
         if not _valid_label(question, answer.selected_label):
             raise HTTPException(status_code=422, detail="answer must be one of the displayed labels")
+        return question
+
+    def submit_answer(self, session_id: str, answer: AnswerIn) -> dict[str, Any]:
+        self.session_row(session_id)
+        question = self.validate_answer_target(answer, self.current_question(session_id))
         correct = ReviewEngine.grade(question, answer.selected_label)
-        attempt_id = review_store.record_attempt(
+        attempt_id = self.store.record_attempt(
             AttemptInput(
                 session_id=session_id,
                 item_id=question.id,
@@ -146,9 +142,19 @@ def create_app(content: str | Path | None = None, db: str | Path | None = None) 
         return {
             "attempt_id": attempt_id,
             "correct": correct,
-            "next_item": _question_payload(current_question(session_id)),
+            "next_item": _question_payload(self.current_question(session_id)),
         }
 
+
+def create_app(content: str | Path | None = None, db: str | Path | None = None) -> FastAPI:
+    content_root = open_content_root(Path(content).resolve() if content else Path.cwd())
+    api = ReviewApi(ReviewEngine(load_corpus(content_root)), SQLiteReviewStore(db), content_root)
+    app = FastAPI(title="ebbifold local review API")
+    app.get("/health")(api.health)
+    app.post("/sessions", status_code=201)(api.create_session)
+    app.get("/sessions/{session_id}")(api.inspect_session)
+    app.get("/sessions/{session_id}/current")(api.inspect_current)
+    app.post("/sessions/{session_id}/answers", status_code=201)(api.submit_answer)
     return app
 
 
