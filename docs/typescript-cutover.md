@@ -53,7 +53,7 @@ The last pre-cutover commit containing the TypeScript implementation and
 fixture generators is:
 
 ```text
-fe80cf44766af7f5646061c5b1b533116ce22000
+d3705ff312af33524ffd1cb03fd8f98dd6e997d3
 ```
 
 The committed fixture JSON files are the canonical oracle. Python tests must
