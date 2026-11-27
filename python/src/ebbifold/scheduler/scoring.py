@@ -110,14 +110,20 @@ def _remove_teaching_where(
     return remaining
 
 
-def _ordinary_teaching_removable(
-    items: Sequence[Mapping[str, Any]], index: int, scaffold: set[int], mastery_core: set[int],
-    protected_ids: set[Any], preserve: Callable[[Mapping[str, Any]], bool] | None,
-) -> bool:
-    if index in scaffold or index in mastery_core:
+@dataclass(frozen=True)
+class TeachingRemovalContext:
+    items: Sequence[Mapping[str, Any]]
+    scaffold: set[int]
+    mastery_core: set[int]
+    protected_ids: set[Any]
+    preserve: Callable[[Mapping[str, Any]], bool] | None
+
+
+def _ordinary_teaching_removable(context: TeachingRemovalContext, index: int) -> bool:
+    item = context.items[index]
+    if index in context.scaffold or index in context.mastery_core or item["id"] in context.protected_ids:
         return False
-    preserved = bool(preserve and preserve(items[index]))
-    return items[index]["id"] not in protected_ids and not preserved
+    return not bool(context.preserve and context.preserve(item))
 
 
 def _teaching_cap_removals(
@@ -136,8 +142,9 @@ def _teaching_cap_removals(
     mastery_core = {i for i in indexes if items[i].get("examTargetMasteryStage") == "scheduled-atomic-core"}
     protected_ids = {struggle(i).get("targetCardId") for i in scaffold} - {None, ""}
     removed: set[int] = set()
+    context = TeachingRemovalContext(items, scaffold, mastery_core, protected_ids, preserve)
     removal_stages = (
-        lambda index: _ordinary_teaching_removable(items, index, scaffold, mastery_core, protected_ids, preserve),
+        lambda index: _ordinary_teaching_removable(context, index),
         lambda index: index in scaffold,
         lambda index: index not in mastery_core,
         lambda _index: True,
