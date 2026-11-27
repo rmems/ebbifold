@@ -376,6 +376,52 @@ def test_mastery_seat_allocator_and_prep_ordering() -> None:
     assert concept_order["changedMembershipCount"] == 1
 
 
+def test_session_prep_blend_and_positive_mastery_seats_are_constructed() -> None:
+    prep_snapshot = _base_session()
+    prep_snapshot["options"]["sessionPrepBlend"] = {
+        "share": 0.5,
+        "itemIds": ["card:u-sickle-s", "question:q-renal-1"],
+        "weakItemIds": ["question:q-renal-1"],
+        "unseenItemIds": ["card:u-sickle-s"],
+        "sessions": [
+            {"share": 0.7, "itemIds": ["card:u-sickle-s"]},
+            {"share": 0.3, "itemIds": ["question:q-renal-1"]},
+        ],
+    }
+    prep = run_session(prep_snapshot)["result"]["items"]
+    assert prep[0]["id"] == "u-sickle-s"
+    assert prep[0]["interventionReason"] == "pre_teach"
+
+    mastery_snapshot = copy.deepcopy(next(c for c in SESSIONS if c["name"] == "exam_target_active")["snapshot"])
+    mastery_snapshot.update({
+        "targetWorkload": {"coreTargetSeats": 1, "surplusSeats": 1, "shortfall": None, "dailyCapacity": 40},
+        "masteryEvidence": {
+            "units": [
+                {"unitId": "unit-core", "stage": "scheduled-atomic-core",
+                 "safeMetadata": {"candidateItemKeys": ["card:u-acid-1"]}},
+                {"unitId": "unit-app", "stage": "applied-distinction",
+                 "safeMetadata": {"candidateItemKeys": ["question:q-acid-1"]}},
+            ],
+            "itemStageMap": {
+                "card:u-acid-1": {"stage": "scheduled-atomic-core", "unitId": "unit-core"},
+                "question:q-acid-1": {"stage": "applied-distinction", "unitId": "unit-app"},
+            },
+            "completedCoreWorkToday": 0,
+            "remainingTargetWork": 2,
+            "masteryPlan": {"policyVersion": "mastery-test"},
+        },
+        "eligibleCoreUnitIds": ["unit-core"],
+        "eligibleAppliedUnitIds": ["unit-app"],
+    })
+    mastery = run_session(mastery_snapshot)["result"]
+    assert [(item["type"], item["id"], item.get("examTargetMasteryStage")) for item in mastery["items"][:2]] == [
+        ("card", "u-acid-1", "scheduled-atomic-core"),
+        ("question", "q-acid-1", "applied-distinction"),
+    ]
+    assert mastery["examTargetDecision"]["coreTargetSeatsSelected"] == 1
+    assert mastery["examTargetDecision"]["surplusTargetSeatsSelected"] == 1
+
+
 def test_pass_set_and_composed_deck_source_identity() -> None:
     from ebbifold.scheduler.lanes import _pass_set_rank
     from ebbifold.scheduler.queue import source_corpus_for
