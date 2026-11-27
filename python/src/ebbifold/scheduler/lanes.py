@@ -325,10 +325,7 @@ def thread_trace() -> dict[str, Any]:
     return {"conceptThreadPolicyVersion": CONCEPT_THREAD_POLICY_VERSION, "conceptThreadPolicyApplied": False}
 
 
-def fill_coverage_lane(inputs: dict[str, Any], plan: dict[str, Any], build: SessionBuildState) -> None:
-    target = plan["targetCardCount"]
-    if plan["coverageReservation"] <= 0 or build.selected_card_count >= target:
-        return
+def _coverage_counts(inputs: dict[str, Any], build: SessionBuildState) -> dict[str, int]:
     bulk = inputs["bulk"]
     counts: dict[str, int] = {}
     for c in inputs["concepts"]:
@@ -342,25 +339,44 @@ def fill_coverage_lane(inputs: dict[str, Any], plan: dict[str, Any], build: Sess
         )
         if n > 0:
             counts[c["id"]] = n
+    return counts
+
+
+def _coverage_rows(inputs: dict[str, Any], plan: dict[str, Any], counts: dict[str, int]) -> list[tuple[dict[str, Any], Any, int]]:
     rows = [(inputs["conceptMap"].get(cid), plan["statesById"].get(cid), n) for cid, n in counts.items()]
     rows = [r for r in rows if r[0] is not None]
     rows.sort(key=lambda r: (-r[2], -(1 if r[0].get("examWeight") is None else r[0]["examWeight"])))
+    return rows
+
+
+def _try_coverage_card(
+    inputs: dict[str, Any], plan: dict[str, Any], build: SessionBuildState,
+    concept: dict[str, Any], state: Any, threshold: float
+) -> None:
+    recall = state.currentRecall if state else None
+    candidates = card_pool(inputs, build, concept["id"], concept, recall)
+    pristine = [c for c in candidates if c["id"] in plan["unseenCardIds"]]
+    if not pristine:
+        return
+    picked = build.pick_card_candidate(pristine, similarity_threshold=threshold, max_per_cluster=5)
+    if not picked:
+        return
+    reason = resolve_reason(inputs, plan, concept["id"], state.recallOnExamDay if state else 0, "reinforcement")
+    item = card_item(picked, challengePolicyApplied=True, conceptId=concept["id"], conceptName=concept["name"],
+                     priority=state.priority if state else 0, interventionReason=reason)
+    commit_card(build, picked, item, recall)
+
+
+def fill_coverage_lane(inputs: dict[str, Any], plan: dict[str, Any], build: SessionBuildState) -> None:
+    target = plan["targetCardCount"]
+    if plan["coverageReservation"] <= 0 or build.selected_card_count >= target:
+        return
+    rows = _coverage_rows(inputs, plan, _coverage_counts(inputs, build))
     threshold = min(0.97, inputs["interferenceThreshold"] + 0.1)
     for concept, state, _ in rows:
         if build.selected_card_count >= target:
             break
-        recall = state.currentRecall if state else None
-        candidates = card_pool(inputs, build, concept["id"], concept, recall)
-        pristine = [c for c in candidates if c["id"] in plan["unseenCardIds"]]
-        if not pristine:
-            continue
-        picked = build.pick_card_candidate(pristine, similarity_threshold=threshold, max_per_cluster=5)
-        if not picked:
-            continue
-        reason = resolve_reason(inputs, plan, concept["id"], state.recallOnExamDay if state else 0, "reinforcement")
-        item = card_item(picked, challengePolicyApplied=True, conceptId=concept["id"], conceptName=concept["name"],
-                         priority=state.priority if state else 0, interventionReason=reason)
-        commit_card(build, picked, item, recall)
+        _try_coverage_card(inputs, plan, build, concept, state, threshold)
 
 
 def backfill_from_any_concept(inputs: dict[str, Any], plan: dict[str, Any], build: SessionBuildState) -> None:
@@ -481,60 +497,64 @@ def backfill_cards_uncapped(inputs: dict[str, Any], plan: dict[str, Any], build:
         commit_card(build, picked, item, concept.currentRecall)
 
 
-def rescue_orphans(inputs: dict[str, Any], plan: dict[str, Any], build: SessionBuildState) -> None:
-    from .build_state import question_suppression_key
-    from .errors import UnsupportedSchedulerInput
+def _orphan_attribution(inputs: dict[str, Any], topics: list[str]) -> tuple[str, str]:
+    from .policies import has_specific_clinical_topic_overlap
+
+    for c in inputs["concepts"]:
+        if has_specific_clinical_topic_overlap(topics, c["topics"]):
+            return c["id"], c["name"]
+    return "_unattached", "Unattached"
+
+
+def _add_orphan_card(inputs: dict[str, Any], build: SessionBuildState, card: dict[str, Any], reason: str) -> None:
+    cid, name = _orphan_attribution(inputs, card["topics"])
+    build.add_item(card_item(card, conceptId=cid, conceptName=name, priority=0.2, interventionReason=reason))
+
+
+def _orphan_nudge(inputs: dict[str, Any], active: dict[str, Any], rows: list[dict[str, Any]], kind: str) -> list[dict[str, Any]]:
     from .ranking import apply_bounded_exam_target_nudge
-    from .policies import (
-        has_specific_clinical_topic_overlap,
-        prioritize_least_recently_served_contrast_siblings,
-        take_with_reentry_cap,
-    )
 
+    if not inputs.get("applyExamTarget"):
+        return rows
+    return apply_bounded_exam_target_nudge(rows, lambda r: active[kind].get(r["id"]), active["rankMove"])
+
+
+def _rescue_seen_cards(inputs: dict[str, Any], build: SessionBuildState, active: dict[str, Any]) -> None:
     size, bulk = inputs["size"], inputs["bulk"]
-    if bulk.get("passSet") and bulk.get("passSetIntakeDecision") in ("pass-set-first", "supply-exhausted", "unlocked"):
-        raise UnsupportedSchedulerInput("pass-set orphan ordering is not ported in Phase 3a")
-
-    def attribution(topics: list[str]) -> tuple[str, str]:
-        for c in inputs["concepts"]:
-            if has_specific_clinical_topic_overlap(topics, c["topics"]):
-                return c["id"], c["name"]
-        return "_unattached", "Unattached"
-
-    def add_card(card: dict[str, Any], reason: str) -> None:
-        cid, name = attribution(card["topics"])
-        build.add_item(card_item(card, conceptId=cid, conceptName=name, priority=0.2, interventionReason=reason))
-
-    active = active_targets(inputs)
-
-    def nudge(rows: list[dict[str, Any]], kind: str) -> list[dict[str, Any]]:
-        if not inputs.get("applyExamTarget"):
-            return rows
-        return apply_bounded_exam_target_nudge(rows, lambda r: active[kind].get(r["id"]), active["rankMove"])
-
-    if len(build.selected_items) < size:
-        for card in nudge([c for c in bulk["seenCards"] if c["id"] not in build.selected_card_ids], "card"):
-            if len(build.selected_items) >= size:
-                break
-            if card.get("variantGroupId") and card["variantGroupId"] in build.selected_card_variant_groups:
-                continue
-            add_card(card, "needs_retest")
-    if len(build.selected_items) >= size or inputs.get("effectiveMaxNewCards") == 0:
+    if len(build.selected_items) >= size:
         return
-    unseen = [c for c in bulk["unseenCards"] if c["id"] not in build.selected_card_ids
-              and c["id"] not in bulk["passSetDeferredCardIds"]]
-    unseen.sort(key=lambda c: -(1 if c.get("importance") is None else c["importance"]))
-    for card in nudge(unseen, "card"):
+    rows = [c for c in bulk["seenCards"] if c["id"] not in build.selected_card_ids]
+    for card in _orphan_nudge(inputs, active, rows, "card"):
         if len(build.selected_items) >= size:
             break
         if card.get("variantGroupId") and card["variantGroupId"] in build.selected_card_variant_groups:
             continue
-        add_card(card, "reinforcement")
+        _add_orphan_card(inputs, build, card, "needs_retest")
+
+
+def _rescue_unseen_cards(inputs: dict[str, Any], build: SessionBuildState, active: dict[str, Any]) -> None:
+    size, bulk = inputs["size"], inputs["bulk"]
+    unseen = [c for c in bulk["unseenCards"] if c["id"] not in build.selected_card_ids
+              and c["id"] not in bulk["passSetDeferredCardIds"]]
+    unseen.sort(key=lambda c: -(1 if c.get("importance") is None else c["importance"]))
+    for card in _orphan_nudge(inputs, active, unseen, "card"):
+        if len(build.selected_items) >= size:
+            break
+        if card.get("variantGroupId") and card["variantGroupId"] in build.selected_card_variant_groups:
+            continue
+        _add_orphan_card(inputs, build, card, "reinforcement")
+
+
+def _rescue_rotation_questions(inputs: dict[str, Any], build: SessionBuildState, active: dict[str, Any]) -> None:
+    from .build_state import question_suppression_key
+    from .policies import prioritize_least_recently_served_contrast_siblings, take_with_reentry_cap
+
+    size, bulk = inputs["size"], inputs["bulk"]
     familiarity = bulk["questionFamiliarity"]
     questions = prioritize_least_recently_served_contrast_siblings(
         [q for q in bulk["rotationQuestions"] if q["id"] not in build.selected_question_ids], lambda q: q["id"], familiarity
     )
-    for q in nudge(questions, "question"):
+    for q in _orphan_nudge(inputs, active, questions, "question"):
         if len(build.selected_items) >= size:
             break
         key = question_suppression_key(q)
@@ -542,10 +562,24 @@ def rescue_orphans(inputs: dict[str, Any], plan: dict[str, Any], build: SessionB
             continue
         if not take_with_reentry_cap(q["id"], familiarity, build.mastered_reentry_counter):
             continue
-        cid, name = attribution(q["topics"])
+        cid, name = _orphan_attribution(inputs, q["topics"])
         build.add_item({"type": "question", "id": q["id"], "conceptId": cid, "conceptName": name, "priority": 0.2,
                         "interventionReason": "reinforcement", **thread_trace(),
                         "variantGroupId": q.get("variantGroupId"), "variantType": q.get("variantType")})
+
+
+def rescue_orphans(inputs: dict[str, Any], plan: dict[str, Any], build: SessionBuildState) -> None:
+    from .errors import UnsupportedSchedulerInput
+
+    size, bulk = inputs["size"], inputs["bulk"]
+    if bulk.get("passSet") and bulk.get("passSetIntakeDecision") in ("pass-set-first", "supply-exhausted", "unlocked"):
+        raise UnsupportedSchedulerInput("pass-set orphan ordering is not ported in Phase 3a")
+    active = active_targets(inputs)
+    _rescue_seen_cards(inputs, build, active)
+    if len(build.selected_items) >= size or inputs.get("effectiveMaxNewCards") == 0:
+        return
+    _rescue_unseen_cards(inputs, build, active)
+    _rescue_rotation_questions(inputs, build, active)
 
 
 def run_selection(inputs: dict[str, Any], plan: dict[str, Any]) -> SessionBuildState:
