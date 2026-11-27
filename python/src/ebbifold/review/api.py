@@ -83,6 +83,21 @@ def _valid_label(question: ReviewQuestion, answer: str) -> bool:
     return any(option.label.upper() == wanted for option in question.options)
 
 
+def _invalid_path_part(part: str) -> bool:
+    separators = "/" in part or "\\" in part
+    return separators or part in {"", ".", ".."}
+
+
+def _figure_path(content_root: Path, domain: str, dataset: str, filename: str) -> Path | None:
+    if any(map(_invalid_path_part, (domain, dataset, filename))):
+        return None
+    media_root = (content_root / domain / dataset / "media").resolve()
+    path = (media_root / filename).resolve()
+    if media_root not in path.parents or not path.is_file():
+        return None
+    return path
+
+
 class ReviewApi:
     def __init__(self, engine: ReviewEngine, store: SQLiteReviewStore, content_root: Path) -> None:
         self.engine = engine
@@ -157,12 +172,8 @@ class ReviewApi:
         }
 
     def figure(self, domain: str, dataset: str, filename: str) -> FileResponse:
-        parts = (domain, dataset, filename)
-        if any(part in {"", ".", ".."} or "/" in part or "\\" in part for part in parts):
-            raise HTTPException(status_code=404, detail="unknown figure")
-        media_root = (self.content_root / domain / dataset / "media").resolve()
-        path = (media_root / filename).resolve()
-        if media_root not in path.parents or not path.is_file():
+        path = _figure_path(self.content_root, domain, dataset, filename)
+        if path is None:
             raise HTTPException(status_code=404, detail="unknown figure")
         return FileResponse(path)
 
