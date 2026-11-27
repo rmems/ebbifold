@@ -2,7 +2,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from ebbifold.review.api import create_app
+from ebbifold.review.api import build_parser, create_app
 from ebbifold.review.store import default_store_path
 
 
@@ -60,3 +60,13 @@ def test_default_memory_path_is_outside_repository():
     path = default_store_path().resolve()
     assert repo_root not in path.parents
     assert path.suffix in {".db", ".sqlite", ".sqlite3"}
+
+
+def test_health_and_api_parser_defaults(tmp_path):
+    client = _client(tmp_path / "review.sqlite3")
+    assert client.get("/health").json() == {"status": "ok"}
+
+    args = build_parser().parse_args([])
+    assert args.host == "127.0.0.1"
+    assert args.port == 8000
+    assert args.db.endswith(("review.sqlite3", "review.sqlite", "review.db"))
