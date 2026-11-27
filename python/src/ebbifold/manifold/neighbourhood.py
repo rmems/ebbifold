@@ -48,6 +48,10 @@ class ConceptManifold:
         self._ids = tuple(ids)
         self._index = {concept_id: i for i, concept_id in enumerate(ids)}
         self._unit = unit
+        groups: dict[bytes, list[int]] = {}
+        for i, row in enumerate(unit):
+            groups.setdefault(row.tobytes(), []).append(i)
+        self._row_groups = tuple(tuple(indices) for indices in groups.values())
         self._id_rank = rank
         self.dimensions = dimensions
 
@@ -88,7 +92,12 @@ class ConceptManifold:
         norm = np.linalg.norm(q)
         if norm <= 0.0:
             raise EmbeddingError("query is a zero vector; cosine is undefined")
-        return self._unit @ (q / norm)
+        unit_query = q / norm
+        result = np.empty(len(self._ids), dtype=np.float64)
+        for indices in self._row_groups:
+            score = self._unit[indices[0]] @ unit_query
+            result[list(indices)] = score
+        return result
 
     def neighbours(
         self,
@@ -103,8 +112,7 @@ class ConceptManifold:
         sims = self.similarities(query)
         skip = set(exclude)
         result: list[Neighbour] = []
-        ordering_scores = np.round(sims, 12)
-        for i in np.lexsort((self._id_rank, -ordering_scores)):
+        for i in np.lexsort((self._id_rank, -sims)):
             if len(result) == k:
                 break
             concept_id = self._ids[i]
