@@ -51,7 +51,7 @@ def _validator_for(path_text: str) -> jsonschema.Draft202012Validator:
     path = Path(path_text)
     schema = json.loads(path.read_text(encoding="utf-8"))
     jsonschema.Draft202012Validator.check_schema(schema)
-    return jsonschema.Draft202012Validator(schema)
+    return jsonschema.Draft202012Validator(schema, format_checker=jsonschema.FormatChecker())
 
 
 def validate_against_schema(

@@ -5,7 +5,7 @@ description = "Spaced repetition over an embedding of concepts — Python port o
 requires-python = ">=3.12"
 license = { text = "MIT" }
 dependencies = [
-    "jsonschema>=4.23",
+    "jsonschema[format]>=4.23",
     "pydantic>=2.10",
 ]
 

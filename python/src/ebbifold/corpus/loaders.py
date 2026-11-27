@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -11,6 +12,7 @@ from pydantic import ValidationError
 
 from .audit import CorpusAudit, CorpusCounts, audit_answer_key
 from .fingerprint import (
+    BASELINE_MODULE,
     cohort_card_serving_fingerprint,
     module_item_content_hash,
     module_source_fingerprint,
@@ -73,6 +75,13 @@ COHORT_DISCIPLINES = frozenset(
         "radiology",
     }
 )
+EXPECTED_CORPUS_COUNTS = {
+    "json_files": 1357,
+    "step1_questions": 556,
+    "baseline_questions": 25,
+    "module_questions": 392,
+    "cloze_cards": 2136,
+}
 PUBLIC_TEXT_LICENCES = frozenset({"CC-BY-4.0", "CC-BY-SA-4.0", "CC0-1.0"})
 PUBLIC_EVIDENCE_LICENCE_IDS = frozenset(
     {
@@ -249,9 +258,14 @@ def _question_audit_errors(
                     f"{source}: evidence licence {licence.cls}/{licence.id} is not approved FOSS"
                 )
         media = provenance.media
-        if record.image_url and (media is None or media.kind != "asset"):
-            errors.append(f"{source}: image-bearing item lacks asset media provenance")
-        if not record.image_url and media is not None and media.kind == "asset":
+        if record.image_url:
+            if media is None or media.kind != "asset":
+                errors.append(f"{source}: image-bearing item lacks asset media provenance")
+            elif media.licence.cls != "foss" or media.licence.id.lower() not in PUBLIC_EVIDENCE_LICENCE_IDS:
+                errors.append(
+                    f"{source}: media licence {media.licence.cls}/{media.licence.id} is not approved FOSS"
+                )
+        elif media is not None and media.kind == "asset":
             errors.append(f"{source}: media asset declared without imageUrl")
     elif isinstance(record, ModuleQuestionRecord):
         provenance = record.public_module
@@ -306,7 +320,9 @@ def _expect_manifest_object(raw: Any, path: Path, version: int) -> list[str]:
     return []
 
 
-def _id_list(raw: dict[str, Any], key: str, path: Path) -> tuple[list[str], list[str]]:
+def _id_list(raw: Any, key: str, path: Path) -> tuple[list[str], list[str]]:
+    if not isinstance(raw, dict):
+        return [], [f"{path}: {key} is unavailable because the manifest is not an object"]
     value = raw.get(key)
     if not isinstance(value, list) or not value or not all(isinstance(item, str) and item for item in value):
         return [], [f"{path}: {key} must be a non-empty string array"]
@@ -341,8 +357,14 @@ def _validate_step1_registry(
         if source["id"] in source_by_id:
             errors.append(f"{registry_path}: duplicate source id {source['id']}")
         source_by_id[source["id"]] = source
+        source_passage_ids: set[str] = set()
         for passage in source.get("passages", []):
             if isinstance(passage, dict) and isinstance(passage.get("id"), str):
+                if passage["id"] in source_passage_ids:
+                    errors.append(
+                        f"{registry_path}: duplicate passage id {passage['id']} for source {source['id']}"
+                    )
+                source_passage_ids.add(passage["id"])
                 passage_keys.add(f"{source['id']}:{passage['id']}")
 
     checked = 0
@@ -354,6 +376,11 @@ def _validate_step1_registry(
             continue
         evidence = record.public_usmle.evidence
         checked += 1
+        expected_cite = f"{evidence.source_id}#{evidence.passage_id}"
+        if record.cite != expected_cite:
+            errors.append(
+                f"{item.source_file}: citation presence: cite {record.cite!r} does not match evidence pointer {expected_cite!r}"
+            )
         source = source_by_id.get(evidence.source_id)
         if source is None:
             errors.append(f"{item.source_file}: unknown evidence source {evidence.source_id}")
@@ -450,8 +477,19 @@ def load_step1_corpus(root: str | Path | None = None) -> Step1Corpus:
 
     if errors:
         raise CorpusAdmissionError(errors)
+    baseline_id_set = set(baseline_ids)
+    questions: list[Step1QuestionRecord] = []
+    for item in loaded:
+        if not isinstance(item.record, Step1QuestionRecord):
+            continue
+        record = item.record
+        if record.id in baseline_id_set and BASELINE_MODULE not in record.module_nodes:
+            record = record.model_copy(
+                update={"module_nodes": [*record.module_nodes, BASELINE_MODULE]}
+            )
+        questions.append(record)
     return Step1Corpus(
-        questions=tuple(item.record for item in loaded if isinstance(item.record, Step1QuestionRecord)),
+        questions=tuple(questions),
         baseline_question_ids=tuple(baseline_ids),
         release_question_ids=tuple(release_ids),
         raw_questions=tuple(item.raw for item in loaded),
@@ -594,6 +632,13 @@ def load_module_questions(
     return questions
 
 
+def _card_shard_suffix(card: ClozeCardRecord) -> str:
+    match = re.search(r":c-([0-9a-f])", card.id)
+    if not match:
+        raise ValueError(f"unexpected public card id {card.id}")
+    return f"open-content/modules/cards/{card.discipline}/{match.group(1)}.json"
+
+
 def load_cloze_card_corpus(root: str | Path | None = None) -> ClozeCardCorpus:
     content_root = open_content_root(root)
     repo_root = content_root.parent
@@ -614,10 +659,14 @@ def load_cloze_card_corpus(root: str | Path | None = None) -> ClozeCardCorpus:
             errors.extend(_validation_error_messages(source, error))
             continue
         for raw_card, card in zip(raw_shard.get("cards", []), shard.cards, strict=True):
-            expected_suffix = f"open-content/modules/cards/{card.discipline}/{card.id.split(':c-')[1][0]}.json"
+            try:
+                expected_suffix = _card_shard_suffix(card)
+            except ValueError as error:
+                errors.append(f"{source}: {card.id}: {error}")
+                expected_suffix = None
             if card.discipline != shard.discipline:
                 errors.append(f"{source}: {card.id}: discipline does not match shard")
-            if source != expected_suffix:
+            if expected_suffix is not None and source != expected_suffix:
                 errors.append(f"{source}: {card.id}: belongs in {expected_suffix}")
             cards.append((card, raw_card, source))
 
@@ -699,8 +748,8 @@ def load_corpus(root: str | Path | None = None) -> CorpusSnapshot:
     if loader_errors or step1 is None or modules is None or cards is None:
         raise CorpusAdmissionError(loader_errors)
 
-    baseline_ids = set(step1.baseline_question_ids)
-    baseline_questions = tuple(question for question in step1.questions if question.id in baseline_ids)
+    step1_by_id = {question.id: question for question in step1.questions}
+    baseline_questions = tuple(step1_by_id[question_id] for question_id in step1.baseline_question_ids)
     step1_answer_key = audit_answer_key(list(step1.questions))
     baseline_answer_key = audit_answer_key(list(baseline_questions))
     audit_errors = [
@@ -708,15 +757,20 @@ def load_corpus(root: str | Path | None = None) -> CorpusSnapshot:
     ] + [
         f"baseline answer-key integrity: {issue['code']}" for issue in baseline_answer_key.issues
     ]
+    counts = CorpusCounts(
+        json_files=len(json_files),
+        step1_questions=len(step1.questions),
+        baseline_questions=len(baseline_questions),
+        module_questions=len(modules.questions),
+        original_module_questions=len(modules.original_questions),
+        cloze_cards=len(cards.cards),
+    )
+    for field, expected in EXPECTED_CORPUS_COUNTS.items():
+        actual = getattr(counts, field)
+        if actual != expected:
+            audit_errors.append(f"corpus count {field}: expected {expected}, found {actual}")
     audit = CorpusAudit(
-        counts=CorpusCounts(
-            json_files=len(json_files),
-            step1_questions=len(step1.questions),
-            baseline_questions=len(baseline_questions),
-            module_questions=len(modules.questions),
-            original_module_questions=len(modules.original_questions),
-            cloze_cards=len(cards.cards),
-        ),
+        counts=counts,
         step1_answer_key=step1_answer_key,
         baseline_answer_key=baseline_answer_key,
         citations_checked=len(step1.questions) + len(modules.questions) + len(modules.original_questions),

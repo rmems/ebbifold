@@ -5,11 +5,13 @@ on:
     paths:
       - 'python/**'
       - 'schemas/**'
+      - 'open-content/**'
       - '.github/workflows/python-ci.yml'
   pull_request:
     paths:
       - 'python/**'
       - 'schemas/**'
+      - 'open-content/**'
       - '.github/workflows/python-ci.yml'
 
 permissions:
@@ -37,3 +39,4 @@ jobs:
         with:
           oidc: true
           files: python/coverage/lcov.info
+          add-prefix: python/
