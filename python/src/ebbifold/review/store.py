@@ -40,9 +40,16 @@ def default_store_path() -> Path:
     return Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share") / "ebbifold" / "review.sqlite3"
 
 
+def _validate_store_path(path: str | Path) -> Path:
+    candidate = Path(path).expanduser().resolve()
+    if candidate.suffix not in {".db", ".sqlite", ".sqlite3"} or any(mark in candidate.name for mark in "?#"):
+        raise ValueError("review database path must be a local .db/.sqlite/.sqlite3 file")
+    return candidate
+
+
 class SQLiteReviewStore:
     def __init__(self, path: str | Path | None = None) -> None:
-        self.path = Path(path) if path is not None else default_store_path()
+        self.path = _validate_store_path(path if path is not None else default_store_path())
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._initialize()
 

@@ -1,6 +1,6 @@
-from datetime import UTC, datetime
+﻿from datetime import UTC, datetime
 from pathlib import Path
-from types import SimpleNamespace
+import argparse
 import sqlite3
 
 from ebbifold.corpus import load_corpus
@@ -66,7 +66,7 @@ def test_review_store_schema_is_domain_neutral(tmp_path):
 def test_scripted_cli_session_persists_attempt_and_resumes(tmp_path, capsys):
     db = tmp_path / "review.sqlite3"
     repo_root = Path(__file__).resolve().parents[2]
-    args = SimpleNamespace(
+    args = argparse.Namespace(
         content=str(repo_root),
         db=str(db),
         session=None,
@@ -80,7 +80,7 @@ def test_scripted_cli_session_persists_attempt_and_resumes(tmp_path, capsys):
     with sqlite3.connect(db) as conn:
         assert conn.execute("SELECT COUNT(*) FROM attempts").fetchone()[0] == 1
 
-    resume_args = SimpleNamespace(
+    resume_args = argparse.Namespace(
         content=str(repo_root),
         db=str(db),
         session=session_id,
