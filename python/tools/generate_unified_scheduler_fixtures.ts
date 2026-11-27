@@ -45,6 +45,8 @@ import { classifyTeachingState } from '../../src/lib/scheduler/concept-teaching-
 import { expandTopicSet, normalizeTopic } from '../../src/lib/topics';
 import type { ConceptState } from '../../src/lib/knowledge/unified-scheduler-types';
 
+const compareJsStrings = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Json = any;
 
@@ -123,14 +125,14 @@ function runConceptPlan(snapshot: Json): Json {
     conceptClusters: clusters,
     sortedConceptIds: ranking.conceptStates.map(s => s.conceptId),
     sortedPriorities: ranking.conceptStates.map(s => s.priority),
-    pristineConceptIds: [...pristine].sort(),
+    pristineConceptIds: [...pristine].sort(compareJsStrings),
     weakConceptIds: selection.weakConcepts.map(s => s.conceptId),
     cardRatio: selection.cardRatio,
     quota,
     clusterRoundRobin: roundRobin,
-    unseenCardIds: [...ranking.unseenCardIds].sort(),
-    crossSourceCardIds: [...ranking.crossSourceCardIds].sort(),
-    crossSourceQuestionIds: [...ranking.crossSourceQuestionIds].sort(),
+    unseenCardIds: [...ranking.unseenCardIds].sort(compareJsStrings),
+    crossSourceCardIds: [...ranking.crossSourceCardIds].sort(compareJsStrings),
+    crossSourceQuestionIds: [...ranking.crossSourceQuestionIds].sort(compareJsStrings),
     maxCrossSourceItems: ranking.maxCrossSourceItems,
     maxNewCards: ranking.maxNewCards,
     unknownItemRotation: ranking.unknownItemRotation,

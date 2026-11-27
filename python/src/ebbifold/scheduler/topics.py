@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 import unicodedata
 from collections.abc import Iterable, Mapping
@@ -143,7 +144,7 @@ def dated_topic_recency_boost(
         age = topic_recency_days.get(normalized)
         if age is None:
             continue
-        if not (age == age and abs(age) != float("inf")) or age < 0 or age >= TAUGHT_TOPIC_WINDOW_DAYS:
+        if not math.isfinite(age) or age < 0 or age >= TAUGHT_TOPIC_WINDOW_DAYS:
             continue
         boost = -PACING_DATED_RECENCY_BOOST * (TAUGHT_TOPIC_WINDOW_DAYS - age) / TAUGHT_TOPIC_WINDOW_DAYS
         strongest = min(strongest, boost)

@@ -70,13 +70,13 @@ def build_rank_from_scores(scores: Mapping[str, float] | None, limit: int) -> di
 
 
 def _zero_nan(value: float) -> float:
-    return 0 if value != value or value == 0 else value
+    return 0 if math.isnan(value) or value == 0 else value
 
 
 def exam_target_rank_boost(score: float | None, factor: float = EXAM_RELEVANCE_BOOST_FACTOR) -> float:
     if score is None:
         return 0
-    if score != score:
+    if math.isnan(score):
         return 0
     return _zero_nan(-(max(0, min(1, score)) * factor))
 
