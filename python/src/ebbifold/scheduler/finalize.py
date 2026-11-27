@@ -8,8 +8,8 @@ from __future__ import annotations
 import math
 from typing import Any
 
+from .delivery import build_repetition_slot_context, build_serve_conditioning, shadow_for_due_id
 from .difficulty import get_effective_question_difficulty
-from .errors import UnsupportedSchedulerInput
 from .exam_target import exam_target_decision, exam_target_stats
 from .policies import recent_neighbor_signal
 from .queue import compute_concept_pairing_rate
@@ -128,9 +128,17 @@ def _apply_recall_telemetry(
 
 def attach_delivery_telemetry(inputs: dict[str, Any], plan: dict[str, Any], build: Any,
                               final: list[dict[str, Any]], card_meta: dict[str, dict[str, Any]]) -> None:
-    if inputs.get("ratingReliability"):
-        raise UnsupportedSchedulerInput("serve conditioning (rating reliability) is not ported in Phase 3a")
     bulk = inputs["bulk"]
+    cards = bulk["unseenCards"] + bulk["seenCards"]
+    overlay = inputs.get("proximityOverlay")
+    repetition_context = build_repetition_slot_context(
+        cards=cards,
+        grades=bulk.get("cardGradeById") or {},
+        seen_card_ids=[card["id"] for card in bulk["seenCards"]],
+        variant_group_history=bulk["cardVariantGroupHistory"],
+        seen_question_ids=list(bulk["questionFamiliarity"].keys()),
+        overlay=overlay,
+    )
     unseen = {c["id"] for c in bulk["unseenCards"]}
     recent_ids = (inputs.get("penaltyContext") or {}).get("recentCardIds")
     for item in final:
@@ -140,6 +148,13 @@ def attach_delivery_telemetry(inputs: dict[str, Any], plan: dict[str, Any], buil
         serve_exposures = state.exposureCount if state else raw.get("exposureCount", 0)
         q_meta = bulk["questionMap"].get(item["id"]) if item["type"] == "question" else None
         c_meta = card_meta.get(item["id"]) if item["type"] == "card" else None
+        if item["type"] == "card" and c_meta:
+            conditioning = build_serve_conditioning(inputs.get("ratingReliability"), overlay, c_meta.get("stableId"))
+            if conditioning:
+                item["conditioning"] = conditioning
+            repetition_slot = shadow_for_due_id(item["id"], repetition_context)
+            if repetition_slot:
+                item["repetitionSlot"] = repetition_slot
         applied = item.get("challengePolicyApplied") is True
         item.pop("challengePolicyApplied", None)
         descriptive = state.currentRecall if state else raw.get("recallProbability")
@@ -150,17 +165,18 @@ def attach_delivery_telemetry(inputs: dict[str, Any], plan: dict[str, Any], buil
         _apply_challenge_telemetry(item, tier, challenge_recall, applied, synthetic)
         _apply_novelty_telemetry(inputs, item, c_meta, applied, synthetic, unseen, recent_ids)
         _apply_recall_telemetry(item, q_meta, c_meta, serve_recall, serve_exposures)
+    return repetition_context
 
 
 def assemble_session_result(inputs: dict[str, Any], plan: dict[str, Any], build: Any,
-                            final: list[dict[str, Any]]) -> dict[str, Any]:
+                            final: list[dict[str, Any]], repetition_slot_context: dict[str, Any] | None = None) -> dict[str, Any]:
     items = [{**item, "firstSightAtSelection": build.is_first_sight_item(item)} for item in final]
     avg = sum(i["priority"] for i in final) / len(final) if final else 0
     budget = inputs.get("budget") or {"dailyThroughput": 0, "totalRemaining": 0, "sessionsRemaining": 0}
-    decision = exam_target_decision(inputs, plan, final)
+    decision = exam_target_decision(inputs, plan, final, build)
     result = {
         "items": items,
-        "repetitionSlotContext": None,
+        "repetitionSlotContext": repetition_slot_context,
         "noveltyQuota": {"required": build.min_first_sight_items,
                          "selected": sum(1 for i in items if i["firstSightAtSelection"])},
         "stats": {

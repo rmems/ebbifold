@@ -187,11 +187,7 @@ def test_unseeded_or_malformed_seed_fails_closed(seed: str | None) -> None:
 
 _UNPORTED = {
     "exam_target_without_workload": lambda s: s.update(applyExamTarget=True),
-    "exam_target_core_seats": lambda s: s.update(applyExamTarget=True, targetWorkload={"coreTargetSeats": 2}),
-    "exam_target_surplus_seats": lambda s: s.update(applyExamTarget=True, targetWorkload={"surplusSeats": 1}),
-    "exam_target_mastery_evidence": lambda s: s.update(masteryEvidence={"remainingTargetWork": 3}),
     "learner_policy_missing": lambda s: s.update(targetSidecarsValid=True, runtimeTargetSnapshot={"definition": {}}),
-    "prep_blend": lambda s: s["options"].update(sessionPrepBlend={"items": []}),
 }
 
 
@@ -322,19 +318,78 @@ def test_bridge_candidates_filter_eligibility_before_window() -> None:
     assert [row["id"] for row in _bridge_candidates(pool, set(), now)] == ["eligible"]
 
 
+def test_serve_conditioning_and_repetition_slot_telemetry() -> None:
+    from ebbifold.scheduler.delivery import build_serve_conditioning, substitute_due_slot
+
+    overlay = {"cards": {"stable-1": [{"q": "q-tight", "sim": 0.9}, {"q": "q-loose", "sim": 0.8}, {"q": "q-noise", "sim": 0.7}]}}
+    record = {"verdict": "trusted", "questionOutcomes": {"q-tight": {"n": 2, "correct": 1}, "q-loose": {"n": 1, "correct": 1}}, "calibration": None, "computedAt": "2026-01-15T00:00:00Z"}
+    conditioning = build_serve_conditioning(record, overlay, "stable-1")
+    assert conditioning["evidence"] == {"tight": {"n": 2, "correct": 1}, "loose": {"n": 1, "correct": 1}}
+
+    due = {"cardId": "due", "stableId": "stable-1", "variantGroupId": "vg", "variantType": "original", "complexity": 2, "lastQuality": 5, "correctCount": 2}
+    pools = {"siblings": [], "seenCardIds": {"due"}, "proximity": {"stable-1": overlay["cards"]["stable-1"]}, "seenQuestionIds": set(), "questionComplexity": {}}
+    decision = substitute_due_slot(due, pools)
+    assert decision == {"kind": "substitute", "itemType": "question", "id": "q-tight", "step": 2, "reason": "same-fact-mcq"}
+
+
+def test_mastery_seat_allocator_and_prep_ordering() -> None:
+    from ebbifold.scheduler.exam_target import allocate_mastery_seats
+    from ebbifold.scheduler.lanes import _order_prep_candidates
+
+    candidates = [
+        {"itemKey": "card:one", "unitId": "u1", "stage": "scheduled-atomic-core"},
+        {"itemKey": "card:two", "unitId": "u1", "stage": "scheduled-atomic-core"},
+        {"itemKey": "question:three", "unitId": "u2", "stage": "applied-distinction"},
+    ]
+    allocation = allocate_mastery_seats(
+        candidates=candidates,
+        eligible_unit_ids_by_stage={"scheduled-atomic-core": ["u1"], "applied-distinction": ["u2"]},
+        core_target_seats=2,
+        surplus_seats=1,
+    )
+    assert allocation["coreSelectedCount"] == 1
+    assert allocation["surplusSelectedCount"] == 1
+    assert [row["itemKey"] for row in allocation["selectedCandidates"]] == ["card:one", "question:three"]
+
+    items = [
+        {"type": "question", "id": "ordinary"},
+        {"type": "card", "id": "weak"},
+        {"type": "card", "id": "unseen"},
+    ]
+    ordered = _order_prep_candidates(items, {
+        "share": 0.5,
+        "itemIds": ["card:weak", "card:unseen"],
+        "weakItemIds": ["card:weak"],
+        "unseenItemIds": ["card:unseen"],
+    }, 2)
+    assert [row["id"] for row in ordered[:2]] == ["ordinary", "weak"]
+    assert ordered[-1]["id"] == "unseen"
+
+
+def test_pass_set_and_composed_deck_source_identity() -> None:
+    from ebbifold.scheduler.lanes import _pass_set_rank
+    from ebbifold.scheduler.queue import source_corpus_for
+
+    bulk = {
+        "passSetIntakeDecision": "pass-set-first",
+        "passSet": {"passSet": {"factKeyByCardId": {"c1": "fact-a"}, "factKeys": ["fact-a"], "rankByFactKey": {"fact-a": 7}}},
+    }
+    assert _pass_set_rank(bulk, {"id": "c1", "variantGroupId": None}) == 7
+    assert _pass_set_rank(bulk, {"id": "c2", "variantGroupId": None}) > 7
+    assert source_corpus_for("anatomy") == "bluelink"
+    assert source_corpus_for("surgical-sciences", "kubie-neuro.mdx") == "kubie"
+    assert source_corpus_for("surgical-sciences", "plates.mdx") == "plates"
+    assert source_corpus_for("neurosurg") == "kubie"
+
+
 @pytest.mark.parametrize(
     "mutate",
     [
         lambda s: s.update(struggleHistory={"cardProgress": {}}, userId=None),
-        lambda s: s.update(ratingReliability={"verdict": "ok"}),
-        lambda s: s.update(composedDeck=True),
-        lambda s: s["bulk"].update(cardGradeById={"s-glyco-1": {"lastQuality": 4, "correctCount": 2}}),
-        lambda s: s["bulk"].update(passSet={"factKeys": []}, passSetIntakeDecision="pass-set-first"),
         lambda s: s.update(conceptThreadAnchors=[{"anchorEventId": "e"}]),
         lambda s: s.update(concepts=[], deckStrandMix={"strands": []}),
     ],
-    ids=["struggle", "serve_conditioning", "composed_deck", "repetition_slot", "pass_set", "concept_thread",
-         "cluster_strands"],
+    ids=["struggle", "concept_thread", "cluster_strands"],
 )
 def test_session_unported_adapters_fail_closed(mutate: Any) -> None:
     snapshot = _base_session()

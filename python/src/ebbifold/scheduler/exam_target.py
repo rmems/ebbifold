@@ -17,18 +17,53 @@ from typing import Any
 from .errors import UnsupportedSchedulerInput
 
 EMPTY_ACTIVE = {"card": {}, "question": {}, "rankMove": 0}
+MASTERY_STAGES = frozenset({"scheduled-atomic-core", "applied-distinction", "breadth-exploration"})
+
+
+def allocate_mastery_seats(*, candidates: list[dict[str, Any]], eligible_unit_ids_by_stage: dict[str, list[str]],
+                           core_target_seats: int = 0, surplus_seats: int = 0) -> dict[str, Any]:
+    """Port of exam-target/mastery-seat-allocation.ts over JSON-shaped snapshots."""
+    eligible = {stage: set(eligible_unit_ids_by_stage.get(stage) or []) for stage in MASTERY_STAGES}
+    selected: list[dict[str, Any]] = []
+    used_items: set[str] = set()
+    used_units: set[str] = set()
+
+    def select(stage: str, limit: int) -> int:
+        count = 0
+        for candidate in candidates:
+            if count >= limit:
+                break
+            if (
+                candidate.get("stage") != stage
+                or candidate.get("unitId") not in eligible[stage]
+                or candidate.get("itemKey") in used_items
+                or candidate.get("unitId") in used_units
+            ):
+                continue
+            row = {"itemKey": candidate["itemKey"], "unitId": candidate["unitId"], "stage": stage}
+            selected.append(row)
+            used_items.add(row["itemKey"])
+            used_units.add(row["unitId"])
+            count += 1
+        return count
+
+    core = select("scheduled-atomic-core", max(0, core_target_seats))
+    applied = select("applied-distinction", max(0, surplus_seats))
+    breadth = select("breadth-exploration", max(0, surplus_seats - applied))
+    return {
+        "selectedCandidates": selected,
+        "coreSelectedCount": core,
+        "appliedSelectedCount": applied,
+        "breadthSelectedCount": breadth,
+        "surplusSelectedCount": applied + breadth,
+    }
 
 
 def assert_exam_target_supported(inputs: dict[str, Any]) -> None:
-    if inputs.get("masteryEvidence"):
-        raise UnsupportedSchedulerInput("exam-target mastery evidence is not ported in Phase 3a")
     if not inputs.get("applyExamTarget"):
         return
-    workload = inputs.get("targetWorkload")
-    if workload is None:
+    if inputs.get("targetWorkload") is None:
         raise UnsupportedSchedulerInput("exam-target treatment requires an explicit targetWorkload snapshot")
-    if (workload.get("coreTargetSeats") or 0) > 0 or (workload.get("surplusSeats") or 0) > 0:
-        raise UnsupportedSchedulerInput("exam-target mastery-seat lanes are not ported in Phase 3a")
 
 
 def resolve_learner_policy(inputs: dict[str, Any], states: list[Any]) -> dict[str, Any] | None:
@@ -196,7 +231,7 @@ def _pressure_bucket(pressure: float) -> str:
 
 
 def exam_target_decision(inputs: dict[str, Any], plan: dict[str, Any],
-                         final: list[dict[str, Any]]) -> dict[str, Any] | None:
+                         final: list[dict[str, Any]], build: Any = None) -> dict[str, Any] | None:
     runtime = inputs.get("runtimeExamTarget") or {}
     snapshot = inputs.get("runtimeTargetSnapshot")
     if not (inputs.get("targetComputeRequested") and snapshot and runtime.get("schedulerVersion")
@@ -213,8 +248,8 @@ def exam_target_decision(inputs: dict[str, Any], plan: dict[str, Any],
         "concepts": sorted(({"conceptId": s.conceptId, "recallOnExamDay": s.recallOnExamDay,
                              "confidence": s.confidence} for s in plan["conceptStates"]),
                            key=lambda c: c["conceptId"]),
-        "completedCoreWorkToday": 0,
-        "remainingTargetWork": None,
+        "completedCoreWorkToday": (inputs.get("masteryEvidence") or {}).get("completedCoreWorkToday") or 0,
+        "remainingTargetWork": (inputs.get("masteryEvidence") or {}).get("remainingTargetWork"),
     }
     move = influence.get("maxItemRankMove")
     return {
@@ -225,10 +260,12 @@ def exam_target_decision(inputs: dict[str, Any], plan: dict[str, Any],
         "applied": bool(inputs.get("applyExamTarget")), "bypassReason": _bypass_reason(inputs, mode, assignment),
         "maxItemRankMove": 0 if move is None else move,
         "unmappedDomainCodes": list((policy or {}).get("unmappedDomainCodes") or []),
-        "masteryPolicyVersion": None, "workload": dict(workload) if workload else None,
-        "coreTargetSeatsSelected": 0,
-        "coreTargetSeatShortfall": max(0, (workload or {}).get("coreTargetSeats") or 0),
-        "surplusTargetSeatsSelected": 0, "allocationChangedConceptMembershipCount": 0,
+        "masteryPolicyVersion": ((inputs.get("masteryEvidence") or {}).get("masteryPlan") or {}).get("policyVersion"),
+        "workload": dict(workload) if workload else None,
+        "coreTargetSeatsSelected": getattr(build, "selected_core_target_seats", 0),
+        "coreTargetSeatShortfall": max(0, ((workload or {}).get("coreTargetSeats") or 0) - getattr(build, "selected_core_target_seats", 0)),
+        "surplusTargetSeatsSelected": getattr(build, "selected_surplus_target_seats", 0),
+        "allocationChangedConceptMembershipCount": 0,
         "allocationCoverageDebtDomainCodes": [],
         "targetAllocationError": _allocation_error(inputs, policy, scores, final),
         "evaluationOnly": bool(inputs.get("examTargetEvaluationOnly")), "curriculumCoverageDebtCount": None,
@@ -251,6 +288,6 @@ def exam_target_stats(inputs: dict[str, Any], decision: dict[str, Any]) -> dict[
         "examTargetCoreSeatsSelected": decision["coreTargetSeatsSelected"],
         "examTargetCoreSeatShortfall": decision["coreTargetSeatShortfall"],
         "examTargetSurplusSeats": workload.get("surplusSeats") or 0,
-        "examTargetRemainingWork": None,
+        "examTargetRemainingWork": (inputs.get("masteryEvidence") or {}).get("remainingTargetWork"),
         "examTargetWorkloadShortfall": workload.get("shortfall"),
     }

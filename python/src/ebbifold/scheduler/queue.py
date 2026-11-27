@@ -174,6 +174,17 @@ def apply_difficulty_rhythm(items: list[dict[str, Any]], level: str) -> list[dic
 MAX_CROSS_SOURCE_ITEMS_PER_SESSION = 2
 
 
+def source_corpus_for(rotation: str | None, source_file: str | None = None) -> str:
+    value = rotation or "unknown"
+    if value == "anatomy":
+        return "bluelink"
+    if value == "surgical-sciences":
+        return "kubie" if (source_file or "").startswith("kubie-") else "plates"
+    if value == "neurosurg":
+        return "kubie"
+    return value
+
+
 def cap_cross_source_session_items(items: list[dict[str, Any]], *, session_rotation: str, allowed: list[str],
                                    max_items: float | None, get_rotation: Any, get_source_key: Any = None):
     sources = {r for r in allowed if r and r != session_rotation}
@@ -429,12 +440,9 @@ def apply_struggle_to_selection(inputs: dict[str, Any], build: Any) -> list[dict
 def order_session_items(inputs: dict[str, Any], plan: dict[str, Any], build: Any,
                         items: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]]]:
     from .difficulty import get_effective_question_difficulty
-    from .errors import UnsupportedSchedulerInput
     from .policies import apply_review_challenge_wave, modality_eligible_for_review_learning, review_learning_policy
     from .scoring import enforce_concept_teaching_caps, normalize_review_challenge_level
 
-    if inputs.get("composedDeck"):
-        raise UnsupportedSchedulerInput("composed-deck source fairness is not ported in Phase 3a")
     options, bulk, rotation = inputs["options"], inputs["bulk"], inputs["rotation"]
     level = normalize_review_challenge_level(options.get("reviewChallenge"))
     policy = review_learning_policy(options.get("reviewChallenge"))
@@ -466,6 +474,21 @@ def order_session_items(inputs: dict[str, Any], plan: dict[str, Any], build: Any
             if level != 0:
                 it["difficulty"] = get_effective_question_difficulty(q.get("difficulty"), q.get("facilityIndex"),
                                                                      q.get("totalAttempts"))
+    if inputs.get("applyExamTarget") and inputs.get("masteryEvidence"):
+        def mastery_rank(item_index: tuple[int, dict[str, Any]]) -> tuple[int, int]:
+            index, item = item_index
+            stage = item.get("examTargetMasteryStage")
+            if stage == "scheduled-atomic-core":
+                return 0, index
+            if stage == "applied-distinction":
+                return 1, index
+            item_rotation = item.get("rotation") or (
+                (card_rot := {c["id"]: c.get("rotation") for c in cards}).get(item["id"])
+                if item["type"] == "card" else (q_rot := {q["id"]: q.get("rotation") for q in bulk["rotationQuestions"]}).get(item["id"])
+            )
+            return (3 if stage == "breadth-exploration" or item_rotation != rotation else 2), index
+        mono = [item for _, item in sorted(enumerate(mono), key=mastery_rank)]
+
     paired = inject_preemptive_scaffolds(
         mono, bulk, rotation_seed=inputs["servingRotationSeed"], step_down_concept_ids=inputs["recentFailureConceptIds"],
         max_pairings=0 if inputs.get("effectiveMaxNewCards") == 0 else None,
@@ -496,9 +519,16 @@ def order_session_items(inputs: dict[str, Any], plan: dict[str, Any], build: Any
             return q_rot.get(item["id"]) or unknown
         return unknown
 
+    card_source = {c["id"]: c.get("sourceFile") for c in cards}
+
+    def get_source_key(item: dict[str, Any]) -> str:
+        item_rotation = item.get("rotation") or (card_rot.get(item["id"]) if item["type"] == "card" else q_rot.get(item["id"]))
+        return source_corpus_for(item_rotation, card_source.get(item["id"]) if item["type"] == "card" else None)
+
     source_capped = cap_cross_source_session_items(
         capped, session_rotation=rotation, allowed=options.get("crossSourceRotations") or [],
         max_items=options.get("maxCrossSourceItems"), get_rotation=get_rotation,
+        get_source_key=get_source_key if inputs.get("composedDeck") else None,
     )
     final = break_modality_runs(source_capped)
     if level != 0:
