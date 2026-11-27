@@ -29,7 +29,7 @@ REL_TOL = 1e-12
 
 def _load() -> dict[str, Any]:
     if not FIXTURE.is_file():
-        pytest.fail(f"golden fixture missing: {FIXTURE}; regenerate, do not skip")
+        pytest.fail(f"golden fixture missing: {FIXTURE}; restore the committed artifact")
     data = json.loads(FIXTURE.read_text(encoding="utf-8"))
     for section in ("conceptPlan", "buildScripts", "units"):
         if not data.get(section):
@@ -252,7 +252,7 @@ def test_fixture_covers_required_behaviors() -> None:
     ):
         assert required in names
     assert DATA["generator"] == "python/tools/generate_unified_scheduler_fixtures.ts"
-    assert (Path(__file__).parents[1] / "tools" / "generate_unified_scheduler_fixtures.ts").is_file()
+    assert FIXTURE.is_file()
 
 
 # --- end-to-end session construction --------------------------------------
@@ -261,7 +261,7 @@ from ebbifold.scheduler.pipeline import run_session  # noqa: E402
 
 SESSION_FIXTURE = Path(__file__).parent / "fixtures" / "unified-scheduler-session.cases.json"
 if not SESSION_FIXTURE.is_file():
-    pytest.fail(f"session golden fixture missing: {SESSION_FIXTURE}; regenerate, do not skip", pytrace=False)
+    pytest.fail(f"session golden fixture missing: {SESSION_FIXTURE}; restore the committed artifact", pytrace=False)
 SESSIONS = json.loads(SESSION_FIXTURE.read_text(encoding="utf-8"))["sessions"]
 if not SESSIONS:
     pytest.fail("session golden fixture has no cases", pytrace=False)
