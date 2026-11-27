@@ -77,9 +77,11 @@ def test_concept_thread_reserves_inside_existing_freshness_tier() -> None:
     bulk["questionMap"] = {q["id"]: q for q in bulk["rotationQuestions"]}
     bulk["conceptThreadMatcher"] = prepare_concept_thread_matcher([_anchor(now)], now)
     concept = {"topics": ["Renal Tubular Acidosis"]}
-    picked = get_questions_from_bulk(_question_query(concept, bulk))
+    query = _question_query(concept, bulk)
+    picked = get_questions_from_bulk(query)
     assert picked[0]["id"] == "followup"
     assert picked[0]["conceptThreadMatch"]["anchorEventId"] == "event-anchor"
+    assert [row["id"] for row in get_questions_from_bulk(query)] == [row["id"] for row in picked]
     assert all("_conceptThreadMatch" not in row for row in bulk["rotationQuestions"])
 
 

@@ -9,7 +9,7 @@ normalized by :func:`normalize_bulk`.
 from __future__ import annotations
 
 import math
-from collections.abc import Mapping
+from collections.abc import Mapping, Set as AbstractSet
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -388,8 +388,8 @@ def get_videos_from_bulk(query: VideoPoolQuery) -> list[dict[str, Any]]:
 
 @dataclass(frozen=True)
 class QuestionRankingOptions:
-    selected_question_ids: set[str] = field(default_factory=set)
-    selected_question_variant_groups: set[str] = field(default_factory=set)
+    selected_question_ids: AbstractSet[str] = field(default_factory=frozenset)
+    selected_question_variant_groups: AbstractSet[str] = field(default_factory=frozenset)
     difficulty_plan: list[str] | None = None
     recent_formats_by_concept: Mapping[str, Any] | None = None
     concept_thread_anchors: list[Any] | None = None
@@ -617,8 +617,8 @@ class QuestionTakeRequest:
     endpoint_plan: list[str]
     limit: int
     familiarity: Mapping[str, Any]
-    selected_ids: set[str]
-    selected_groups: set[str]
+    selected_ids: AbstractSet[str]
+    selected_groups: AbstractSet[str]
     counter: dict[str, int] | None
     level: int | None
     slot: int
@@ -629,6 +629,8 @@ class _QuestionTaker:
     def __init__(self, request: QuestionTakeRequest) -> None:
         self.request = request
         self.selected: list[dict[str, Any]] = []
+        self.selected_ids = set(request.selected_ids)
+        self.selected_groups = set(request.selected_groups)
 
     def rows(self, difficulty: str) -> list[dict[str, Any]]:
         return self.request.by_difficulty.get(difficulty) or []
@@ -640,19 +642,27 @@ class _QuestionTaker:
         return next((index for index, candidate in enumerate(rows) if candidate["id"] not in familiarity), -1)
 
     def _blocked(self, candidate: Mapping[str, Any]) -> bool:
-        if candidate["id"] in self.request.selected_ids:
+        if candidate["id"] in self.selected_ids:
             return True
         key = _suppression_key(candidate)
-        if key and key in self.request.selected_groups:
+        if key and key in self.selected_groups:
             return True
         counter = self.request.counter
         return counter is not None and not take_with_reentry_cap(candidate["id"], self.request.familiarity, counter)
 
+    @staticmethod
+    def _record_reservation(reservations: AbstractSet[str], value: str) -> None:
+        if isinstance(reservations, set):
+            reservations.add(value)
+
     def _mark_selected(self, candidate: Mapping[str, Any]) -> dict[str, Any]:
-        self.request.selected_ids.add(candidate["id"])
+        item_id = candidate["id"]
+        self.selected_ids.add(item_id)
+        self._record_reservation(self.request.selected_ids, item_id)
         key = _suppression_key(candidate)
         if key:
-            self.request.selected_groups.add(key)
+            self.selected_groups.add(key)
+            self._record_reservation(self.request.selected_groups, key)
         return {
             "id": candidate["id"], "variantGroupId": candidate.get("variantGroupId"),
             "variantType": candidate.get("variantType"),
@@ -675,7 +685,7 @@ class _QuestionTaker:
 
     def _already_reserved(self, candidate: Mapping[str, Any]) -> bool:
         key = _suppression_key(candidate)
-        return candidate["id"] in self.request.selected_ids or bool(key and key in self.request.selected_groups)
+        return candidate["id"] in self.selected_ids or bool(key and key in self.selected_groups)
 
     def _may_shift(self, baseline: dict[str, Any] | None) -> bool:
         return (
