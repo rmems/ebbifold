@@ -1,151 +1,67 @@
-<p align="center"><img src="public/icons/cohort-192.png" width="96" height="96" alt="Cohort"></p>
+# ebbifold
 
-# Cohort
+Spaced repetition over an embedding of concepts — not a deck of facts.
 
-Open-source spaced repetition for medicine, scheduled over an embedding of
-concepts rather than a deck of facts.
+The name folds three things together: **Ebbinghaus** (the forgetting curve),
+**e-fold** (the `e` in exponential decay), and **fold** (this is a fold of
+upstream's code into a new stack).
 
-Try it at **[cohort.md](https://cohort.md)**. No account is needed to study:
-the front page is a review loop over the clinical module cards and questions,
-and the Step 1 bank is at [cohort.md/usmle](https://cohort.md/usmle).
+## What this is
 
-Cohort is a learning engine with an open question bank aligned to the USMLE
-curriculum: 556 questions so far, each written for this corpus and carrying the
-source passage behind it. The bank is early and grows every release. Code and
-content are both open, MIT software and CC BY 4.0 content, and the export that
-produces this repository fails closed, so nothing reaches it without
-machine-checkable rights.
+ebbifold is a Python port of [todd866/cohort](https://github.com/todd866/cohort),
+the open-source spaced-repetition engine. The TypeScript app remains in this
+repository as the reference implementation; new development happens under
+`python/` and `julia/`:
 
-## How it works
+- **Python** (`python/`, `src/ebbifold/`) — the engine: adaptive scheduling,
+  the concept-space scheduler over 3,072-dimensional embeddings, corpus
+  loaders, a CLI and a local FastAPI app with SQLite persistence.
+- **Julia** (`julia/`) — the math layer: forgetting-curve fitting
+  (`R = e^(−t/S)`), per-concept memory-strength estimation and half-life
+  regression, reached over a ZMQ boundary.
 
-Every card, question and concept in the engine becomes a 3,072-dimensional
-vector, so scheduling happens over concepts and their neighbourhoods instead of
-over isolated facts: the scheduler measures the distance between what a learner
-has shown they know and what an exam expects, and serves what lies between.
-Cosine scoring runs inside Postgres, so the vectors stay in the database. That
-engine is in this repository, under `src/lib/manifold/` and
-`src/lib/knowledge/unified-scheduler.ts`, and it is what runs md3.info.
+The port follows one rule above all: **parity before features** — every
+ported module ships tests proving it matches the TypeScript original on
+identical inputs before new behavior is added. The full plan, including phase
+gates, is at [docs/python-port-plan.md](docs/python-port-plan.md).
 
-The public Step 1 reviewer does not use that concept-space scheduler yet; the
-surfaces are being moved onto it one at a time. Today the reviewer ranks on
-your answer history, the question's difficulty and the teaching ladders in the
-corpus, and is small enough to read in one sitting. Questions sit on three tiers. Two correct
-answers at a tier move you up; a single miss moves you down at once, and the questions that
-follow are drawn from the same ladder — the rungs that build toward the concept
-you just missed — before widening to its domain. The asymmetry is deliberate:
-nobody should have to fail twice before being helped.
-
-Progress is reported as what you have seen, what you got right, and how the
-ladder moved. There is no predicted score, and the product says so.
-
-Rights metadata, citations and content hashes travel with every item, and the
-release gate rejects anything missing them. Design notes and the measurements
-behind them are at [cohort.md/tech](https://cohort.md/tech).
-
-## The open corpus
+## Datasets
 
 | | |
 |---|---|
-| Step 1 questions | 556 original, citation-backed items, each with a source and passage pointer |
-| Baseline set | 25 original items served as the fixed first exposure |
-| Recorded ECGs | 5 de-identified: four PTB-XL (CC BY 4.0), one VTaC (CC BY-SA 4.0) |
-| Clinical module questions | 392 guideline-cited items in 24 disciplines, mirrored from md3, under `open-content/modules/questions/` |
-| Anatomy questions | 36 written for Cohort, under `open-content/modules/original-questions/` |
-| Clinical module cards | 2,136 cloze cards, each factually audited at its current wording, under `open-content/modules/cards/`; 88 of them are anatomy cards written for Cohort |
+| **Dataset #1 — USMLE Step 1** | 556 original, citation-backed questions plus a 25-item baseline set, under `open-content/usmle/step1/` |
+| **Dataset #2 — AI Engineering blueprint** | Planned. A second exam blueprint exercising the same engine, unmodified |
 
-All of it is in this repository. The questions are plain JSON under
-`open-content/usmle/step1/questions/`, each with its provenance envelope, and
-the recorded ECGs sit beside them in `open-content/usmle/step1/media/`,
-reusable under their stated licences without running the app. Blueprint coverage is
-incomplete. The questions are written for this corpus rather than recalled from
-exams; see the trademark note below.
+The corpus is frozen: 1,357 JSON files under `open-content/` are the data
+contract. Python reads them as-is — no format conversion, no re-authoring.
+Every record carries its provenance envelope, and admission is fail-closed:
+nothing unverified enters the bank.
 
-## Quick start
+## Upstream
 
-You need Node.js 24 and PostgreSQL.
+This repository is a fork of [todd866/cohort](https://github.com/todd866/cohort)
+(main-branch-only copy). Software is MIT (`LICENSE`); original educational
+content is CC BY 4.0 (`LICENSE-CONTENT.md`). Attribution to upstream is kept
+throughout the port. Upstream's live deployment is
+[cohort.md](https://cohort.md); this fork does not serve it.
 
-```bash
-npm ci
-cp .env.example .env.local
-# Set DATABASE_URL and NEXTAUTH_SECRET.
-# /usmle is a public early product: guests and signed-in users can study.
-# To enable sign-in, configure at least one provider:
-#   GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET, GITHUB_ID + GITHUB_SECRET,
-#   or RESEND_API_KEY + EMAIL_FROM.
-npm run db:push
-npm run db:seed:usmle-open
-npm run db:seed:cohort-modules  # the clinical module questions
-npm run db:seed:cohort-module-cards  # the clinical module cards
-npm run usmle:figures:install   # copy the 60 open visual assets into public/
-npm run dev
-```
+## The inherited app
 
-`usmle:figures:install` copies the openly licensed assets from
-`open-content/usmle/step1/media/` to `public/figures/usmle/step1/`, where the
-questions expect them. Run it before `dev` or `build`; it is idempotent and only
-copies assets that pass the open-corpus name check.
+The TypeScript application (Next.js, PostgreSQL/pgvector) still lives in this
+tree and remains the parity reference. Its key pieces:
 
-The scheduler ranks items by their position in an embedding space, so it
-needs vectors. `manifold:embed:open` fills them with Gemini text embeddings
-(set `GEMINI_API_KEY`). Each item embedded is a paid API call, so it embeds
-nothing unless you name a type, and `--dry-run` counts the items first:
+- `src/lib/usmle/step1-adaptive.ts` — the public reviewer's tiered scheduler
+  (3 tiers; 2 correct moves up, 1 miss drops immediately; follow-ups come from
+  the missed concept's teaching ladder before widening).
+- `src/lib/knowledge/unified-scheduler.ts` — the concept-space scheduler over
+  the embedding manifold.
+- `src/lib/exam-target/` — blueprint targeting; ships with an empty registry.
+- `open-content/` — the frozen corpus described above.
 
-```bash
-npm run manifold:embed:open -- --dry-run
-npm run manifold:embed:open -- --type cards --limit 100
-```
-
-To check a clean checkout:
-
-```bash
-npm run foss:boundary:audit      # nothing private crossed the boundary
-npm run foss:test                # the public test surface
-npm run usmle:corpus:release-gate
-npm run usmle:corpus:seed:dry
-npm run build
-```
-
-## What is in here
-
-- `src/lib/manifold/` — the embedding space and the in-database cosine scoring.
-- `src/lib/knowledge/unified-scheduler.ts` — the concept-space scheduler
-  described above. md3.info runs it; the public Step 1 surface is not wired to
-  it yet.
-- `src/lib/exam-target/` — points that scheduler at a blueprint. It ships with
-  an **empty registry**: the private instance targets one university's exam
-  domains and weightings, which are that institution's material. Register your
-  own target in `registry-data.ts`.
-- `src/lib/usmle/step1-adaptive.ts` — the public reviewer's tiers, promotion
-  streak and ladder scaffolding. Pure and dependency-free, so the rule is
-  testable without a database or a session.
-- `open-content/usmle/step1/` — the corpus, its baseline, its media and the
-  source registry, with a release fingerprint the seed checks against.
-
-## Cohort and md3
-
-The same engine runs [md3.info](https://md3.info), the author's own deployment,
-which carries a much larger question bank and course content. That instance is
-sign-in only: most of its material is written from licensed textbooks and
-university teaching, which cannot be redistributed. Ask if you would like an
-account to see the engine at that scale. Cohort stays open, content included.
-
-## Running it for other people
-
-Because both hosts share one engine, an `AUTH_TRUST_MD3_COHORT_HOSTS` flag
-exists. For a fork, leave it false and set your own HTTPS `AUTH_URL`. For the
-canonical dual-host deployment, set `AUTH_TRUST_MD3_COHORT_HOSTS=true`, leave AUTH_URL and NEXTAUTH_URL unset,
-and register both `https://md3.info/api/auth/callback/google` and
-`https://cohort.md/api/auth/callback/google` (and the GitHub equivalents).
-
-`/privacy` and `/terms` ship operator-neutral. If you host Cohort for learners,
-write your own before you onboard anyone.
-
-## Contributing
-
-Code, accessibility, tests, documentation, source-registry entries and original
-questions are all welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) first: it
-explains the rights boundary, the provenance envelope every question needs, and
-why "publicly accessible" does not mean "free to redistribute".
+Upstream's own README-era details (quick start, seeding, embedding pipeline)
+still apply to the TypeScript app; see
+[CONTRIBUTING.md](CONTRIBUTING.md) for the rights boundary and provenance
+rules every contribution must satisfy.
 
 ## Licence and provenance
 
@@ -153,15 +69,11 @@ Software: MIT (`LICENSE`). Original educational content: CC BY 4.0
 (`LICENSE-CONTENT.md`). Third-party material keeps its own terms, recorded
 beside it; citing a page does not relicense it.
 
-This repository is generated by `npm run foss:export` from a private source
-tree. Only explicitly selected files and rights-verified items enter an export,
-each hashed in `FOSS-DISTRIBUTION-MANIFEST.json`. Learner data never enters this
-repository.
-
 ## Trademark
 
 USMLE® is a registered trademark of the Federation of State Medical Boards and
-the National Board of Medical Examiners. Cohort is independent and is not affiliated with or endorsed by the USMLE program. See
+the National Board of Medical Examiners. ebbifold is independent and is not
+affiliated with or endorsed by the USMLE program. See
 [About USMLE](https://www.usmle.org/about-usmle) and the
 [exam security guidance](https://www.usmle.org/what-to-know/exam-security-fairness).
 This corpus uses original questions, not recalled exam items.
