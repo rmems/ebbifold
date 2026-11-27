@@ -97,13 +97,36 @@ def build_cluster_round_robin(
     return result
 
 
+def _remove_teaching_where(
+    indexes: list[int], predicate: Callable[[int], bool], removed: set[int], remaining: int,
+) -> int:
+    for index in reversed(indexes):
+        if remaining <= 0:
+            break
+        if index in removed or not predicate(index):
+            continue
+        removed.add(index)
+        remaining -= 1
+    return remaining
+
+
+def _ordinary_teaching_removable(
+    items: Sequence[Mapping[str, Any]], index: int, scaffold: set[int], mastery_core: set[int],
+    protected_ids: set[Any], preserve: Callable[[Mapping[str, Any]], bool] | None,
+) -> bool:
+    if index in scaffold or index in mastery_core:
+        return False
+    preserved = bool(preserve and preserve(items[index]))
+    return items[index]["id"] not in protected_ids and not preserved
+
+
 def _teaching_cap_removals(
     items: Sequence[Mapping[str, Any]], indexes: list[int], cap_value: float,
     preserve: Callable[[Mapping[str, Any]], bool] | None = None,
 ) -> set[int]:
     cap = max(0, math.floor(cap_value))
-    excess = len(indexes) - cap
-    if excess <= 0:
+    remaining = len(indexes) - cap
+    if remaining <= 0:
         return set()
 
     def struggle(i: int) -> Mapping[str, Any]:
@@ -113,35 +136,14 @@ def _teaching_cap_removals(
     mastery_core = {i for i in indexes if items[i].get("examTargetMasteryStage") == "scheduled-atomic-core"}
     protected_ids = {struggle(i).get("targetCardId") for i in scaffold} - {None, ""}
     removed: set[int] = set()
-
-    def remove_where(predicate: Callable[[int], bool]) -> None:
-        nonlocal excess
-        for index in reversed(indexes):
-            if excess <= 0:
-                break
-            if index in removed or not predicate(index):
-                continue
-            removed.add(index)
-            excess -= 1
-
-    def preserved(index: int) -> bool:
-        return bool(preserve and preserve(items[index]))
-
-    def ordinary_removable(index: int) -> bool:
-        if index in scaffold or index in mastery_core:
-            return False
-        if items[index]["id"] in protected_ids or preserved(index):
-            return False
-        return True
-
     removal_stages = (
-        ordinary_removable,
+        lambda index: _ordinary_teaching_removable(items, index, scaffold, mastery_core, protected_ids, preserve),
         lambda index: index in scaffold,
         lambda index: index not in mastery_core,
         lambda _index: True,
     )
     for stage in removal_stages:
-        remove_where(stage)
+        remaining = _remove_teaching_where(indexes, stage, removed, remaining)
     return removed
 
 
