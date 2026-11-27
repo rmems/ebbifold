@@ -161,7 +161,8 @@ def run_session(snapshot: dict[str, Any]) -> dict[str, Any]:
         "maxNewCards": ranking.maxNewCards, "crossSourceCardIds": ranking.crossSourceCardIds,
         "crossSourceQuestionIds": ranking.crossSourceQuestionIds, "maxCrossSourceItems": ranking.maxCrossSourceItems,
         "unknownItemRotation": ranking.unknownItemRotation, "weakConcepts": selection.weakConcepts,
-        "cardRatio": selection.cardRatio, **quota, "conceptHasPristine": pristine,
+        "cardRatio": selection.cardRatio, **quota,
+        "allocatedConceptRanks": selection.allocatedConceptRanks, "conceptHasPristine": pristine,
     }
     build = run_selection(inputs, plan)
     lane_counts = [{"id": t["id"], "result": t["result"]} for t in build.trace if t["op"] == "lane"]

@@ -61,8 +61,6 @@ def assert_supported(inputs: dict[str, Any]) -> None:
         raise UnsupportedSchedulerInput("exam-target treatment is not ported in Phase 3a")
     if inputs.get("targetSidecarsValid") and inputs.get("runtimeTargetSnapshot"):
         raise UnsupportedSchedulerInput("exam-target learner policy is not ported in Phase 3a")
-    if options.get("simulationFocus"):
-        raise UnsupportedSchedulerInput("simulation focus is not ported in Phase 3a")
     if options.get("sessionPrepBlend"):
         raise UnsupportedSchedulerInput("session prep blend is not ported in Phase 3a")
 
@@ -279,6 +277,7 @@ class ConceptSelection:
     weakConcepts: list[ConceptState]
     cardRatio: float
     maintenanceShift: float
+    allocatedConceptRanks: dict[str, int] | None = None
 
 
 def select_weak_concepts(
@@ -298,13 +297,26 @@ def select_weak_concepts(
     ]
     if budget_filtered:
         weak = budget_filtered
+    allocated_ranks = None
+    focus = options.get("simulationFocus")
+    if focus:
+        from .simulation import prefer_simulation_topics
+
+        recent = set(inputs.get("recentFailureConceptIds", []))
+        concept_map = inputs["conceptMap"]
+        preferred = iter(prefer_simulation_topics(
+            [s for s in weak if s.conceptId not in recent],
+            lambda s: (concept_map.get(s.conceptId) or {}).get("topics", []), focus))
+        weak = [s if s.conceptId in recent else next(preferred) for s in weak]
+        allocated_ranks = {s.conceptId: rank for rank, s in enumerate(weak)}
     shift = 0.0
     if options.get("cardRatio") is None and normalize_review_challenge_level(options.get("reviewChallenge")) == 0:
         _, breadth_ratio = smath.compute_knowledge_breadth([s.recallOnExamDay for s in ranking.conceptStates])
         shift = smath.compute_maintenance_shift(breadth_ratio, len(ranking.conceptStates))
         if shift > 0:
             card_ratio = min(0.9, card_ratio + shift)
-    return ConceptSelection(weakConcepts=weak, cardRatio=card_ratio, maintenanceShift=shift)
+    return ConceptSelection(weakConcepts=weak, cardRatio=card_ratio, maintenanceShift=shift,
+                            allocatedConceptRanks=allocated_ranks)
 
 
 def plan_card_quota(inputs: dict[str, Any], card_ratio: float) -> dict[str, int]:

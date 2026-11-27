@@ -377,14 +377,9 @@ def inject_preemptive_scaffolds(items: list[dict[str, Any]], bulk: dict[str, Any
 
 
 def apply_struggle_to_selection(inputs: dict[str, Any], build: Any) -> list[dict[str, Any]]:
-    """Struggle interventions read learner struggle history from storage. The
-    snapshot adapter ``struggleHistory`` must be empty; non-empty history is
-    rejected rather than silently skipped."""
-    from .errors import UnsupportedSchedulerInput
+    from .struggle import apply_struggle_interventions
 
-    if inputs.get("struggleHistory"):
-        raise UnsupportedSchedulerInput("struggle intervention history is not ported in Phase 3a")
-    return build.selected_items
+    return apply_struggle_interventions(inputs, build.selected_items)
 
 
 def order_session_items(inputs: dict[str, Any], plan: dict[str, Any], build: Any,

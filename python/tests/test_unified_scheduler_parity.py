@@ -187,7 +187,6 @@ def test_unseeded_or_malformed_seed_fails_closed(seed: str | None) -> None:
 _UNPORTED = {
     "exam_target": lambda s: s.update(applyExamTarget=True),
     "learner_policy": lambda s: s.update(targetSidecarsValid=True, runtimeTargetSnapshot={"definition": {}}),
-    "simulation_focus": lambda s: s["options"].update(simulationFocus={"topics": ["x"]}),
     "prep_blend": lambda s: s["options"].update(sessionPrepBlend={"items": []}),
 }
 
@@ -297,7 +296,7 @@ def _base_session() -> dict[str, Any]:
 @pytest.mark.parametrize(
     "mutate",
     [
-        lambda s: s.update(struggleHistory=[{"cardId": "u-renal-1"}]),
+        lambda s: s.update(struggleHistory={"cardProgress": {}}, userId=None),
         lambda s: s.update(ratingReliability={"verdict": "ok"}),
         lambda s: s.update(composedDeck=True),
         lambda s: s["bulk"].update(cardGradeById={"s-glyco-1": {"lastQuality": 4, "correctCount": 2}}),

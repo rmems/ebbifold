@@ -7,7 +7,11 @@
  *   empty cluster table (cluster fallback) from the snapshot.
  * - rotation top-up rows come from snapshot.rotationTopUp (what
  *   getQuestionsForRotation would return), mirroring topUpFromRotationBank.
- * - struggle history is empty, so applyStruggleToSelection is the identity.
+ * - struggle-history tables (card progress, question responses, bridge-card
+ *   pools, scaffold/context/variant lookups) come from snapshot.struggleHistory.
+ * - the global Date is frozen at NOW_MS so code that reads the wall clock
+ *   (e.g. hasDemonstratedLearningGap's default `now`) sees the fixture clock.
+ * - the reviewed simulation item registry is copied into snapshot.simulationItemMap.
  *
  * Run: node --import tsx python/tools/generate_unified_scheduler_session_fixtures.ts
  */
@@ -18,14 +22,77 @@ import { fileURLToPath } from 'node:url';
 type Json = any;
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 declare const require: (id: string) => any;
-const fakeDb = { embeddings: new Map<string, number[]>() };
+const NOW_MS = Date.UTC(2026, 0, 15, 12, 0, 0);
+const RealDate = Date;
+class FrozenDate extends RealDate {
+  constructor(...args: unknown[]) {
+    if (args.length === 0) super(NOW_MS);
+    else super(...(args as [string | number]));
+  }
+
+  static now(): number {
+    return NOW_MS;
+  }
+}
+(globalThis as any).Date = FrozenDate;
+const fakeDb = { embeddings: new Map<string, number[]>(), struggle: {} as Json };
+const at = (ms: number | null | undefined) => (ms == null ? null : new Date(ms));
+const cardOfTopics = (topics: string[] | undefined) => (topics?.[0] ?? '').replace(/^__card:/, '');
+const sameTopics = (a: string[], b: string[]) => JSON.stringify(a) === JSON.stringify(b);
+const responseCounts = async ({ where }: Json) => (where.questionId.in as string[])
+  .map((questionId) => {
+    const stats = fakeDb.struggle.questionAttempts?.[questionId] ?? {};
+    return { questionId, _count: { _all: (where.isCorrect ? stats.correct : stats.attempts) ?? 0 } };
+  })
+  .filter((row) => row._count._all > 0);
+const bridgePool = async ({ where, take }: Json) => {
+  const question = (fakeDb.struggle.questions ?? []).find((q: Json) => sameTopics(q.topics, where.topics.hasSome));
+  const pools = fakeDb.struggle.bridgePools?.[question?.id] ?? {};
+  const notIn = new Set<string>(where.id.notIn);
+  return ((where.sourceComponent === 'KeyPoint' ? pools.keyPoint : pools.primary) ?? [])
+    .filter((row: Json) => !notIn.has(row.id))
+    .slice(0, take)
+    .map((row: Json) => ({
+      id: row.id,
+      progress: row.progress
+        ? [{ status: row.progress.status, lastReview: at(row.progress.lastReview), nextDueAt: at(row.progress.nextDueAt) }]
+        : [],
+    }));
+};
 (globalThis as any).prisma = {
-  $queryRaw: async (_strings: unknown, ...values: unknown[]) => {
+  $queryRaw: async (strings: unknown, ...values: unknown[]) => {
+    if (!Array.isArray(strings)) return fakeDb.struggle.bridgeCards ?? [];
     const ids = (values.find(v => Array.isArray(v)) ?? []) as string[];
     return ids.filter(id => fakeDb.embeddings.has(id))
       .map(id => ({ id, embedding: `[${fakeDb.embeddings.get(id)!.join(',')}]` }));
   },
   cluster: { findMany: async () => [] },
+  cardProgress: {
+    findMany: async ({ where }: Json) => (where.cardId.in as string[])
+      .filter((cardId) => fakeDb.struggle.cardProgress?.[cardId])
+      .map((cardId) => {
+        const row = fakeDb.struggle.cardProgress[cardId];
+        return { cardId, ...row, recentFailWindowStart: at(row.recentFailWindowStart) };
+      }),
+  },
+  questionResponse: { groupBy: responseCounts },
+  question: {
+    findMany: async ({ where }: Json) => (fakeDb.struggle.questions ?? []).filter((q: Json) => where.id.in.includes(q.id)),
+    findFirst: async ({ where }: Json) => {
+      const variant = fakeDb.struggle.variantQuestions?.[cardOfTopics(where.topics?.hasSome)];
+      return variant ? { id: variant.id } : null;
+    },
+  },
+  card: {
+    findUnique: async ({ where }: Json) => ({
+      topics: [`__card:${where.id}`],
+      rotation: fakeDb.struggle.variantQuestions?.[where.id]?.rotation ?? 'rot-main',
+    }),
+    findMany: bridgePool,
+  },
+  concept: {
+    findFirst: async ({ where }: Json) => (where.rotation ? null : fakeDb.struggle.contextConcepts?.[cardOfTopics(where.topics?.hasSome)] ?? null),
+  },
 };
 
 const K = '../../src/lib/knowledge/';
@@ -39,7 +106,7 @@ const variants = require(`${K}variant-suppression`);
 const retirement = require(`${K}question-retirement`);
 const types = require(`${K}unified-scheduler-types`);
 
-const NOW_MS = Date.UTC(2026, 0, 15, 12, 0, 0);
+const simRegistry = require('../../src/lib/study/simulation-item-map.json');
 const DAY = 86_400_000;
 const SEED = 'a3f1c9e2b7d4058e6a1f3c5d7e9b2a4c6e8f0a1b3c5d7e9f1a2b3c4d5e6f7a8b';
 
@@ -99,6 +166,11 @@ function toSessionInputs(s: Json): any {
     cardVariantGroupHistory: new Map(Object.entries<any>(b.cardVariantGroupHistory ?? {}).map(([k, v]) => [k, new Set(v)])),
     questionFamiliarity: mapOf(b.questionFamiliarity),
     passSetDeferredCardIds: new Set(b.passSetDeferredCardIds ?? []),
+    simulationPreparation: (b.simulationPreparation ?? []).map((r: Json) => ({
+      ...r,
+      lastReview: r.lastReview == null ? null : new Date(r.lastReview),
+      nextDueAt: r.nextDueAt == null ? null : new Date(r.nextDueAt),
+    })),
   };
   const pc = s.penaltyContext;
   return {
@@ -152,6 +224,7 @@ function topUpAdapter(inputs: any, plan: any, build: any, rows: Json[]): void {
 
 async function runSession(s: Json): Promise<Json> {
   fakeDb.embeddings = new Map(Object.entries<number[]>(s.itemEmbeddings ?? {}));
+  fakeDb.struggle = s.struggleHistory ?? {};
   const inputs = toSessionInputs(s);
   if (inputs.concepts.length === 0) {
     const result = await clusterSession.constructClusterSession('fixture-user', {
@@ -187,7 +260,8 @@ async function runSession(s: Json): Promise<Json> {
   lane('rescue_orphans', () => backfill.rescueOrphans(inputs, plan, build));
   backfill.releaseFirstSightReservation(inputs, build);
   const selectedIds = build.selectedItems.map((i: Json) => `${i.type}:${i.id}`);
-  const { finalOrdered, cardMetaById } = await queue.orderSessionItems(inputs, plan, build, build.selectedItems);
+  const struggled = await queue.applyStruggleToSelection(inputs, build);
+  const { finalOrdered, cardMetaById } = await queue.orderSessionItems(inputs, plan, build, struggled);
   const telemetry = finalize.attachDeliveryTelemetry(inputs, plan, build, finalOrdered, cardMetaById);
   const result = finalize.assembleSessionResult(inputs, plan, build, finalOrdered, telemetry);
   return toJson({ result, laneCounts, selectedIds });
@@ -214,7 +288,7 @@ const concept = (id: string, topics: string[], extra: Json = {}) => ({
 
 function baseSession(): Json {
   return {
-    nowMs: NOW_MS, daysToExam: 30, examPressure: 1 / (1 + Math.exp(-0.15 * (21 - 30))), size: 12, cardRatio: 0.7,
+    userId: 'fixture-user', nowMs: NOW_MS, daysToExam: 30, examPressure: 1 / (1 + Math.exp(-0.15 * (21 - 30))), size: 12, cardRatio: 0.7,
     rotation: 'rot-main', effectiveMaxNewCards: null, interferenceThreshold: 0.85, includeVideos: true,
     servingRotationSeed: `serving:${SEED}`, budget: { dailyThroughput: 41.6, totalRemaining: 812.4, sessionsRemaining: 9 },
     options: { examTargetTieBreakSeed: SEED },
@@ -285,6 +359,71 @@ function sessionVariant(name: string, mutate: (s: Json) => void = () => {}): { n
   return { name, snapshot };
 }
 
+const preEclampsia = simRegistry.records.filter((r: Json) => r.topic === 'pre-eclampsia');
+
+function simulationSession(s: Json): void {
+  const [scaffold, reviewed, prepared] = preEclampsia.map((r: Json) => r.stableId);
+  s.options.simulationFocus = {
+    fingerprint: 'fixture-focus', deadline: '2026-02-01', topics: ['pre-eclampsia'], preparationStableIds: [prepared],
+  };
+  s.concepts.push(concept('c-pe', ['Pre-eclampsia'], { examWeight: 4 }), concept('c-ecl', ['Eclampsia']));
+  s.stateMap['c-ecl'] = st(0.4, 0.5, 4, 2, 3);
+  s.bulk.unseenCards.push(
+    card('u-pe-plain-s', ['Pre-eclampsia'], { stableId: null, complexity: 1 }),
+    card('u-pe-s', ['Pre-eclampsia'], { stableId: scaffold, complexity: 1 }),
+    card('u-ecl-plain', ['Eclampsia'], { stableId: null }),
+    card('u-ecl-reviewed', ['Eclampsia'], { stableId: reviewed }),
+    card('u-ecl-prepared', ['Eclampsia'], { stableId: prepared }),
+  );
+  const prep = (id: string, extra: Json) => ({
+    id, stableId: `prep-${id}`, lastQuality: null, totalReviews: 0, lastReview: null, nextDueAt: null,
+    card: { variantGroupId: null, variantIndex: null, variantType: null }, ...extra,
+  });
+  s.bulk.simulationPreparation = [
+    prep('sp-unknown', {}),
+    prep('sp-recalled', { lastQuality: 5, totalReviews: 3, lastReview: ago(2), nextDueAt: ago(-5) }),
+    prep('sp-due', { lastQuality: 4, totalReviews: 2, lastReview: ago(9), nextDueAt: ago(1) }),
+    prep('sp-weak', { lastQuality: 1, totalReviews: 1, lastReview: ago(3), nextDueAt: ago(-1) }),
+    prep('sp-weak-older', { lastQuality: 1, totalReviews: 4, lastReview: ago(6), nextDueAt: null, card: { variantGroupId: 'pg', variantIndex: 0, variantType: 'cloze' } }),
+  ];
+  const ids = new Set([scaffold, reviewed, prepared]);
+  s.simulationItemMap = simRegistry.records.filter((r: Json) => ids.has(r.stableId));
+}
+
+function struggleSession(s: Json, withLookups: boolean): void {
+  const progress = (recentFailCount: number, windowHoursAgo: number | null, totalReviews: number, correctCount: number) => ({
+    recentFailCount, recentFailWindowStart: windowHoursAgo == null ? null : NOW_MS - windowHoursAgo * 3_600_000,
+    totalReviews, correctCount,
+  });
+  const cards = ['u-renal-1', 'u-cardiac-1', 'u-acid-1', 's-glyco-1', 's-glyco-2', 'u-cardiac-2', 'u-sickle-s', 'u-orphan'];
+  s.struggleHistory = {
+    cardProgress: {
+      'u-renal-1': progress(3, 2, 4, 1), 'u-cardiac-1': progress(4, 30, 5, 1), 'u-acid-1': progress(1, 1, 6, 3),
+      's-glyco-1': progress(3, 5, 3, 2), 's-glyco-2': progress(0, null, 10, 2), 'u-cardiac-2': progress(5, 1, 5, 0),
+      'u-sickle-s': progress(2, 1, 2, 0), 'u-orphan': progress(3, 23, 3, 1),
+    },
+    questionAttempts: { 'q-renal-1': { attempts: 5, correct: 1 }, 'q-cardiac-1': { attempts: 4, correct: 1 }, 'q-acid-1': { attempts: 2, correct: 0 } },
+    questions: [
+      { id: 'q-cardiac-1', topics: ['Cardiac Output'], rotation: 'rot-main' },
+      { id: 'q-renal-1', topics: ['Renal Tubular Acidosis'], rotation: 'rot-main' },
+    ],
+    bridgePools: {
+      'q-renal-1': {
+        primary: [
+          { id: 'b-cooldown', progress: { status: 'mastered', lastReview: ago(0.5), nextDueAt: ago(1) } },
+          { id: 'b-fresh', progress: null },
+          { id: 'b-due', progress: { status: 'reviewing', lastReview: ago(3), nextDueAt: ago(1) } },
+          { id: 'u-renal-1', progress: null },
+        ],
+      },
+      'q-cardiac-1': { primary: [{ id: 'b-not-due', progress: { status: 'mastered', lastReview: ago(4), nextDueAt: ago(-2) } }], keyPoint: [{ id: 'kp-cardiac', progress: null }] },
+    },
+    bridgeCards: withLookups ? [{ id: 'bridge-a' }, { id: 'bridge-b' }] : [],
+    contextConcepts: withLookups ? Object.fromEntries(cards.map((id) => [id, { id: `ctx-${id}`, name: 'Context', description: 'Teaching note' }])) : {},
+    variantQuestions: withLookups ? Object.fromEntries(cards.map((id) => [id, { id: `vq-${id}`, rotation: 'rot-main' }])) : {},
+  };
+}
+
 const sessionCases = [
   sessionVariant('full_session_weak_new_pristine'),
   sessionVariant('empty_pools', s => { s.bulk = { rotationQuestions: [], unseenCards: [], seenCards: [] }; s.itemEmbeddings = {}; }),
@@ -317,6 +456,16 @@ const sessionCases = [
     s.options.topicTeachingWeeks = { 'cardiac-output': 2, glycolysis: 4 };
   }),
   sessionVariant('excluded_items', s => { s.excludedCardIds = ['u-renal-1', 's-glyco-1']; s.excludedQuestionIds = ['q-renal-1']; }),
+  sessionVariant('simulation_focus_preparation', s => { simulationSession(s); s.size = 16; }),
+  sessionVariant('simulation_focus_recent_failure', s => { simulationSession(s); s.recentFailureConceptIds = ['c-renal', 'c-ecl']; }),
+  sessionVariant('simulation_preparation_fills_session', s => { simulationSession(s); s.size = 3; }),
+  sessionVariant('review_challenge_hardest_learning_gap', s => {
+    s.options.reviewChallenge = 2;
+    s.stateMap['c-renal'] = st(0.3, 0.4, 5, 2, 0.5, { recentFailRate: 0.5 });
+    s.stateMap['c-cardiac'] = st(0.55, 0.2, 2, 6, 3, { recentFailRate: 0.4 });
+  }),
+  sessionVariant('struggle_history_interventions', s => { struggleSession(s, true); s.size = 16; }),
+  sessionVariant('struggle_history_lookups_missing', s => { struggleSession(s, false); s.size = 16; }),
   sessionVariant('empty_concepts_cluster_fallback', s => { s.concepts = []; }),
 ];
 

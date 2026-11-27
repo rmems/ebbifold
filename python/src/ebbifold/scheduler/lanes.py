@@ -13,6 +13,7 @@ from typing import Any
 from .build_state import SessionBuildState
 from .config import DEFAULTS
 from .policies import has_demonstrated_learning_gap
+from .simulation import prefer_reviewed_simulation_cards
 from .ranking import EXAM_RELEVANCE_BOOST_FACTOR, get_cards_from_bulk, get_questions_from_bulk, get_videos_from_bulk
 from .scoring import build_cluster_round_robin, classify_teaching_state, normalize_review_challenge_level
 from .scoring import resolve_intervention_reason as _resolve_reason
@@ -37,12 +38,15 @@ def demonstrated_gap(inputs: dict[str, Any], concept_id: str) -> bool:
     )
 
 
-def card_pool(inputs: dict[str, Any], build: SessionBuildState, concept_id: str, concept: dict[str, Any], recall: float | None):
+def card_pool(inputs: dict[str, Any], build: SessionBuildState, concept_id: str, concept: dict[str, Any],
+              recall: float | None, *, apply_review_challenge: bool = True):
+    """Backfill lanes (any-concept, uncapped) pass no review challenge in TypeScript."""
     options = inputs["options"]
+    challenge = (options.get("reviewChallenge") or 0) if apply_review_challenge else 0
     return get_cards_from_bulk(
         concept_id, concept, 20, inputs["bulk"], build.selected_card_ids, inputs.get("penaltyContext"), recall,
         options.get("currentTeachingWeek"), None, EXAM_RELEVANCE_BOOST_FACTOR, options.get("topicTeachingWeeks"),
-        options.get("recentFigureExposures"), inputs["nowMs"], options.get("reviewChallenge") or 0,
+        options.get("recentFigureExposures"), inputs["nowMs"], challenge,
         options.get("topicRecencyDays"),
     )
 
@@ -132,7 +136,7 @@ def _topics_overlap(a: list[str] | None, b: list[str]) -> bool:
 
 
 def pick_naive_pre_teach_cards(naive: list[dict[str, Any]], bulk: dict[str, Any], max_pre_teach: float,
-                               already: set[str]) -> list[dict[str, Any]]:
+                               already: set[str], prefer_card: Any = None) -> list[dict[str, Any]]:
     if max_pre_teach <= 0 or not naive or not bulk["unseenCards"]:
         return []
     used = set(already)
@@ -140,6 +144,10 @@ def pick_naive_pre_teach_cards(naive: list[dict[str, Any]], bulk: dict[str, Any]
     if not scaffolds:
         return []
     ordered = sorted(naive, key=lambda c: (-c["priority"], c["conceptName"]))
+    if prefer_card is not None:
+        scaffolds.sort(key=lambda c: not prefer_card(c))
+        preferred = [c for c in scaffolds if c["id"] not in used and prefer_card(c)]
+        ordered.sort(key=lambda concept: not any(_topics_overlap(concept["topics"], c["topics"]) for c in preferred))
     picks: list[dict[str, Any]] = []
     for concept in ordered:
         if len(picks) >= max_pre_teach:
@@ -165,8 +173,11 @@ def pre_teach_naive_concepts(inputs: dict[str, Any], plan: dict[str, Any], build
     budget = math.inf if max_new == math.inf else max(0, max_new - build.new_card_count)
     target = plan["targetCardCount"]
     if budget > 0 and naive and build.selected_card_count < target:
+        focus = inputs["options"].get("simulationFocus")
+        registry = _simulation_registry(inputs)
+        prefer = (lambda c: registry.evidence(c.get("stableId"), focus) is not None) if focus else None
         picks = pick_naive_pre_teach_cards(naive, inputs["bulk"], min(3, target - build.selected_card_count, budget),
-                                           build.selected_card_ids)
+                                           build.selected_card_ids, prefer)
         for pick in picks:
             if build.selected_card_count >= target:
                 break
@@ -175,7 +186,38 @@ def pre_teach_naive_concepts(inputs: dict[str, Any], plan: dict[str, Any], build
 
 
 def _round_robin(plan: dict[str, Any]) -> list[Any]:
-    return build_cluster_round_robin(plan["weakConcepts"], plan["getConceptCluster"])
+    ranks = plan.get("allocatedConceptRanks")
+    rank_fn = (lambda c: ranks.get(c.conceptId)) if ranks is not None else None
+    return build_cluster_round_robin(plan["weakConcepts"], plan["getConceptCluster"], rank_fn)
+
+
+def _simulation_registry(inputs: dict[str, Any]):
+    from .simulation import SimulationRegistry
+
+    if "_simulationRegistry" not in inputs:
+        inputs["_simulationRegistry"] = SimulationRegistry(inputs.get("simulationItemMap") or [])
+    return inputs["_simulationRegistry"]
+
+
+def fill_simulation_preparation(inputs: dict[str, Any], plan: dict[str, Any], build: SessionBuildState) -> None:
+    from .simulation import order_unrecalled_simulation_preparation
+
+    rows = inputs["bulk"].get("simulationPreparation") or []
+    if not inputs["options"].get("simulationFocus") or not rows:
+        return
+    for row in order_unrecalled_simulation_preparation(rows, inputs["nowMs"]):
+        if len(build.selected_items) >= inputs["size"]:
+            break
+        if any(item["id"] == row["id"] for item in build.selected_items):
+            continue
+        build.selected_card_ids.discard(row["id"])
+        card = row.get("card") or {}
+        build.add_item({
+            "type": "card", "id": row["id"], "conceptId": "_unattached", "conceptName": "Simulation preparation",
+            "priority": 1, "interventionReason": "simulation_preparation",
+            "variantGroupId": card.get("variantGroupId"), "variantIndex": card.get("variantIndex"),
+            "variantType": card.get("variantType"),
+        }, bypass_novelty_reservation=True)
 
 
 def fill_questions(inputs: dict[str, Any], plan: dict[str, Any], build: SessionBuildState) -> None:
@@ -228,6 +270,9 @@ def fill_cards(inputs: dict[str, Any], plan: dict[str, Any], build: SessionBuild
     hard_max = 5
     concepts = _round_robin(plan)
     threshold = inputs["interferenceThreshold"]
+    recent_failures = set(inputs.get("recentFailureConceptIds", []))
+    bulk = inputs["bulk"]
+    stable_ids = {c["id"]: c.get("stableId") for c in [*bulk["unseenCards"], *bulk["seenCards"]]}
     for _ in range(hard_max):
         if build.selected_card_count >= target:
             break
@@ -247,7 +292,10 @@ def fill_cards(inputs: dict[str, Any], plan: dict[str, Any], build: SessionBuild
             if not candidates:
                 continue
             sim = threshold if already == 0 else min(0.97, threshold + 0.1)
-            picked = build.pick_card_candidate(list(candidates), similarity_threshold=sim,
+            focus = None if concept.conceptId in recent_failures else inputs["options"].get("simulationFocus")
+            ordered = prefer_reviewed_simulation_cards(list(candidates), lambda c: stable_ids.get(c["id"]), focus,
+                                                       _simulation_registry(inputs))
+            picked = build.pick_card_candidate(ordered, similarity_threshold=sim,
                                                max_per_cluster=3 if already == 0 else 5)
             if not picked:
                 continue
@@ -317,7 +365,7 @@ def backfill_from_any_concept(inputs: dict[str, Any], plan: dict[str, Any], buil
         data = inputs["conceptMap"].get(concept.conceptId)
         if not data:
             continue
-        candidates = card_pool(inputs, build, concept.conceptId, data, concept.currentRecall)
+        candidates = card_pool(inputs, build, concept.conceptId, data, concept.currentRecall, apply_review_challenge=False)
         if not candidates:
             continue
         picked = build.pick_card_candidate(candidates, similarity_threshold=threshold, max_per_cluster=5)
@@ -403,7 +451,7 @@ def backfill_cards_uncapped(inputs: dict[str, Any], plan: dict[str, Any], build:
         data = inputs["conceptMap"].get(concept.conceptId)
         if not data:
             continue
-        candidates = card_pool(inputs, build, concept.conceptId, data, concept.currentRecall)
+        candidates = card_pool(inputs, build, concept.conceptId, data, concept.currentRecall, apply_review_challenge=False)
         if not candidates:
             continue
         picked = build.pick_card_candidate(candidates, similarity_threshold=threshold, max_per_cluster=5)
@@ -477,6 +525,7 @@ def rescue_orphans(inputs: dict[str, Any], plan: dict[str, Any], build: SessionB
 def run_selection(inputs: dict[str, Any], plan: dict[str, Any]) -> SessionBuildState:
     """Facade steps 10-26: build state, every selection lane, first-sight release."""
     build = create_session_build(inputs, plan)
+    fill_simulation_preparation(inputs, plan, build)
     for lane in (pre_teach_videos, pre_teach_naive_concepts, fill_questions, fill_cards, fill_coverage_lane,
                  backfill_from_any_concept, probe_stale_strong_concepts, top_up_from_rotation_bank,
                  backfill_cards_uncapped, rescue_orphans):
