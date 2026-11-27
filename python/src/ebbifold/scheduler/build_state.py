@@ -42,7 +42,6 @@ def question_suppression_key(item: Mapping[str, Any]) -> str | None:
 
 
 class SessionBuildState:
-# NOSONAR
     def __init__(
         self,
         *,

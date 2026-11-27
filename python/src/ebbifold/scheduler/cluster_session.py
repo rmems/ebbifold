@@ -31,7 +31,6 @@ def _restricted(inputs: dict[str, Any]) -> bool:
     return bool(options.get("media") or options.get("crossSourceRotations") or inputs.get("week") is not None or options.get("week") is not None)
 
 
-# NOSONAR
 def _eligible_row(inputs: dict[str, Any], row: dict[str, Any]) -> bool:
     options = inputs["options"]
     rotations = [inputs["rotation"], *(options.get("crossSourceRotations") or [])]

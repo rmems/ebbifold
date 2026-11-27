@@ -38,7 +38,6 @@ def deck_strand_of(mix: dict[str, Any], identity: dict[str, Any]) -> str:
     return strands[-1]["id"] if strands else "default"
 
 
-# NOSONAR
 def order_by_deck_strands(
     items: list[dict[str, Any]], mix: dict[str, Any] | None, *, seed: str,
     identify: Callable[[dict[str, Any]], dict[str, Any]],

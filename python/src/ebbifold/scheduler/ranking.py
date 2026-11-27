@@ -394,7 +394,6 @@ def _question_pool(concept_id: str, concept: Mapping[str, Any], bulk: Mapping[st
     return primary, linked, topic_matched
 
 
-# NOSONAR
 def get_questions_from_bulk(
     concept_id: str,
     concept: Mapping[str, Any],
@@ -524,7 +523,6 @@ def get_questions_from_bulk(
     )
 
 
-# NOSONAR
 def _take_questions(by_difficulty, endpoint_plan, limit, familiarity, selected_ids, selected_groups, counter, level, slot, thread_matches=None):
     def take_next(difficulty: str, unseen_only: bool = False) -> dict[str, Any] | None:
         rows = by_difficulty.get(difficulty)

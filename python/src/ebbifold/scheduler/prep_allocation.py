@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any, Callable
 
 
-# NOSONAR
 def order_prep_keys(keys: list[str], plan: dict[str, Any]) -> list[str]:
     weak = set(plan.get("weakItemIds") or [])
     unseen = set(plan.get("unseenItemIds") or [])
@@ -59,7 +58,6 @@ def prep_modality_budgets(share: float, card_seats: int, question_seats: int, ca
     return {"cards": cards, "questions": questions}
 
 
-# NOSONAR
 def order_session_prep_candidates(
     items: list[dict[str, Any]], plan: dict[str, Any] | None, *, size: int,
     key: Callable[[dict[str, Any]], str], protected: Callable[[dict[str, Any]], bool] | None = None,
