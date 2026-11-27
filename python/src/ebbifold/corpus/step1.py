@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -163,42 +164,44 @@ def _validate_step1_registry(
     errors.extend(citation_errors)
     return checked, errors
 
+@dataclass(frozen=True)
+class _Step1ManifestContext:
+    baseline_path: Path
+    release_path: Path
+    baseline_ids: list[str]
+    release_ids: list[str]
+
+
 def _step1_membership_errors(
-    baseline_path: Path,
-    release_path: Path,
-    question_ids: set[str],
-    baseline_ids: list[str],
-    release_ids: list[str],
+    context: _Step1ManifestContext, question_ids: set[str]
 ) -> list[str]:
-    release_id_set = set(release_ids)
+    release_id_set = set(context.release_ids)
     return [
-        *(f"{baseline_path}: unknown baseline question {question_id}"
-          for question_id in baseline_ids if question_id not in question_ids),
-        *(f"{release_path}: unknown release question {question_id}"
-          for question_id in release_ids if question_id not in question_ids),
-        *(f"{release_path}: unreleased source question {question_id}"
+        *(f"{context.baseline_path}: unknown baseline question {question_id}"
+          for question_id in context.baseline_ids if question_id not in question_ids),
+        *(f"{context.release_path}: unknown release question {question_id}"
+          for question_id in context.release_ids if question_id not in question_ids),
+        *(f"{context.release_path}: unreleased source question {question_id}"
           for question_id in sorted(question_ids) if question_id not in release_id_set),
     ]
 
+
 def _step1_fingerprint_errors(
-    release_raw: Any,
-    release_path: Path,
-    loaded: list[LoadedQuestion],
-    release_id_set: set[str],
-    baseline_ids: list[str],
+    release_raw: Any, loaded: list[LoadedQuestion], context: _Step1ManifestContext
 ) -> list[str]:
     fingerprints = release_raw.get("questionFingerprints") if isinstance(release_raw, dict) else None
     if not isinstance(fingerprints, dict):
-        return [f"{release_path}: questionFingerprints must be an object"]
+        return [f"{context.release_path}: questionFingerprints must be an object"]
 
     errors: list[str] = []
-    baseline_id_set = set(baseline_ids)
+    baseline_id_set = set(context.baseline_ids)
+    release_id_set = set(context.release_ids)
     for item in loaded:
         if item.record.id not in release_id_set:
             continue
         expected = fingerprints.get(item.record.id)
         if not expected:
-            errors.append(f"{release_path}: missing release fingerprint {item.record.id}")
+            errors.append(f"{context.release_path}: missing release fingerprint {item.record.id}")
             continue
         actual = public_serving_fingerprint(
             item.raw,
@@ -206,7 +209,9 @@ def _step1_fingerprint_errors(
             baseline_question_ids=baseline_id_set,
         )
         if actual != expected:
-            errors.append(f"{release_path}: release fingerprint differs from source {item.record.id}")
+            errors.append(
+                f"{context.release_path}: release fingerprint differs from source {item.record.id}"
+            )
     return errors
 
 def _project_step1_questions(
@@ -242,17 +247,15 @@ def load_step1_corpus(root: str | Path | None = None) -> Step1Corpus:
     errors.extend(baseline_errors)
     errors.extend(release_errors)
 
+    context = _Step1ManifestContext(
+        baseline_path=baseline_path,
+        release_path=release_path,
+        baseline_ids=baseline_ids,
+        release_ids=release_ids,
+    )
     question_ids = {item.record.id for item in loaded}
-    errors.extend(
-        _step1_membership_errors(
-            baseline_path, release_path, question_ids, baseline_ids, release_ids
-        )
-    )
-    errors.extend(
-        _step1_fingerprint_errors(
-            release_raw, release_path, loaded, set(release_ids), baseline_ids
-        )
-    )
+    errors.extend(_step1_membership_errors(context, question_ids))
+    errors.extend(_step1_fingerprint_errors(release_raw, loaded, context))
 
     citations_checked, registry_errors = _validate_step1_registry(
         step1_root / "sources.json", loaded

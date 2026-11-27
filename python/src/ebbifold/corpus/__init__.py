@@ -2,7 +2,10 @@
 
 from .audit import AnswerKeyAudit, CorpusAudit, CorpusCounts, audit_answer_key
 from .loaders import (
+    ClozeCardCorpus,
     CorpusSnapshot,
+    ModuleCorpus,
+    Step1Corpus,
     admit_attempt_payload,
     admit_question_payload,
     load_cloze_card_corpus,
@@ -29,6 +32,7 @@ __all__ = [
     "QUESTION_SCHEMA",
     "AnswerKeyAudit",
     "AttemptRecord",
+    "ClozeCardCorpus",
     "ClozeCardRecord",
     "ClozeCardShard",
     "CorpusAdmissionError",
@@ -36,8 +40,10 @@ __all__ = [
     "CorpusCounts",
     "CorpusSchemaError",
     "CorpusSnapshot",
+    "ModuleCorpus",
     "ModuleQuestionRecord",
     "QuestionOption",
+    "Step1Corpus",
     "Step1QuestionRecord",
     "admit_attempt_payload",
     "admit_question_payload",

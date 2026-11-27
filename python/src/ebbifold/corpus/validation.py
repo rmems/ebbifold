@@ -43,11 +43,21 @@ def _expect_manifest_object(raw: Any, path: Path, version: int) -> list[str]:
         return [f"{path}: expected schemaVersion {version}"]
     return []
 
+def _non_empty_string(value: Any) -> bool:
+    return isinstance(value, str) and bool(value)
+
+
+def _valid_id_list(value: Any) -> bool:
+    if not isinstance(value, list) or not value:
+        return False
+    return all(_non_empty_string(item) for item in value)
+
+
 def _id_list(raw: Any, key: str, path: Path) -> tuple[list[str], list[str]]:
     if not isinstance(raw, dict):
         return [], [f"{path}: {key} is unavailable because the manifest is not an object"]
     value = raw.get(key)
-    if not isinstance(value, list) or not value or not all(isinstance(item, str) and item for item in value):
+    if not _valid_id_list(value):
         return [], [f"{path}: {key} must be a non-empty string array"]
     duplicates = sorted({item for item in value if value.count(item) > 1})
     errors = [f"{path}: duplicate {key} entry {item}" for item in duplicates]
