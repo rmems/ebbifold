@@ -105,7 +105,10 @@ class ClusterCardSelection:
         return [row for row in self.rows if row["id"] in target_ids and row["id"] not in present]
 
     def ordered_candidates(self, cluster_id: str, wants_prep: bool) -> list[dict[str, Any]]:
-        candidates = [row for row in self.rows if str(row.get("clusterId")) == cluster_id][:12]
+        candidates = [
+            row for row in self.rows
+            if str(row.get("clusterId")) == cluster_id and row["id"] not in self.selected_ids
+        ][:12]
         target_ids = set(self.prep_by_cluster.get(cluster_id, []))
         if wants_prep and target_ids:
             candidates += self._targeted_prep_rows(candidates, target_ids)
