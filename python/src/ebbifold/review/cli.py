@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -16,6 +17,15 @@ from ebbifold.corpus import load_corpus
 
 from .engine import ReviewEngine, ReviewQuestion
 from .store import AttemptInput, SQLiteReviewStore, default_store_path
+
+
+@dataclass
+class CliContext:
+    engine: ReviewEngine
+    store: SQLiteReviewStore
+    session_id: str
+    scripted: list[str]
+    script_mode: bool
 
 
 def _print_question(question: ReviewQuestion) -> None:
@@ -29,16 +39,17 @@ def _valid_label(question: ReviewQuestion, answer: str) -> bool:
     return any(option.label.upper() == wanted for option in question.options)
 
 
-def _answer(question: ReviewQuestion, answer: str, store: SQLiteReviewStore, session_id: str, started: datetime) -> bool:
+def _answer(ctx: CliContext, question: ReviewQuestion, answer: str, started: datetime) -> bool:
     correct = ReviewEngine.grade(question, answer)
-    store.record_attempt(
+    answered_at = datetime.now(UTC)
+    ctx.store.record_attempt(
         AttemptInput(
-            session_id=session_id,
+            session_id=ctx.session_id,
             item_id=question.id,
             selected_label=answer.strip().upper(),
             is_correct=correct,
-            answered_at=datetime.now(UTC),
-            time_to_answer_ms=int((datetime.now(UTC) - started).total_seconds() * 1000),
+            answered_at=answered_at,
+            time_to_answer_ms=int((answered_at - started).total_seconds() * 1000),
             difficulty_at_attempt=question.difficulty,
             concept_at_attempt=question.concept_id,
         )
@@ -47,49 +58,75 @@ def _answer(question: ReviewQuestion, answer: str, store: SQLiteReviewStore, ses
     return correct
 
 
-def run(args: argparse.Namespace) -> int:
-    content_root = Path(args.content).resolve() if args.content else None
-    snapshot = load_corpus(content_root)
-    engine = ReviewEngine(snapshot)
-    store = SQLiteReviewStore(args.db)
-    if args.session:
-        if not store.session_exists(args.session):
-            print(f"unknown review session: {args.session}", file=sys.stderr)
-            return 2
-        session_id = args.session
-    else:
-        session_id = store.create_session(str(content_root or Path.cwd()))
-    print(f"session {session_id}")
+def _open_session(args: argparse.Namespace, store: SQLiteReviewStore) -> str | None:
+    if not args.session:
+        return store.create_session(str(Path(args.content).resolve() if args.content else Path.cwd()))
+    if store.session_exists(args.session):
+        return args.session
+    print(f"unknown review session: {args.session}", file=sys.stderr)
+    return None
 
-    scripted = [part.strip() for part in args.script.split(",")] if args.script else []
+
+def _read_answer(ctx: CliContext, scripted_index: int) -> tuple[str | None, int]:
+    if scripted_index < len(ctx.scripted):
+        answer = ctx.scripted[scripted_index]
+        print(f"> {answer}")
+        return answer, scripted_index + 1
+    if ctx.script_mode:
+        return None, scripted_index
+    return input("answer: "), scripted_index
+
+
+def _submit_answer(ctx: CliContext, question: ReviewQuestion, answer: str, started: datetime) -> str:
+    if answer.strip().lower() in {"q", "quit", "exit"}:
+        return "stop"
+    if _valid_label(question, answer):
+        _answer(ctx, question, answer, started)
+        return "answered"
+    print("answer must be one of the displayed labels", file=sys.stderr)
+    return "invalid-scripted" if ctx.script_mode else "retry"
+
+
+def _review_loop(ctx: CliContext, size: int) -> int:
     scripted_index = 0
     answered = 0
-    while answered < args.size:
-        session_attempts = store.attempts(session_id)
-        question = engine.next_question(session_attempts, store.attempts())
+    while answered < size:
+        session_attempts = ctx.store.attempts(ctx.session_id)
+        question = ctx.engine.next_question(session_attempts, ctx.store.attempts())
         if question is None:
             print("no unanswered items remain")
             break
         started = datetime.now(UTC)
         _print_question(question)
-        if scripted_index < len(scripted):
-            answer = scripted[scripted_index]
-            scripted_index += 1
-            print(f"> {answer}")
-        elif args.script:
+        answer, scripted_index = _read_answer(ctx, scripted_index)
+        if answer is None:
             break
-        else:
-            answer = input("answer: ")
-        if answer.strip().lower() in {"q", "quit", "exit"}:
+        outcome = _submit_answer(ctx, question, answer, started)
+        if outcome == "invalid-scripted":
+            return 2
+        if outcome == "stop":
             break
-        if not _valid_label(question, answer):
-            print("answer must be one of the displayed labels", file=sys.stderr)
-            if args.script:
-                return 2
-            continue
-        _answer(question, answer, store, session_id, started)
-        answered += 1
+        if outcome == "answered":
+            answered += 1
     return 0
+
+
+def run(args: argparse.Namespace) -> int:
+    content_root = Path(args.content).resolve() if args.content else None
+    snapshot = load_corpus(content_root)
+    store = SQLiteReviewStore(args.db)
+    session_id = _open_session(args, store)
+    if session_id is None:
+        return 2
+    print(f"session {session_id}")
+    ctx = CliContext(
+        engine=ReviewEngine(snapshot),
+        store=store,
+        session_id=session_id,
+        scripted=[part.strip() for part in args.script.split(",")] if args.script else [],
+        script_mode=bool(args.script),
+    )
+    return _review_loop(ctx, args.size)
 
 
 def build_parser() -> argparse.ArgumentParser:

@@ -1,7 +1,10 @@
 from datetime import UTC, datetime
+from pathlib import Path
+from types import SimpleNamespace
 import sqlite3
 
 from ebbifold.corpus import load_corpus
+from ebbifold.review.cli import run
 from ebbifold.review.engine import ReviewEngine
 from ebbifold.review.store import AttemptInput, SQLiteReviewStore
 
@@ -58,3 +61,33 @@ def test_review_store_schema_is_domain_neutral(tmp_path):
     assert "item_id" in columns
     assert "concept_at_attempt" in columns
     assert not any("usmle" in column or "medical" in column for column in columns)
+
+
+def test_scripted_cli_session_persists_attempt_and_resumes(tmp_path, capsys):
+    db = tmp_path / "review.sqlite3"
+    repo_root = Path(__file__).resolve().parents[2]
+    args = SimpleNamespace(
+        content=str(repo_root),
+        db=str(db),
+        session=None,
+        size=1,
+        script="A",
+    )
+
+    assert run(args) == 0
+    output = capsys.readouterr().out
+    session_id = next(line.split()[-1] for line in output.splitlines() if line.startswith("session "))
+    with sqlite3.connect(db) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM attempts").fetchone()[0] == 1
+
+    resume_args = SimpleNamespace(
+        content=str(repo_root),
+        db=str(db),
+        session=session_id,
+        size=1,
+        script="B",
+    )
+    assert run(resume_args) == 0
+    store = SQLiteReviewStore(db)
+    assert store.session_exists(session_id)
+    assert len(store.attempts(session_id)) == 2
