@@ -98,9 +98,11 @@ public/figures/anki/
 # Codespace file uploads (drag-and-drop from Finder)
 uploads/
 
-# Python cache
+# Python cache and coverage
 __pycache__/
 .venv/
+.coverage
+/python/coverage/
 
 # Research projects (separate repos)
 research/

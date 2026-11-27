@@ -1,0 +1,249 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/rmems/ebbifold/schemas/question-record-v1.json",
+  "title": "ebbifold corpus question record v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "rotation", "topics", "moduleNodes", "questionType", "difficulty", "stem", "options", "context"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "rotation": { "type": "string", "minLength": 1 },
+    "topics": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "moduleNodes": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "ladderId": { "type": ["string", "null"], "minLength": 1 },
+    "questionType": { "type": ["string", "null"], "minLength": 1 },
+    "difficulty": { "type": ["string", "null"], "minLength": 1 },
+    "stem": { "type": "string", "minLength": 1 },
+    "options": {
+      "type": "array",
+      "minItems": 2,
+      "items": { "$ref": "#/$defs/option" }
+    },
+    "context": { "type": ["string", "null"] },
+    "imageUrl": { "type": ["string", "null"], "minLength": 1 },
+    "imageCaption": { "type": ["string", "null"], "minLength": 1 },
+    "cite": { "type": "string", "minLength": 1 },
+    "publicUsmle": { "$ref": "#/$defs/publicUsmleProvenance" },
+    "publicModule": { "$ref": "#/$defs/publicModuleProvenance" }
+  },
+  "oneOf": [
+    {
+      "title": "USMLE Step 1 public question",
+      "required": ["cite", "publicUsmle"],
+      "properties": {
+        "rotation": { "const": "usmle-step1-open" },
+        "id": { "pattern": "^bank:usmle-step1:.+:v1$" },
+        "publicModule": false
+      }
+    },
+    {
+      "title": "Cohort module public question",
+      "required": ["publicModule"],
+      "properties": {
+        "rotation": { "const": "cohort-open" },
+        "id": { "pattern": "^bank:cohort:[a-z-]+:q-[0-9a-f]{12}:v1$" },
+        "cite": false,
+        "publicUsmle": false
+      }
+    }
+  ],
+  "$defs": {
+    "option": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "text", "isCorrect"],
+      "properties": {
+        "label": { "type": "string", "minLength": 1 },
+        "text": { "type": "string", "minLength": 1 },
+        "isCorrect": { "type": "boolean" },
+        "misconception": { "type": "string" },
+        "explanation": { "type": "string" }
+      }
+    },
+    "licence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cls", "id"],
+      "properties": {
+        "cls": { "enum": ["foss", "verify", "unknown"] },
+        "id": { "type": "string", "minLength": 1 }
+      }
+    },
+    "itemText": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["licence", "attribution"],
+      "properties": {
+        "licence": {
+          "enum": ["CC-BY-4.0", "CC-BY-SA-4.0", "CC0-1.0", "restricted", "unknown"]
+        },
+        "attribution": { "type": "string", "minLength": 1 }
+      }
+    },
+    "evidence": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": { "kind": { "const": "none" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "sourceId", "licence"],
+          "properties": {
+            "kind": { "const": "reference" },
+            "sourceId": { "type": "string", "minLength": 1 },
+            "licence": { "$ref": "#/$defs/licence" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "sourceId", "passageId", "licence"],
+          "properties": {
+            "kind": { "const": "passage" },
+            "sourceId": { "type": "string", "minLength": 1 },
+            "passageId": { "type": "string", "minLength": 1 },
+            "licence": { "$ref": "#/$defs/licence" }
+          }
+        }
+      ]
+    },
+    "media": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": { "kind": { "const": "none" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "assetId", "job", "showWhen", "licence", "attribution"],
+          "properties": {
+            "kind": { "const": "asset" },
+            "assetId": { "type": "string", "minLength": 1 },
+            "job": {
+              "enum": [
+                "pathway",
+                "mechanism",
+                "anatomy",
+                "compare-table",
+                "finding-exemplar",
+                "smear",
+                "histo",
+                "imaging",
+                "trace"
+              ]
+            },
+            "showWhen": { "enum": ["after-reveal", "always"] },
+            "licence": { "$ref": "#/$defs/licence" },
+            "attribution": { "type": "string", "minLength": 1 },
+            "sourceUrl": { "type": "string", "format": "uri" },
+            "contentHash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+            "clinicalConditionIds": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 100,
+              "items": {
+                "type": "string",
+                "maxLength": 160,
+                "pattern": "^[a-z0-9]+(?:[a-z0-9._-]*[a-z0-9])?$"
+              }
+            },
+            "clinicalKeyFindings": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 100,
+              "items": { "type": "string", "minLength": 1, "maxLength": 1000 }
+            }
+          }
+        }
+      ]
+    },
+    "publicUsmleProvenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "origin", "itemText", "evidence"],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "origin": {
+          "enum": [
+            "authored",
+            "generated",
+            "anking",
+            "y3g-reshape",
+            "legacy-instagram",
+            "first-aid-derived",
+            "source-derived",
+            "unknown"
+          ]
+        },
+        "itemText": { "$ref": "#/$defs/itemText" },
+        "evidence": { "$ref": "#/$defs/evidence" },
+        "media": { "$ref": "#/$defs/media" }
+      }
+    },
+    "moduleItemText": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["licence", "attribution"],
+      "properties": {
+        "licence": { "const": "CC-BY-4.0" },
+        "attribution": { "type": "string", "minLength": 1 }
+      }
+    },
+    "moduleEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "sourceId"],
+      "properties": {
+        "kind": { "const": "reference" },
+        "sourceId": { "type": "string", "minLength": 1 }
+      }
+    },
+    "moduleReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["verdict", "contentHash"],
+      "properties": {
+        "verdict": { "enum": ["passed", "needs-fix"] },
+        "contentHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "publicModuleProvenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "origin", "discipline", "itemText", "evidence", "review"],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "origin": { "enum": ["mirrored", "original"] },
+        "discipline": { "type": "string", "minLength": 1 },
+        "mirroredFrom": { "type": "string", "minLength": 1 },
+        "originalId": { "type": "string", "minLength": 1 },
+        "itemText": { "$ref": "#/$defs/moduleItemText" },
+        "evidence": { "$ref": "#/$defs/moduleEvidence" },
+        "review": { "$ref": "#/$defs/moduleReview" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "origin": { "const": "mirrored" } } },
+          "then": { "required": ["mirroredFrom"] }
+        },
+        {
+          "if": { "properties": { "origin": { "const": "original" } } },
+          "then": { "required": ["originalId"] }
+        }
+      ]
+    }
+  }
+}

@@ -4,21 +4,27 @@ on:
   push:
     paths:
       - 'python/**'
+      - 'schemas/**'
+      - 'open-content/**'
       - '.github/workflows/python-ci.yml'
   pull_request:
     paths:
       - 'python/**'
+      - 'schemas/**'
+      - 'open-content/**'
       - '.github/workflows/python-ci.yml'
 
 permissions:
   contents: read
-  id-token: write # Qlty coverage upload (OIDC)
+  id-token: write
 
 jobs:
   pytest:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           enable-cache: true
@@ -27,19 +33,12 @@ jobs:
         # --no-install-project: the scaffold's tests import ebbifold via
         # pytest's pythonpath, so nothing needs building from source.
         run: uv sync --locked --no-install-project --no-build
-      - name: Install coverage plugin
+      - name: Run pytest with coverage
         working-directory: python
-        run: uv pip install --no-build pytest-cov
-      - name: Run pytest
-        working-directory: python
-        run: uv run --no-sync pytest -q
-        env:
-          PYTEST_ADDOPTS: --cov=src --cov-report=lcov:coverage.lcov
+        run: uv run --no-sync pytest -q --cov=src/ebbifold --cov-report=lcov:coverage/lcov.info --cov-report=term-missing
       - name: Upload coverage to Qlty
-        if: ${{ !github.event.pull_request.head.repo.fork }}
-        uses: qltysh/qlty-action/coverage@v2
+        uses: qltysh/qlty-action/coverage@56bee2d751c94b7bd8de22f64c9b5f398048e13f # v2.8.1
         with:
           oidc: true
-          files: python/coverage.lcov
+          files: python/coverage/lcov.info
           add-prefix: python/
-          tag: python
