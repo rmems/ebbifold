@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 from typing import Any
 
 from .build_state import SessionBuildState
@@ -15,9 +16,48 @@ from .scoring import resolve_intervention_reason as _resolve_reason
 from .topics import expand_topic_set
 
 
-def resolve_reason(inputs: dict[str, Any], plan: dict[str, Any], concept_id: str, recall: float, base: str) -> str:
+@dataclass(frozen=True)
+class ReasonRequest:
+    inputs: dict[str, Any]
+    plan: dict[str, Any]
+    concept_id: str
+    recall: float
+    base: str
+
+
+@dataclass(frozen=True)
+class CardPoolRequest:
+    inputs: dict[str, Any]
+    build: SessionBuildState
+    concept_id: str
+    concept: dict[str, Any]
+    recall: float | None
+    apply_review_challenge: bool = True
+
+
+@dataclass(frozen=True)
+class QuestionPoolRequest:
+    inputs: dict[str, Any]
+    build: SessionBuildState
+    concept_id: str
+    concept: dict[str, Any]
+    difficulty: str
+    slot: int | None = None
+
+
+@dataclass(frozen=True)
+class CardCommitRequest:
+    build: SessionBuildState
+    picked: dict[str, Any]
+    item: dict[str, Any]
+    recall: float | None = None
+    record_recall: bool = True
+
+
+def resolve_reason(request: ReasonRequest) -> str:
     return _resolve_reason(
-        concept_id, recall, base, inputs["recentFailureConceptIds"], plan["conceptHasPristine"], DEFAULTS["target_recall"]
+        request.concept_id, request.recall, request.base, request.inputs["recentFailureConceptIds"],
+        request.plan["conceptHasPristine"], DEFAULTS["target_recall"],
     )
 
 
@@ -33,14 +73,15 @@ def demonstrated_gap(inputs: dict[str, Any], concept_id: str) -> bool:
     )
 
 
-def card_pool(inputs: dict[str, Any], build: SessionBuildState, concept_id: str, concept: dict[str, Any],
-              recall: float | None, *, apply_review_challenge: bool = True):
+def card_pool(request: CardPoolRequest):
     """Backfill lanes (any-concept, uncapped) pass no review challenge in TypeScript."""
+    inputs = request.inputs
     options = inputs["options"]
-    challenge = (options.get("reviewChallenge") or 0) if apply_review_challenge else 0
+    challenge = (options.get("reviewChallenge") or 0) if request.apply_review_challenge else 0
     active = active_targets(inputs)
     return get_cards_from_bulk(
-        concept_id, concept, 20, inputs["bulk"], build.selected_card_ids, inputs.get("penaltyContext"), recall,
+        request.concept_id, request.concept, 20, inputs["bulk"], request.build.selected_card_ids,
+        inputs.get("penaltyContext"), request.recall,
         options.get("currentTeachingWeek"), active["card"] if inputs.get("applyExamTarget") else None,
         active["rankMove"], options.get("topicTeachingWeeks"),
         options.get("recentFigureExposures"), inputs["nowMs"], challenge,
@@ -48,25 +89,25 @@ def card_pool(inputs: dict[str, Any], build: SessionBuildState, concept_id: str,
     )
 
 
-def question_pool(inputs: dict[str, Any], build: SessionBuildState, concept_id: str, concept: dict[str, Any],
-                  difficulty: str, slot: int | None = None) -> list[dict[str, Any]]:
+def question_pool(request: QuestionPoolRequest) -> list[dict[str, Any]]:
+    inputs = request.inputs
     options = inputs["options"]
     exam: dict[str, Any] = {}
     if inputs.get("applyExamTarget"):
         active = active_targets(inputs)
         exam = {"exam_target_scores": active["question"], "exam_target_max_rank_move": active["rankMove"]}
     return get_questions_from_bulk(
-        concept_id, concept, 1, inputs["bulk"],
-        selected_question_ids=build.selected_question_ids,
-        selected_question_variant_groups=build.selected_question_variant_groups,
-        difficulty_plan=[difficulty],
+        request.concept_id, request.concept, 1, inputs["bulk"],
+        selected_question_ids=request.build.selected_question_ids,
+        selected_question_variant_groups=request.build.selected_question_variant_groups,
+        difficulty_plan=[request.difficulty],
         review_challenge=options.get("reviewChallenge"),
-        review_challenge_gap=demonstrated_gap(inputs, concept_id),
-        challenge_slot_index=slot or 0,
+        review_challenge_gap=demonstrated_gap(inputs, request.concept_id),
+        challenge_slot_index=request.slot or 0,
         current_teaching_week=options.get("currentTeachingWeek"),
         topic_teaching_weeks=options.get("topicTeachingWeeks"),
         topic_recency_days=options.get("topicRecencyDays"),
-        mastered_reentry_counter=build.mastered_reentry_counter,
+        mastered_reentry_counter=request.build.mastered_reentry_counter,
         recent_formats_by_concept=inputs.get("recentFormatsByConcept"),
         **exam,
     )
@@ -77,14 +118,13 @@ def card_item(picked: dict[str, Any], **fields: Any) -> dict[str, Any]:
             "variantIndex": picked.get("variantIndex"), "variantType": picked.get("variantType")}
 
 
-def commit_card(build: SessionBuildState, picked: dict[str, Any], item: dict[str, Any], recall: float | None = None,
-                record_recall: bool = True) -> bool:
-    added = build.add_item(item)
+def commit_card(request: CardCommitRequest) -> bool:
+    added = request.build.add_item(request.item)
     if added:
-        if record_recall:
-            build.record_applied_challenge_recall(picked["id"], recall)
-        build.record_cluster(picked.get("clusterId"))
-        build.record_card_neighborhood(picked)
+        if request.record_recall:
+            request.build.record_applied_challenge_recall(request.picked["id"], request.recall)
+        request.build.record_cluster(request.picked.get("clusterId"))
+        request.build.record_card_neighborhood(request.picked)
     return added
 
 
@@ -109,9 +149,8 @@ def _block_items_without_mastery_evidence(bulk: dict[str, Any], build: SessionBu
         build.selected_video_ids.add(video["id"])
 
 
-def create_session_build(inputs: dict[str, Any], plan: dict[str, Any]) -> SessionBuildState:
-    size, bulk = inputs["size"], inputs["bulk"]
-    build = SessionBuildState(
+def _initial_build_state(inputs: dict[str, Any], plan: dict[str, Any], size: int, bulk: dict[str, Any]) -> SessionBuildState:
+    return SessionBuildState(
         size=size, min_first_sight_items=_minimum_first_sight_items(size, inputs["options"]),
         max_new_cards=plan["maxNewCards"],
         max_cross_source_items=plan["maxCrossSourceItems"], unseen_card_ids=plan["unseenCardIds"],
@@ -120,12 +159,25 @@ def create_session_build(inputs: dict[str, Any], plan: dict[str, Any]) -> Sessio
         excluded_question_ids=inputs["excludedQuestionIds"], excluded_video_ids=inputs["excludedVideoIds"],
         weak_concepts=plan["weakConcepts"], concept_thread_anchors=inputs.get("conceptThreadAnchors") or [],
     )
+
+
+def _missing_required_mastery_evidence(inputs: dict[str, Any], requirement: int) -> bool:
+    if not inputs.get("applyExamTarget"):
+        return False
+    if requirement <= 0:
+        return False
+    return inputs.get("masteryEvidence") is None
+
+
+def create_session_build(inputs: dict[str, Any], plan: dict[str, Any]) -> SessionBuildState:
+    size, bulk = inputs["size"], inputs["bulk"]
+    build = _initial_build_state(inputs, plan, size, bulk)
     build.mastered_reentry_counter = {"masteredServed": 0}
     build.selected_core_target_seats = 0
     build.selected_surplus_target_seats = 0
     requirement = _core_target_requirement(inputs, size)
     build.core_target_quota_satisfied = requirement == 0
-    if inputs.get("applyExamTarget") and requirement > 0 and inputs.get("masteryEvidence") is None:
+    if _missing_required_mastery_evidence(inputs, requirement):
         _block_items_without_mastery_evidence(bulk, build)
     return build
 
@@ -141,13 +193,21 @@ def _topic_fallback_state(inputs: dict[str, Any], plan: dict[str, Any], topics: 
     return matches[0] if matches else None
 
 
+def _better_scored_state(state: Any, score: float, best: tuple[Any, float] | None) -> bool:
+    if best is None:
+        return True
+    if score != best[1]:
+        return score > best[1]
+    return state.conceptId < best[0].conceptId
+
+
 def _scored_card_state(inputs: dict[str, Any], plan: dict[str, Any], card: dict[str, Any]):
     best = None
     for state in plan["conceptStates"]:
         score = (inputs["bulk"]["cardScores"].get(state.conceptId) or {}).get(card["id"])
         if score is None:
             continue
-        if best is None or score > best[1] or (score == best[1] and state.conceptId < best[0].conceptId):
+        if _better_scored_state(state, score, best):
             best = (state, score)
     return best[0] if best else None
 

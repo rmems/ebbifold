@@ -16,6 +16,10 @@ from .ranking import get_videos_from_bulk
 from .scoring import classify_teaching_state
 from .simulation import prefer_reviewed_simulation_cards
 from .lane_utils import (
+    CardCommitRequest,
+    CardPoolRequest,
+    QuestionPoolRequest,
+    ReasonRequest,
     _round_robin,
     _simulation_registry,
     card_item,
@@ -163,12 +167,14 @@ def fill_questions(inputs: dict[str, Any], plan: dict[str, Any], build: SessionB
                 base = "low_confidence" if low else "needs_retest"
             else:
                 base = "needs_retest" if concept.intervention == "remediate" else "reinforcement"
-            reason = resolve_reason(inputs, plan, concept.conceptId, concept.recallOnExamDay, base)
+            reason = resolve_reason(ReasonRequest(inputs, plan, concept.conceptId, concept.recallOnExamDay, base))
             difficulty = question_request_difficulty(inputs["examPressure"], base, already)
             data = inputs["conceptMap"].get(concept.conceptId)
             if not data:
                 continue
-            questions = question_pool(inputs, build, concept.conceptId, data, difficulty, build.selected_question_count)
+            questions = question_pool(QuestionPoolRequest(
+                inputs, build, concept.conceptId, data, difficulty, build.selected_question_count,
+            ))
             if not questions:
                 continue
             q = questions[0]
@@ -207,7 +213,7 @@ def fill_cards(inputs: dict[str, Any], plan: dict[str, Any], build: SessionBuild
             data = inputs["conceptMap"].get(concept.conceptId)
             if not data:
                 continue
-            candidates = card_pool(inputs, build, concept.conceptId, data, concept.currentRecall)
+            candidates = card_pool(CardPoolRequest(inputs, build, concept.conceptId, data, concept.currentRecall))
             if not candidates:
                 continue
             sim = threshold if already == 0 else min(0.97, threshold + 0.1)
@@ -221,8 +227,10 @@ def fill_cards(inputs: dict[str, Any], plan: dict[str, Any], build: SessionBuild
             base = "weak_recall" if concept.recallOnExamDay < DEFAULTS["recall_threshold"] else "reinforcement"
             item = card_item(picked, challengePolicyApplied=True, conceptId=concept.conceptId,
                              conceptName=concept.conceptName, priority=concept.priority,
-                             interventionReason=resolve_reason(inputs, plan, concept.conceptId, concept.recallOnExamDay, base))
-            if commit_card(build, picked, item, concept.currentRecall):
+                             interventionReason=resolve_reason(ReasonRequest(
+                                 inputs, plan, concept.conceptId, concept.recallOnExamDay, base,
+                             )))
+            if commit_card(CardCommitRequest(build, picked, item, concept.currentRecall)):
                 added_this_pass += 1
         if added_this_pass == 0:
             break
