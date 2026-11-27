@@ -64,24 +64,21 @@ class CorpusAudit:
         }
 
 
-def audit_answer_key(questions: list[Any] | tuple[Any, ...]) -> AnswerKeyAudit:
-    """Port of upstream's deliberately corpus-level raw answer-position floor."""
-    counts = dict.fromkeys(ANSWER_LABELS, 0)
-    labels: list[str] = []
-    for index, question in enumerate(questions):
-        correct = [option for option in question.options if option.is_correct]
-        if len(correct) != 1:
-            raise ValueError(
-                f"question at index {index} must have exactly one correct option to audit its raw answer key"
-            )
-        label = correct[0].label.strip().upper()
-        if label not in counts:
-            raise ValueError(
-                f"question at index {index} has unsupported raw correct label {label!r}; expected A-E"
-            )
-        counts[label] += 1
-        labels.append(label)
+def _correct_label(question: Any, index: int) -> str:
+    correct = [option for option in question.options if option.is_correct]
+    if len(correct) != 1:
+        raise ValueError(
+            f"question at index {index} must have exactly one correct option to audit its raw answer key"
+        )
+    label = correct[0].label.strip().upper()
+    if label not in ANSWER_LABELS:
+        raise ValueError(
+            f"question at index {index} has unsupported raw correct label {label!r}; expected A-E"
+        )
+    return label
 
+
+def _longest_streak(labels: list[str]) -> int:
     longest = 0
     current = 0
     previous = None
@@ -89,21 +86,28 @@ def audit_answer_key(questions: list[Any] | tuple[Any, ...]) -> AnswerKeyAudit:
         current = current + 1 if label == previous else 1
         longest = max(longest, current)
         previous = label
+    return longest
 
-    question_count = len(labels)
-    represented = sum(1 for label in ANSWER_LABELS if counts[label] > 0)
-    maximum_count = max(counts.values(), default=0)
-    maximum_share = maximum_count / question_count if question_count else 0.0
-    issues: list[dict[str, Any]] = []
-    required_coverage = 0
+
+def _required_coverage(question_count: int) -> int:
     if question_count >= FULL_COVERAGE_SIZE:
-        required_coverage = len(ANSWER_LABELS)
-    elif question_count >= MINIMUM_AUDIT_SIZE:
-        required_coverage = MINIMUM_SMALL_CORPUS_COVERAGE
+        return len(ANSWER_LABELS)
+    if question_count >= MINIMUM_AUDIT_SIZE:
+        return MINIMUM_SMALL_CORPUS_COVERAGE
+    return 0
+
+
+def _answer_key_issues(
+    question_count: int,
+    represented: int,
+    maximum_count: int,
+    maximum_share: float,
+    longest: int,
+) -> list[dict[str, Any]]:
+    issues: list[dict[str, Any]] = []
+    required_coverage = _required_coverage(question_count)
     if represented < required_coverage:
-        issues.append(
-            {"code": "label-coverage", "actual": represented, "required": required_coverage}
-        )
+        issues.append({"code": "label-coverage", "actual": represented, "required": required_coverage})
     if question_count >= MINIMUM_AUDIT_SIZE and maximum_count > question_count * MAXIMUM_LABEL_SHARE:
         issues.append(
             {
@@ -114,14 +118,29 @@ def audit_answer_key(questions: list[Any] | tuple[Any, ...]) -> AnswerKeyAudit:
             }
         )
     if question_count >= MINIMUM_AUDIT_SIZE and longest > MAXIMUM_SAME_LABEL_STREAK:
-        issues.append(
-            {"code": "label-streak", "actual": longest, "maximum": MAXIMUM_SAME_LABEL_STREAK}
-        )
+        issues.append({"code": "label-streak", "actual": longest, "maximum": MAXIMUM_SAME_LABEL_STREAK})
+    return issues
+
+
+def audit_answer_key(questions: list[Any] | tuple[Any, ...]) -> AnswerKeyAudit:
+    """Port of upstream's deliberately corpus-level raw answer-position floor."""
+    labels = [_correct_label(question, index) for index, question in enumerate(questions)]
+    counts = dict.fromkeys(ANSWER_LABELS, 0)
+    for label in labels:
+        counts[label] += 1
+
+    question_count = len(labels)
+    represented = sum(1 for label in ANSWER_LABELS if counts[label] > 0)
+    maximum_count = max(counts.values(), default=0)
+    maximum_share = maximum_count / question_count if question_count else 0.0
+    longest = _longest_streak(labels)
     return AnswerKeyAudit(
         question_count=question_count,
         represented_label_count=represented,
         maximum_label_count=maximum_count,
         maximum_label_share=maximum_share,
         longest_same_label_streak=longest,
-        issues=issues,
+        issues=_answer_key_issues(
+            question_count, represented, maximum_count, maximum_share, longest
+        ),
     )
