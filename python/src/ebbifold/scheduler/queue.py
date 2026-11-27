@@ -174,6 +174,17 @@ def apply_difficulty_rhythm(items: list[dict[str, Any]], level: str) -> list[dic
 MAX_CROSS_SOURCE_ITEMS_PER_SESSION = 2
 
 
+def source_corpus_for(rotation: str | None, source_file: str | None = None) -> str:
+    value = rotation or "unknown"
+    if value == "anatomy":
+        return "bluelink"
+    if value == "surgical-sciences":
+        return "kubie" if (source_file or "").startswith("kubie-") else "plates"
+    if value == "neurosurg":
+        return "kubie"
+    return value
+
+
 def cap_cross_source_session_items(items: list[dict[str, Any]], *, session_rotation: str, allowed: list[str],
                                    max_items: float | None, get_rotation: Any, get_source_key: Any = None):
     sources = {r for r in allowed if r and r != session_rotation}
@@ -378,13 +389,15 @@ def _preemptive_scaffold_item(item: dict[str, Any], card: dict[str, Any], rotati
 
 
 def inject_preemptive_scaffolds(items: list[dict[str, Any]], bulk: dict[str, Any], *, rotation_seed: str,
-                                step_down_concept_ids: set[str], max_pairings: int | None) -> list[dict[str, Any]]:
+                                step_down_concept_ids: set[str], max_pairings: int | None,
+                                excluded_card_ids: set[str] | None = None) -> list[dict[str, Any]]:
     if not step_down_concept_ids:
         return items
     if max_pairings is None:
         anchors = sum(1 for it in items if _is_anchor(it))
         max_pairings = max(2, min(max(2, anchors), max(2, len(items) // 3)))
-    pool = bulk["unseenCards"]
+    excluded = excluded_card_ids or set()
+    pool = [card for card in bulk["unseenCards"] if card["id"] not in excluded]
     if max_pairings <= 0 or not items or not pool:
         return items
     scaffolds = [c for c in pool if c.get("complexity") == 1]
@@ -426,15 +439,137 @@ def apply_struggle_to_selection(inputs: dict[str, Any], build: Any) -> list[dict
     return apply_struggle_interventions(inputs, build.selected_items)
 
 
+def _mastery_assignment_allowed(assignment: dict[str, Any], *, quota_satisfied: bool,
+                                eligible_core: set[str], eligible_applied: set[str]) -> bool:
+    stage, unit_id = assignment.get("stage"), assignment.get("unitId")
+    if stage == "scheduled-atomic-core":
+        return unit_id in eligible_core
+    if stage == "applied-distinction":
+        return quota_satisfied and unit_id in eligible_applied
+    return stage == "breadth-exploration" and quota_satisfied
+
+
+def _annotate_mastery_assignments(inputs: dict[str, Any], build: Any, items: list[dict[str, Any]]) -> None:
+    evidence = inputs.get("masteryEvidence")
+    if not (inputs.get("applyExamTarget") and evidence):
+        return
+    assignments = evidence.get("itemStageMap") or {}
+    eligible_core = set(inputs.get("eligibleCoreUnitIds") or [])
+    eligible_applied = set(inputs.get("eligibleAppliedUnitIds") or [])
+    for item in items:
+        if item["type"] not in ("card", "question"):
+            continue
+        assignment = assignments.get(f"{item['type']}:{item['id']}")
+        if not assignment:
+            continue
+        if _mastery_assignment_allowed(assignment, quota_satisfied=build.core_target_quota_satisfied,
+                                       eligible_core=eligible_core, eligible_applied=eligible_applied):
+            item["examTargetMasteryStage"] = assignment.get("stage")
+            item["examTargetMasteryUnitId"] = assignment.get("unitId")
+
+
+def _group_mastery_items(items: list[dict[str, Any]], rank_item: Any) -> list[dict[str, Any]]:
+    scaffold_indexes: dict[str, list[int]] = {}
+    for index, item in enumerate(items):
+        intervention = item.get("struggleIntervention") or {}
+        if intervention.get("isScaffold") and intervention.get("targetCardId"):
+            scaffold_indexes.setdefault(intervention["targetCardId"], []).append(index)
+    grouped_indexes: set[int] = set()
+    groups: list[dict[str, Any]] = []
+    for index, item in enumerate(items):
+        intervention = item.get("struggleIntervention") or {}
+        if index in grouped_indexes or intervention.get("isScaffold"):
+            continue
+        scaffolds = scaffold_indexes.get(item["id"], [])
+        grouped_indexes.add(index)
+        grouped_indexes.update(scaffolds)
+        groups.append({"rank": rank_item(item), "originalIndex": index,
+                       "items": [item] + [items[scaffold] for scaffold in scaffolds]})
+    for index, item in enumerate(items):
+        if index not in grouped_indexes:
+            groups.append({"rank": rank_item(item), "originalIndex": index, "items": [item]})
+    groups.sort(key=lambda group: (group["rank"], group["originalIndex"]))
+    return [item for group in groups for item in group["items"]]
+
+
+def _augment_card_metadata(item: dict[str, Any], card_meta: dict[str, Any]) -> None:
+    for key in ("topics", "complexity", "clusterId", "variantGroupId"):
+        if item.get(key) is None:
+            item[key] = card_meta[key]
+
+
+def _augment_question_metadata(item: dict[str, Any], question: dict[str, Any], level: int) -> None:
+    from .difficulty import get_effective_question_difficulty
+
+    if item.get("topics") is None:
+        item["topics"] = question["topics"]
+    if level != 0:
+        item["difficulty"] = get_effective_question_difficulty(
+            question.get("difficulty"), question.get("facilityIndex"), question.get("totalAttempts")
+        )
+
+
+def _augment_order_metadata(items: list[dict[str, Any]], meta: dict[str, dict[str, Any]],
+                            question_map: dict[str, dict[str, Any]], level: int) -> None:
+    for item in items:
+        if item["type"] == "card" and item["id"] in meta:
+            _augment_card_metadata(item, meta[item["id"]])
+        elif item["type"] == "question" and item["id"] in question_map:
+            _augment_question_metadata(item, question_map[item["id"]], level)
+
+
+def _mastery_ranker(card_rot: dict[str, str | None], q_rot: dict[str, str | None], rotation: str) -> Any:
+    def rank(item: dict[str, Any]) -> int:
+        stage = item.get("examTargetMasteryStage")
+        if stage == "scheduled-atomic-core":
+            return 0
+        if stage == "applied-distinction":
+            return 1
+        item_rotation = item.get("rotation")
+        if item_rotation is None and item["type"] == "card":
+            item_rotation = card_rot.get(item["id"])
+        if item_rotation is None and item["type"] == "question":
+            item_rotation = q_rot.get(item["id"])
+        if item_rotation is None:
+            item_rotation = rotation
+        if stage == "breadth-exploration":
+            return 3
+        return 2 if item_rotation == rotation else 3
+    return rank
+
+
+def _endpoint_filter(question_map: dict[str, dict[str, Any]], hard_gap: set[str],
+                     complexity: dict[str, Any], policy: dict[str, Any]) -> Any:
+    from .policies import modality_eligible_for_review_learning
+
+    def endpoint(item: dict[str, Any]) -> bool:
+        if not modality_eligible_for_review_learning(item["type"], policy["level"]):
+            return False
+        if policy["questionsOnly"]:
+            question = question_map.get(item["id"]) if item["type"] == "question" else None
+            if not question or question.get("difficulty") != "hard" or item["id"] not in hard_gap:
+                return False
+        if policy["scaffoldsOnly"]:
+            return item["type"] == "card" and complexity.get(item["id"]) == 1
+        return True
+    return endpoint
+
+
+def _recompute_mastery_seat_counts(build: Any, final: list[dict[str, Any]]) -> None:
+    core_units = {item.get("examTargetMasteryUnitId") for item in final
+                  if item.get("examTargetMasteryStage") == "scheduled-atomic-core" and item.get("examTargetMasteryUnitId")}
+    surplus_units = {item.get("examTargetMasteryUnitId") for item in final
+                     if item.get("examTargetMasteryStage") in ("applied-distinction", "breadth-exploration")
+                     and item.get("examTargetMasteryUnitId")}
+    build.selected_core_target_seats = len(core_units)
+    build.selected_surplus_target_seats = len(surplus_units)
+
+
 def order_session_items(inputs: dict[str, Any], plan: dict[str, Any], build: Any,
                         items: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]]]:
-    from .difficulty import get_effective_question_difficulty
-    from .errors import UnsupportedSchedulerInput
-    from .policies import apply_review_challenge_wave, modality_eligible_for_review_learning, review_learning_policy
+    from .policies import apply_review_challenge_wave, review_learning_policy
     from .scoring import enforce_concept_teaching_caps, normalize_review_challenge_level
 
-    if inputs.get("composedDeck"):
-        raise UnsupportedSchedulerInput("composed-deck source fairness is not ported in Phase 3a")
     options, bulk, rotation = inputs["options"], inputs["bulk"], inputs["rotation"]
     level = normalize_review_challenge_level(options.get("reviewChallenge"))
     policy = review_learning_policy(options.get("reviewChallenge"))
@@ -453,38 +588,23 @@ def order_session_items(inputs: dict[str, Any], plan: dict[str, Any], build: Any
                       "clusterId": c.get("clusterId"), "variantGroupId": c.get("variantGroupId"),
                       "facilityIndex": c.get("facilityIndex"), "sampleSize": c.get("sampleSize"),
                       "similarCards": c.get("similarCards")} for c in cards}
-    for it in mono:
-        if it["type"] == "card" and it["id"] in meta:
-            m = meta[it["id"]]
-            for key in ("topics", "complexity", "clusterId", "variantGroupId"):
-                if it.get(key) is None:
-                    it[key] = m[key]
-        elif it["type"] == "question" and it["id"] in bulk["questionMap"]:
-            q = bulk["questionMap"][it["id"]]
-            if it.get("topics") is None:
-                it["topics"] = q["topics"]
-            if level != 0:
-                it["difficulty"] = get_effective_question_difficulty(q.get("difficulty"), q.get("facilityIndex"),
-                                                                     q.get("totalAttempts"))
+    _augment_order_metadata(mono, meta, bulk["questionMap"], level)
     paired = inject_preemptive_scaffolds(
         mono, bulk, rotation_seed=inputs["servingRotationSeed"], step_down_concept_ids=inputs["recentFailureConceptIds"],
         max_pairings=0 if inputs.get("effectiveMaxNewCards") == 0 else None,
+        excluded_card_ids=build.selected_card_ids,
     )
 
-    def endpoint(item: dict[str, Any]) -> bool:
-        if not modality_eligible_for_review_learning(item["type"], policy["level"]):
-            return False
-        if policy["questionsOnly"]:
-            q = bulk["questionMap"].get(item["id"]) if item["type"] == "question" else None
-            if not q or q.get("difficulty") != "hard" or item["id"] not in hard_gap:
-                return False
-        if policy["scaffoldsOnly"]:
-            return item["type"] == "card" and complexity.get(item["id"]) == 1
-        return True
-
+    endpoint = _endpoint_filter(bulk["questionMap"], hard_gap, complexity, policy)
     capped = enforce_concept_teaching_caps([i for i in paired if endpoint(i)], build.teaching_cap_for)
+    _annotate_mastery_assignments(inputs, build, capped)
     card_rot = {c["id"]: c.get("rotation") for c in cards}
     q_rot = {q["id"]: q.get("rotation") for q in bulk["rotationQuestions"]}
+
+    mastery_stage_rank = _mastery_ranker(card_rot, q_rot, rotation)
+
+    if inputs.get("applyExamTarget"):
+        capped = _group_mastery_items(capped, mastery_stage_rank)
     unknown = plan["unknownItemRotation"]
 
     def get_rotation(item: dict[str, Any]) -> str:
@@ -496,11 +616,21 @@ def order_session_items(inputs: dict[str, Any], plan: dict[str, Any], build: Any
             return q_rot.get(item["id"]) or unknown
         return unknown
 
+    card_source = {c["id"]: c.get("sourceFile") for c in cards}
+
+    def get_source_key(item: dict[str, Any]) -> str:
+        item_rotation = item.get("rotation") or (card_rot.get(item["id"]) if item["type"] == "card" else q_rot.get(item["id"]))
+        return source_corpus_for(item_rotation, card_source.get(item["id"]) if item["type"] == "card" else None)
+
     source_capped = cap_cross_source_session_items(
         capped, session_rotation=rotation, allowed=options.get("crossSourceRotations") or [],
         max_items=options.get("maxCrossSourceItems"), get_rotation=get_rotation,
+        get_source_key=get_source_key if inputs.get("composedDeck") else None,
     )
-    final = break_modality_runs(source_capped)
+    ordering_group = mastery_stage_rank if inputs.get("applyExamTarget") else None
+    final = break_modality_runs(source_capped, ordering_group)
     if level != 0:
         final = apply_review_challenge_wave(final, level)
+    if inputs.get("applyExamTarget"):
+        _recompute_mastery_seat_counts(build, final)
     return final, meta

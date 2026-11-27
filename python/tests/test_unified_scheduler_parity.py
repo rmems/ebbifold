@@ -11,6 +11,7 @@ import copy
 import json
 import math
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -187,11 +188,7 @@ def test_unseeded_or_malformed_seed_fails_closed(seed: str | None) -> None:
 
 _UNPORTED = {
     "exam_target_without_workload": lambda s: s.update(applyExamTarget=True),
-    "exam_target_core_seats": lambda s: s.update(applyExamTarget=True, targetWorkload={"coreTargetSeats": 2}),
-    "exam_target_surplus_seats": lambda s: s.update(applyExamTarget=True, targetWorkload={"surplusSeats": 1}),
-    "exam_target_mastery_evidence": lambda s: s.update(masteryEvidence={"remainingTargetWork": 3}),
     "learner_policy_missing": lambda s: s.update(targetSidecarsValid=True, runtimeTargetSnapshot={"definition": {}}),
-    "prep_blend": lambda s: s["options"].update(sessionPrepBlend={"items": []}),
 }
 
 
@@ -322,19 +319,133 @@ def test_bridge_candidates_filter_eligibility_before_window() -> None:
     assert [row["id"] for row in _bridge_candidates(pool, set(), now)] == ["eligible"]
 
 
+def test_serve_conditioning_and_repetition_slot_telemetry() -> None:
+    from ebbifold.scheduler.delivery import build_serve_conditioning, substitute_due_slot
+
+    overlay = {"cards": {"stable-1": [{"q": "q-tight", "sim": 0.9}, {"q": "q-loose", "sim": 0.8}, {"q": "q-noise", "sim": 0.7}]}}
+    record = {"verdict": "trusted", "questionOutcomes": {"q-tight": {"n": 2, "correct": 1}, "q-loose": {"n": 1, "correct": 1}}, "calibration": None, "computedAt": "2026-01-15T00:00:00Z"}
+    conditioning = build_serve_conditioning(record, overlay, "stable-1")
+    assert conditioning["evidence"] == {"tight": {"n": 2, "correct": 1}, "loose": {"n": 1, "correct": 1}}
+
+    due = {"cardId": "due", "stableId": "stable-1", "variantGroupId": "vg", "variantType": "original", "complexity": 2, "lastQuality": 5, "correctCount": 2}
+    pools = {"siblings": [], "seenCardIds": {"due"}, "proximity": {"stable-1": overlay["cards"]["stable-1"]}, "seenQuestionIds": set(), "questionComplexity": {}}
+    decision = substitute_due_slot(due, pools)
+    assert decision == {"kind": "substitute", "itemType": "question", "id": "q-tight", "step": 2, "reason": "same-fact-mcq"}
+
+
+def test_mastery_seat_allocator_and_prep_ordering() -> None:
+    from ebbifold.scheduler.exam_target import allocate_exam_target_concept_order, allocate_mastery_seats
+    from ebbifold.scheduler.lanes import order_prep_keys
+
+    candidates = [
+        {"itemKey": "card:one", "unitId": "u1", "stage": "scheduled-atomic-core"},
+        {"itemKey": "card:two", "unitId": "u1", "stage": "scheduled-atomic-core"},
+        {"itemKey": "question:three", "unitId": "u2", "stage": "applied-distinction"},
+    ]
+    allocation = allocate_mastery_seats(
+        candidates=candidates,
+        eligible_unit_ids_by_stage={"scheduled-atomic-core": ["u1"], "applied-distinction": ["u2"]},
+        core_target_seats=2,
+        surplus_seats=1,
+    )
+    assert allocation["coreSelectedCount"] == 1
+    assert allocation["surplusSelectedCount"] == 1
+    assert [row["itemKey"] for row in allocation["selectedCandidates"]] == ["card:one", "question:three"]
+
+    ordered_keys = order_prep_keys(["card:c1", "card:c2", "question:q1"], {
+        "share": 0.4,
+        "sessions": [
+            {"share": 0.7, "itemIds": ["card:c1", "card:c2"]},
+            {"share": 0.3, "itemIds": ["question:q1"]},
+        ],
+    })
+    assert ordered_keys == ["card:c1", "card:c2", "question:q1"]
+
+    concepts = [SimpleNamespace(conceptId=key) for key in ("a", "b", "c")]
+    concept_order = allocate_exam_target_concept_order(
+        concepts=concepts, protected_concept_ids=set(), requested_discretionary_size=2,
+        concept_mappings={
+            "a": {"primaryDomainCode": "X", "targetIndex": 0.9},
+            "b": {"primaryDomainCode": "Y", "targetIndex": 0.1},
+            "c": {"primaryDomainCode": "X", "targetIndex": 0.8},
+        },
+        desired_shares={"X": 0.8, "Y": 0.2}, observed_domain_counts={"X": 0, "Y": 2},
+        influence={"allocator": "full", "maxItemRankMove": 5},
+    )
+    assert [concept.conceptId for concept in concept_order["concepts"]] == ["a", "c", "b"]
+    assert concept_order["changedMembershipCount"] == 1
+
+
+def test_session_prep_blend_and_positive_mastery_seats_are_constructed() -> None:
+    prep_snapshot = _base_session()
+    prep_snapshot["options"]["sessionPrepBlend"] = {
+        "share": 0.5,
+        "itemIds": ["card:u-sickle-s", "question:q-renal-1"],
+        "weakItemIds": ["question:q-renal-1"],
+        "unseenItemIds": ["card:u-sickle-s"],
+        "sessions": [
+            {"share": 0.7, "itemIds": ["card:u-sickle-s"]},
+            {"share": 0.3, "itemIds": ["question:q-renal-1"]},
+        ],
+    }
+    prep = run_session(prep_snapshot)["result"]["items"]
+    assert prep[0]["id"] == "u-sickle-s"
+    assert prep[0]["interventionReason"] == "pre_teach"
+
+    mastery_snapshot = copy.deepcopy(next(c for c in SESSIONS if c["name"] == "exam_target_active")["snapshot"])
+    mastery_snapshot.update({
+        "targetWorkload": {"coreTargetSeats": 1, "surplusSeats": 1, "shortfall": None, "dailyCapacity": 40},
+        "masteryEvidence": {
+            "units": [
+                {"unitId": "unit-core", "stage": "scheduled-atomic-core",
+                 "safeMetadata": {"candidateItemKeys": ["card:u-acid-1"]}},
+                {"unitId": "unit-app", "stage": "applied-distinction",
+                 "safeMetadata": {"candidateItemKeys": ["question:q-acid-1"]}},
+            ],
+            "itemStageMap": {
+                "card:u-acid-1": {"stage": "scheduled-atomic-core", "unitId": "unit-core"},
+                "question:q-acid-1": {"stage": "applied-distinction", "unitId": "unit-app"},
+            },
+            "completedCoreWorkToday": 0,
+            "remainingTargetWork": 2,
+            "masteryPlan": {"policyVersion": "mastery-test"},
+        },
+        "eligibleCoreUnitIds": ["unit-core"],
+        "eligibleAppliedUnitIds": ["unit-app"],
+    })
+    mastery = run_session(mastery_snapshot)["result"]
+    assert [(item["type"], item["id"], item.get("examTargetMasteryStage")) for item in mastery["items"][:2]] == [
+        ("card", "u-acid-1", "scheduled-atomic-core"),
+        ("question", "q-acid-1", "applied-distinction"),
+    ]
+    assert mastery["examTargetDecision"]["coreTargetSeatsSelected"] == 1
+    assert mastery["examTargetDecision"]["surplusTargetSeatsSelected"] == 1
+
+
+def test_pass_set_and_composed_deck_source_identity() -> None:
+    from ebbifold.scheduler.lanes import _pass_set_rank
+    from ebbifold.scheduler.queue import source_corpus_for
+
+    bulk = {
+        "passSetIntakeDecision": "pass-set-first",
+        "passSet": {"passSet": {"factKeyByCardId": {"c1": "fact-a"}, "factKeys": ["fact-a"], "rankByFactKey": {"fact-a": 7}}},
+    }
+    assert _pass_set_rank(bulk, {"id": "c1", "variantGroupId": None}) == 7
+    assert _pass_set_rank(bulk, {"id": "c2", "variantGroupId": None}) > 7
+    assert source_corpus_for("anatomy") == "bluelink"
+    assert source_corpus_for("surgical-sciences", "kubie-neuro.mdx") == "kubie"
+    assert source_corpus_for("surgical-sciences", "plates.mdx") == "plates"
+    assert source_corpus_for("neurosurg") == "kubie"
+
+
 @pytest.mark.parametrize(
     "mutate",
     [
         lambda s: s.update(struggleHistory={"cardProgress": {}}, userId=None),
-        lambda s: s.update(ratingReliability={"verdict": "ok"}),
-        lambda s: s.update(composedDeck=True),
-        lambda s: s["bulk"].update(cardGradeById={"s-glyco-1": {"lastQuality": 4, "correctCount": 2}}),
-        lambda s: s["bulk"].update(passSet={"factKeys": []}, passSetIntakeDecision="pass-set-first"),
         lambda s: s.update(conceptThreadAnchors=[{"anchorEventId": "e"}]),
         lambda s: s.update(concepts=[], deckStrandMix={"strands": []}),
     ],
-    ids=["struggle", "serve_conditioning", "composed_deck", "repetition_slot", "pass_set", "concept_thread",
-         "cluster_strands"],
+    ids=["struggle", "concept_thread", "cluster_strands"],
 )
 def test_session_unported_adapters_fail_closed(mutate: Any) -> None:
     snapshot = _base_session()

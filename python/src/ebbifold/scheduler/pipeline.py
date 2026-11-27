@@ -33,7 +33,8 @@ def _planner_inputs(snapshot: dict[str, Any]) -> dict[str, Any]:
     inputs["conceptMap"] = dict(
         snapshot.get("conceptMap") or {c["id"]: c for c in snapshot.get("concepts", [])}
     )
-    for key in ("recentFailureConceptIds", "excludedCardIds", "excludedQuestionIds", "excludedVideoIds"):
+    for key in ("recentFailureConceptIds", "excludedCardIds", "excludedQuestionIds", "excludedVideoIds",
+                "eligibleCoreUnitIds", "eligibleAppliedUnitIds"):
         inputs[key] = set(snapshot.get(key) or [])
     return inputs
 
@@ -147,7 +148,8 @@ def normalize_inputs(snapshot: dict[str, Any]) -> dict[str, Any]:
     inputs["concepts"] = list(snapshot.get("concepts") or [])
     inputs["conceptMap"] = {c["id"]: c for c in inputs["concepts"]}
     inputs["stateMap"] = dict(snapshot.get("stateMap") or {})
-    for key in ("recentFailureConceptIds", "excludedCardIds", "excludedQuestionIds", "excludedVideoIds"):
+    for key in ("recentFailureConceptIds", "excludedCardIds", "excludedQuestionIds", "excludedVideoIds",
+                "eligibleCoreUnitIds", "eligibleAppliedUnitIds"):
         inputs[key] = set(snapshot.get(key) or [])
     if snapshot.get("penaltyContext") is not None:
         pc = dict(snapshot["penaltyContext"])
@@ -161,7 +163,6 @@ def normalize_inputs(snapshot: dict[str, Any]) -> dict[str, Any]:
 def run_session(snapshot: dict[str, Any]) -> dict[str, Any]:
     """End-to-end constructUnifiedSession over an explicit snapshot (steps 2-30)."""
     from .cluster_session import construct_cluster_session
-    from .errors import UnsupportedSchedulerInput
     from .finalize import assemble_session_result, attach_delivery_telemetry
     from .lanes import run_selection
     from .queue import apply_struggle_to_selection, order_session_items
@@ -169,8 +170,6 @@ def run_session(snapshot: dict[str, Any]) -> dict[str, Any]:
     inputs = normalize_inputs(snapshot)
     if not inputs["concepts"]:
         return {"result": construct_cluster_session(inputs), "trace": []}
-    if inputs["bulk"].get("cardGradeById"):
-        raise UnsupportedSchedulerInput("repetition-slot shadow telemetry is not ported in Phase 3a")
     ranking = rank_concepts(inputs)
     sort_concepts_by_priority(inputs, ranking)
     pristine = find_pristine_concepts(inputs)
@@ -184,12 +183,14 @@ def run_session(snapshot: dict[str, Any]) -> dict[str, Any]:
         "unknownItemRotation": ranking.unknownItemRotation, "weakConcepts": selection.weakConcepts,
         "cardRatio": selection.cardRatio, **quota,
         "allocatedConceptRanks": selection.allocatedConceptRanks, "conceptHasPristine": pristine,
+        "allocationChangedConceptMembershipCount": selection.allocation_changed_concept_membership_count,
+        "allocationCoverageDebtDomainCodes": selection.allocation_coverage_debt_domain_codes or [],
     }
     build = run_selection(inputs, plan)
     lane_counts = [{"id": t["id"], "result": t["result"]} for t in build.trace if t["op"] == "lane"]
     selected_ids = [f"{i['type']}:{i['id']}" for i in build.selected_items]
     items = apply_struggle_to_selection(inputs, build)
     final, meta = order_session_items(inputs, plan, build, items)
-    attach_delivery_telemetry(inputs, plan, build, final, meta)
-    return {"result": assemble_session_result(inputs, plan, build, final), "laneCounts": lane_counts,
+    repetition_context = attach_delivery_telemetry(inputs, plan, build, final, meta)
+    return {"result": assemble_session_result(inputs, plan, build, final, repetition_context), "laneCounts": lane_counts,
             "selectedIds": selected_ids, "trace": build.trace}
