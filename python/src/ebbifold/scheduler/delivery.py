@@ -7,6 +7,7 @@ not read committed proximity artifacts or learner memory directly.
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 from typing import Any
 
 PROXIMITY_TIGHT_FLOOR = 0.85
@@ -79,18 +80,20 @@ def _search_order(target: int) -> list[int]:
     return list(range(target, 4)) + list(range(target - 1, 0, -1))
 
 
-def _pick_step(step: int, due: dict[str, Any], pools: dict[str, Any]) -> str | None:
-    if step == 1:
-        cards = [
-            card for card in pools["siblings"]
-            if card.get("variantGroupId") is not None
-            and card.get("variantGroupId") == due.get("variantGroupId")
-            and is_reword(card)
-            and card["id"] != due["cardId"]
-            and card["id"] not in pools["seenCardIds"]
-        ]
-        cards.sort(key=lambda c: (abs((c.get("complexity") or 1) - (due.get("complexity") or 1)), c["id"]))
-        return cards[0]["id"] if cards else None
+def _reword_candidates(due: dict[str, Any], pools: dict[str, Any]) -> list[dict[str, Any]]:
+    cards = [
+        card for card in pools["siblings"]
+        if card.get("variantGroupId") is not None
+        and card.get("variantGroupId") == due.get("variantGroupId")
+        and is_reword(card)
+        and card["id"] != due["cardId"]
+        and card["id"] not in pools["seenCardIds"]
+    ]
+    cards.sort(key=lambda c: (abs((c.get("complexity") or 1) - (due.get("complexity") or 1)), c["id"]))
+    return cards
+
+
+def _proximity_probe_links(step: int, due: dict[str, Any], pools: dict[str, Any]) -> list[dict[str, Any]]:
     links = [
         link for link in pools["proximity"].get(due["stableId"], [])
         if link.get("sim", 0) >= PROXIMITY_TIGHT_FLOOR and link.get("q") not in pools["seenQuestionIds"]
@@ -98,6 +101,14 @@ def _pick_step(step: int, due: dict[str, Any], pools: dict[str, Any]) -> str | N
     if step == 3:
         links = [link for link in links if pools["questionComplexity"].get(link["q"], -math.inf) > due.get("complexity", 1)]
     links.sort(key=lambda link: (-link.get("sim", 0), link.get("q") or ""))
+    return links
+
+
+def _pick_step(step: int, due: dict[str, Any], pools: dict[str, Any]) -> str | None:
+    if step == 1:
+        cards = _reword_candidates(due, pools)
+        return cards[0]["id"] if cards else None
+    links = _proximity_probe_links(step, due, pools)
     return links[0]["q"] if links else None
 
 
@@ -145,11 +156,17 @@ def repetition_slot_shadow(due: dict[str, Any], pools: dict[str, Any]) -> dict[s
     }
 
 
-def build_repetition_slot_context(*, cards: list[dict[str, Any]], grades: dict[str, dict[str, Any]] | None,
-                                  seen_card_ids: list[str], variant_group_history: dict[str, set[str]],
-                                  seen_question_ids: list[str], overlay: dict[str, Any] | None) -> dict[str, Any] | None:
-    if not grades:
-        return None
+@dataclass(frozen=True)
+class RepetitionSlotContextRequest:
+    cards: list[dict[str, Any]]
+    grades: dict[str, dict[str, Any]] | None
+    seen_card_ids: list[str]
+    variant_group_history: dict[str, set[str]]
+    seen_question_ids: list[str]
+    overlay: dict[str, Any] | None
+
+
+def _due_grade_rows(cards: list[dict[str, Any]], grades: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
     cards_by_id = {card["id"]: card for card in cards}
     due_cards: dict[str, dict[str, Any]] = {}
     for card_id, grade in grades.items():
@@ -165,31 +182,47 @@ def build_repetition_slot_context(*, cards: list[dict[str, Any]], grades: dict[s
             "lastQuality": grade.get("lastQuality"),
             "correctCount": grade.get("correctCount") or 0,
         }
-    if not due_cards:
-        return None
+    return due_cards
+
+
+def _seen_card_ids(seen_card_ids: list[str], variant_group_history: dict[str, set[str]]) -> set[str]:
     seen = set(seen_card_ids)
     for ids in variant_group_history.values():
         seen.update(ids)
-    proximity = {stable_id: list(links) for stable_id, links in ((overlay or {}).get("cards") or {}).items()}
+    return seen
+
+
+def _repetition_sibling_rows(cards: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        {
+            "id": card["id"],
+            "stableId": card.get("stableId") or "",
+            "variantGroupId": card.get("variantGroupId"),
+            "variantType": card.get("variantType"),
+            "complexity": card.get("complexity") or 1,
+        }
+        for card in cards
+    ]
+
+
+def _repetition_pools(request: RepetitionSlotContextRequest) -> dict[str, Any]:
+    proximity = {stable_id: list(links) for stable_id, links in ((request.overlay or {}).get("cards") or {}).items()}
     return {
-        "grades": due_cards,
-        "pools": {
-            "siblings": [
-                {
-                    "id": card["id"],
-                    "stableId": card.get("stableId") or "",
-                    "variantGroupId": card.get("variantGroupId"),
-                    "variantType": card.get("variantType"),
-                    "complexity": card.get("complexity") or 1,
-                }
-                for card in cards
-            ],
-            "seenCardIds": sorted(seen),
-            "proximity": proximity,
-            "seenQuestionIds": sorted(set(seen_question_ids)),
-            "questionComplexity": {},
-        },
+        "siblings": _repetition_sibling_rows(request.cards),
+        "seenCardIds": sorted(_seen_card_ids(request.seen_card_ids, request.variant_group_history)),
+        "proximity": proximity,
+        "seenQuestionIds": sorted(set(request.seen_question_ids)),
+        "questionComplexity": {},
     }
+
+
+def build_repetition_slot_context(request: RepetitionSlotContextRequest) -> dict[str, Any] | None:
+    if not request.grades:
+        return None
+    due_cards = _due_grade_rows(request.cards, request.grades)
+    if not due_cards:
+        return None
+    return {"grades": due_cards, "pools": _repetition_pools(request)}
 
 
 def shadow_for_due_id(card_id: str, context: dict[str, Any] | None) -> dict[str, Any] | None:

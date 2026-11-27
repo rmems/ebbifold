@@ -334,8 +334,12 @@ def test_serve_conditioning_and_repetition_slot_telemetry() -> None:
 
 
 def test_mastery_seat_allocator_and_prep_ordering() -> None:
-    from ebbifold.scheduler.exam_target import allocate_exam_target_concept_order, allocate_mastery_seats
-    from ebbifold.scheduler.lanes import order_prep_keys
+    from ebbifold.scheduler.exam_target import (
+        ExamTargetConceptOrderRequest,
+        allocate_exam_target_concept_order,
+        allocate_mastery_seats,
+    )
+    from ebbifold.scheduler.prep_lanes import order_prep_keys
 
     candidates = [
         {"itemKey": "card:one", "unitId": "u1", "stage": "scheduled-atomic-core"},
@@ -362,7 +366,7 @@ def test_mastery_seat_allocator_and_prep_ordering() -> None:
     assert ordered_keys == ["card:c1", "card:c2", "question:q1"]
 
     concepts = [SimpleNamespace(conceptId=key) for key in ("a", "b", "c")]
-    concept_order = allocate_exam_target_concept_order(
+    concept_order = allocate_exam_target_concept_order(ExamTargetConceptOrderRequest(
         concepts=concepts, protected_concept_ids=set(), requested_discretionary_size=2,
         concept_mappings={
             "a": {"primaryDomainCode": "X", "targetIndex": 0.9},
@@ -371,7 +375,7 @@ def test_mastery_seat_allocator_and_prep_ordering() -> None:
         },
         desired_shares={"X": 0.8, "Y": 0.2}, observed_domain_counts={"X": 0, "Y": 2},
         influence={"allocator": "full", "maxItemRankMove": 5},
-    )
+    ))
     assert [concept.conceptId for concept in concept_order["concepts"]] == ["a", "c", "b"]
     assert concept_order["changedMembershipCount"] == 1
 
@@ -423,7 +427,7 @@ def test_session_prep_blend_and_positive_mastery_seats_are_constructed() -> None
 
 
 def test_pass_set_and_composed_deck_source_identity() -> None:
-    from ebbifold.scheduler.lanes import _pass_set_rank
+    from ebbifold.scheduler.rescue_lanes import _pass_set_rank
     from ebbifold.scheduler.queue import source_corpus_for
 
     bulk = {
