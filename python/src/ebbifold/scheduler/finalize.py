@@ -10,6 +10,7 @@ from typing import Any
 
 from .difficulty import get_effective_question_difficulty
 from .errors import UnsupportedSchedulerInput
+from .exam_target import exam_target_decision, exam_target_stats
 from .policies import recent_neighbor_signal
 from .queue import compute_concept_pairing_rate
 from .scoring import is_calibrated_review_item, is_synthetic_concept_attribution
@@ -124,7 +125,8 @@ def assemble_session_result(inputs: dict[str, Any], plan: dict[str, Any], build:
     items = [{**item, "firstSightAtSelection": build.is_first_sight_item(item)} for item in final]
     avg = sum(i["priority"] for i in final) / len(final) if final else 0
     budget = inputs.get("budget") or {"dailyThroughput": 0, "totalRemaining": 0, "sessionsRemaining": 0}
-    return {
+    decision = exam_target_decision(inputs, plan, final)
+    result = {
         "items": items,
         "repetitionSlotContext": None,
         "noveltyQuota": {"required": build.min_first_sight_items,
@@ -143,6 +145,10 @@ def assemble_session_result(inputs: dict[str, Any], plan: dict[str, Any], build:
             "sessionsRemaining": budget["sessionsRemaining"],
         },
     }
+    if decision is not None:
+        result["stats"].update(exam_target_stats(inputs, decision))
+        result["examTargetDecision"] = decision
+    return result
 
 
 def js_round(value: float) -> float:

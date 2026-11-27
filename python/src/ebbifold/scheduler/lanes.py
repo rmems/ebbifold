@@ -13,8 +13,9 @@ from typing import Any
 from .build_state import SessionBuildState
 from .config import DEFAULTS
 from .policies import has_demonstrated_learning_gap
+from .exam_target import active_targets
 from .simulation import prefer_reviewed_simulation_cards
-from .ranking import EXAM_RELEVANCE_BOOST_FACTOR, get_cards_from_bulk, get_questions_from_bulk, get_videos_from_bulk
+from .ranking import get_cards_from_bulk, get_questions_from_bulk, get_videos_from_bulk
 from .scoring import build_cluster_round_robin, classify_teaching_state, normalize_review_challenge_level
 from .scoring import resolve_intervention_reason as _resolve_reason
 from .topics import expand_topic_set
@@ -43,9 +44,11 @@ def card_pool(inputs: dict[str, Any], build: SessionBuildState, concept_id: str,
     """Backfill lanes (any-concept, uncapped) pass no review challenge in TypeScript."""
     options = inputs["options"]
     challenge = (options.get("reviewChallenge") or 0) if apply_review_challenge else 0
+    active = active_targets(inputs)
     return get_cards_from_bulk(
         concept_id, concept, 20, inputs["bulk"], build.selected_card_ids, inputs.get("penaltyContext"), recall,
-        options.get("currentTeachingWeek"), None, EXAM_RELEVANCE_BOOST_FACTOR, options.get("topicTeachingWeeks"),
+        options.get("currentTeachingWeek"), active["card"] if inputs.get("applyExamTarget") else None,
+        active["rankMove"], options.get("topicTeachingWeeks"),
         options.get("recentFigureExposures"), inputs["nowMs"], challenge,
         options.get("topicRecencyDays"),
     )
@@ -54,6 +57,10 @@ def card_pool(inputs: dict[str, Any], build: SessionBuildState, concept_id: str,
 def question_pool(inputs: dict[str, Any], build: SessionBuildState, concept_id: str, concept: dict[str, Any],
                   difficulty: str, slot: int | None = None) -> list[dict[str, Any]]:
     options = inputs["options"]
+    exam: dict[str, Any] = {}
+    if inputs.get("applyExamTarget"):
+        active = active_targets(inputs)
+        exam = {"exam_target_scores": active["question"], "exam_target_max_rank_move": active["rankMove"]}
     return get_questions_from_bulk(
         concept_id, concept, 1, inputs["bulk"],
         selected_question_ids=build.selected_question_ids,
@@ -67,6 +74,7 @@ def question_pool(inputs: dict[str, Any], build: SessionBuildState, concept_id: 
         topic_recency_days=options.get("topicRecencyDays"),
         mastered_reentry_counter=build.mastered_reentry_counter,
         recent_formats_by_concept=inputs.get("recentFormatsByConcept"),
+        **exam,
     )
 
 
@@ -466,6 +474,7 @@ def backfill_cards_uncapped(inputs: dict[str, Any], plan: dict[str, Any], build:
 def rescue_orphans(inputs: dict[str, Any], plan: dict[str, Any], build: SessionBuildState) -> None:
     from .build_state import question_suppression_key
     from .errors import UnsupportedSchedulerInput
+    from .ranking import apply_bounded_exam_target_nudge
     from .policies import (
         has_specific_clinical_topic_overlap,
         prioritize_least_recently_served_contrast_siblings,
@@ -486,8 +495,15 @@ def rescue_orphans(inputs: dict[str, Any], plan: dict[str, Any], build: SessionB
         cid, name = attribution(card["topics"])
         build.add_item(card_item(card, conceptId=cid, conceptName=name, priority=0.2, interventionReason=reason))
 
+    active = active_targets(inputs)
+
+    def nudge(rows: list[dict[str, Any]], kind: str) -> list[dict[str, Any]]:
+        if not inputs.get("applyExamTarget"):
+            return rows
+        return apply_bounded_exam_target_nudge(rows, lambda r: active[kind].get(r["id"]), active["rankMove"])
+
     if len(build.selected_items) < size:
-        for card in [c for c in bulk["seenCards"] if c["id"] not in build.selected_card_ids]:
+        for card in nudge([c for c in bulk["seenCards"] if c["id"] not in build.selected_card_ids], "card"):
             if len(build.selected_items) >= size:
                 break
             if card.get("variantGroupId") and card["variantGroupId"] in build.selected_card_variant_groups:
@@ -498,7 +514,7 @@ def rescue_orphans(inputs: dict[str, Any], plan: dict[str, Any], build: SessionB
     unseen = [c for c in bulk["unseenCards"] if c["id"] not in build.selected_card_ids
               and c["id"] not in bulk["passSetDeferredCardIds"]]
     unseen.sort(key=lambda c: -(1 if c.get("importance") is None else c["importance"]))
-    for card in unseen:
+    for card in nudge(unseen, "card"):
         if len(build.selected_items) >= size:
             break
         if card.get("variantGroupId") and card["variantGroupId"] in build.selected_card_variant_groups:
@@ -508,7 +524,7 @@ def rescue_orphans(inputs: dict[str, Any], plan: dict[str, Any], build: SessionB
     questions = prioritize_least_recently_served_contrast_siblings(
         [q for q in bulk["rotationQuestions"] if q["id"] not in build.selected_question_ids], lambda q: q["id"], familiarity
     )
-    for q in questions:
+    for q in nudge(questions, "question"):
         if len(build.selected_items) >= size:
             break
         key = question_suppression_key(q)

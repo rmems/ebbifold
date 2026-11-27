@@ -121,6 +121,18 @@ stubModule(`${K}unified-scheduler-queries`, {
     (clusterSnapshot().clusterScaffolds ?? [])
       .filter((row: Json) => clusterIds.includes(row.clusterId) && !selected.has(row.id)),
 });
+stubModule('../../src/lib/exam-target/learner-policy', {
+  buildExamTargetLearnerPolicy: () => {
+    const policy = clusterSnapshot().learnerTargetPolicy;
+    if (!policy) throw new Error('fixture requires a learnerTargetPolicy snapshot');
+    return {
+      ...policy,
+      conceptMultipliers: mapOf(policy.conceptMultipliers),
+      itemPersonalizedScores: mapOf(policy.itemPersonalizedScores),
+      desiredDomains: mapOf(policy.desiredDomains),
+    };
+  },
+});
 stubModule(`${K}bulk-candidates`, {
   loadQuestionFamiliarity: async () => new Map(Object.entries(clusterSnapshot().questionFamiliarity ?? {})),
 });
@@ -187,7 +199,7 @@ function toSessionInputs(s: Json): any {
     cardGapAlignment: new Map(),
     cardExamRelevance: mapOf(b.cardExamRelevance),
     questionExamRelevance: mapOf(b.questionExamRelevance),
-    examTargetItemScores: new Map(),
+    examTargetItemScores: mapOf(b.examTargetItemScores),
     cardExamTargetScores: new Map(),
     questionExamTargetScores: new Map(),
     examTargetRejectedItemKeys: [],
@@ -215,10 +227,12 @@ function toSessionInputs(s: Json): any {
     } : undefined,
     recentClusterExposures: mapOf(s.recentClusterExposures),
     concepts: s.concepts, conceptMap: new Map(s.concepts.map((c: Json) => [c.id, c])),
-    runtimeExamTarget: undefined, runtimeTargetSnapshot: null, examTargetEvaluationOnly: false,
-    effectiveTargetInfluence: null, targetComputeRequested: false, targetSidecarsValid: false, applyExamTarget: false,
+    runtimeExamTarget: s.runtimeExamTarget ?? undefined, runtimeTargetSnapshot: s.runtimeTargetSnapshot ?? null,
+    examTargetEvaluationOnly: Boolean(s.examTargetEvaluationOnly), effectiveTargetInfluence: s.effectiveTargetInfluence ?? null,
+    targetComputeRequested: Boolean(s.targetComputeRequested), targetSidecarsValid: Boolean(s.targetSidecarsValid),
+    applyExamTarget: Boolean(s.applyExamTarget),
     conceptTargetScores: { scores: new Map() }, observedExamTargetDomainCounts: new Map(), masteryEvidence: null,
-    eligibleCoreUnitIds: new Set(), eligibleAppliedUnitIds: new Set(), targetWorkload: null,
+    eligibleCoreUnitIds: new Set(), eligibleAppliedUnitIds: new Set(), targetWorkload: s.targetWorkload ?? null,
     stateMap, conceptEmbeddings: mapOf(s.conceptEmbeddings), gapDirection: s.gapDirection ?? null,
     likedConceptIds: new Set(s.likedConceptIds ?? []), chronicFailureConceptIds: new Set(s.chronicFailureConceptIds ?? []),
     practiceMissConceptIds: new Set(s.practiceMissConceptIds ?? []),
@@ -453,6 +467,41 @@ function struggleSession(s: Json, withLookups: boolean): void {
   };
 }
 
+function examTargetSession(s: Json, mode: 'active' | 'shadow', assignment: string, applied: boolean): void {
+  const influence = { allocator: 'active', maxItemRankMove: 4 };
+  s.targetComputeRequested = true;
+  s.targetSidecarsValid = true;
+  s.applyExamTarget = applied;
+  s.runtimeTargetSnapshot = {
+    id: 'target-snapshot-1', targetVersion: 'target-v1', targetBasis: 'fixture-blueprint', scorerVersion: 'scorer-v1',
+    definition: { influence },
+  };
+  s.runtimeExamTarget = {
+    schedulerVersion: 'scheduler-v1', policyDigest: 'digest-1', activationRevision: 3,
+    resolved: { effectiveMode: mode, assignment },
+  };
+  s.effectiveTargetInfluence = influence;
+  s.targetWorkload = { coreTargetSeats: 0, surplusSeats: 0, shortfall: null, dailyCapacity: 40 };
+  const cardIds = [...(s.bulk.unseenCards ?? []), ...(s.bulk.seenCards ?? [])].map((c: Json) => c.id);
+  const questionIds = (s.bulk.rotationQuestions ?? []).map((q: Json) => q.id);
+  const keys = [...cardIds.map((id: string) => `card:${id}`), ...questionIds.map((id: string) => `question:${id}`)];
+  const domains = ['RENAL', 'CARDIO', 'HEME'];
+  s.bulk.examTargetItemScores = Object.fromEntries(keys.map((key, i) => [key, {
+    domainCode: domains[i % 3], sourceRotation: 'rot-main', embeddingHash: `emb-${i}`, fitPercentile: (i * 13) % 100,
+    effectiveDomainWeight: 0.25 + (i % 3) * 0.125, itemTargetIndex: ((i * 7) % 10) / 10, weightProvenance: 'fixture',
+  }]));
+  s.learnerTargetPolicy = {
+    conceptMultipliers: { 'c-renal': 1.4, 'c-cardiac': 0.6, 'c-acid': 1.1 },
+    itemPersonalizedScores: Object.fromEntries(keys.filter((_k, i) => i % 4 !== 3).map((key, i) => [key, ((i * 37) % 100) / 100])),
+    desiredDomains: {
+      RENAL: { desiredShare: 0.5, userDomainGap: 0.3 },
+      CARDIO: { desiredShare: 0.3, userDomainGap: 0.1 },
+      NEURO: { desiredShare: 0.2, userDomainGap: 0.4 },
+    },
+    unmappedDomainCodes: ['HEME'],
+  };
+}
+
 function clusterFallbackSession(s: Json): void {
   s.concepts = [];
   const card = (id: string, clusterId: string, complexity: number, firstSight: boolean, group: string | null = null) => ({
@@ -528,6 +577,18 @@ const sessionCases = [
   sessionVariant('struggle_history_interventions', s => { struggleSession(s, true); s.size = 16; }),
   sessionVariant('struggle_history_lookups_missing', s => { struggleSession(s, false); s.size = 16; }),
   sessionVariant('empty_concepts_cluster_fallback', s => { s.concepts = []; }),
+  sessionVariant('exam_target_active', s => examTargetSession(s, 'active', 'treatment', true)),
+  sessionVariant('exam_target_shadow_mode', s => examTargetSession(s, 'shadow', 'treatment', false)),
+  sessionVariant('exam_target_control_assignment', s => examTargetSession(s, 'active', 'control', false)),
+  sessionVariant('exam_target_invalid_sidecars', s => {
+    examTargetSession(s, 'active', 'treatment', false);
+    s.targetSidecarsValid = false;
+  }),
+  sessionVariant('card_exam_relevance_without_target', s => {
+    s.bulk.cardExamRelevance = Object.fromEntries([...(s.bulk.unseenCards ?? []), ...(s.bulk.seenCards ?? [])]
+      .map((c: Json, i: number) => [c.id, ((i * 29) % 100) / 100]));
+    s.bulk.questionExamRelevance = Object.fromEntries((s.bulk.rotationQuestions ?? []).map((q: Json, i: number) => [q.id, ((i * 31) % 100) / 100]));
+  }),
   sessionVariant('cluster_present_fallback', s => { clusterFallbackSession(s); s.size = 10; }),
   sessionVariant('cluster_present_first_sight_quota', s => {
     clusterFallbackSession(s);

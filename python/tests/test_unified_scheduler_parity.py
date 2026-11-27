@@ -185,8 +185,11 @@ def test_unseeded_or_malformed_seed_fails_closed(seed: str | None) -> None:
 
 
 _UNPORTED = {
-    "exam_target": lambda s: s.update(applyExamTarget=True),
-    "learner_policy": lambda s: s.update(targetSidecarsValid=True, runtimeTargetSnapshot={"definition": {}}),
+    "exam_target_without_workload": lambda s: s.update(applyExamTarget=True),
+    "exam_target_core_seats": lambda s: s.update(applyExamTarget=True, targetWorkload={"coreTargetSeats": 2}),
+    "exam_target_surplus_seats": lambda s: s.update(applyExamTarget=True, targetWorkload={"surplusSeats": 1}),
+    "exam_target_mastery_evidence": lambda s: s.update(masteryEvidence={"remainingTargetWork": 3}),
+    "learner_policy_missing": lambda s: s.update(targetSidecarsValid=True, runtimeTargetSnapshot={"definition": {}}),
     "prep_blend": lambda s: s["options"].update(sessionPrepBlend={"items": []}),
 }
 

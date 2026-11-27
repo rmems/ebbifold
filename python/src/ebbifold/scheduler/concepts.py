@@ -15,6 +15,7 @@ from typing import Any, Callable
 from . import math as smath
 from .config import DEFAULTS, RECALL_RANKING_HORIZON_DAYS, stable_target_random
 from .errors import UnsupportedSchedulerInput
+from .exam_target import assert_exam_target_supported, resolve_learner_policy
 from .scoring import (
     PRACTICE_MISS_BOOST,
     cluster_exposure_dampening,
@@ -57,10 +58,7 @@ def _json_number(value: Any) -> Any:
 def assert_supported(inputs: dict[str, Any]) -> None:
     """Fail closed on lanes Phase 3a does not port."""
     options = inputs.get("options", {})
-    if inputs.get("applyExamTarget"):
-        raise UnsupportedSchedulerInput("exam-target treatment is not ported in Phase 3a")
-    if inputs.get("targetSidecarsValid") and inputs.get("runtimeTargetSnapshot"):
-        raise UnsupportedSchedulerInput("exam-target learner policy is not ported in Phase 3a")
+    assert_exam_target_supported(inputs)
     if options.get("sessionPrepBlend"):
         raise UnsupportedSchedulerInput("session prep blend is not ported in Phase 3a")
 
@@ -131,7 +129,7 @@ def rank_concepts(inputs: dict[str, Any]) -> ConceptRanking:
         concept_emb = smath.truncate_to_manifold_dim(raw_emb) if raw_emb else None
         gap_alignment = (
             max(0, smath.cosine_similarity(concept_emb, gap_direction)) * (0.15 + exam_pressure * 0.15)
-            if concept_emb and gap_direction
+            if not inputs.get("applyExamTarget") and concept_emb and gap_direction
             else 0
         )
         liked_boost = 0.15 if concept["id"] in liked else 0
@@ -142,7 +140,7 @@ def rank_concepts(inputs: dict[str, Any]) -> ConceptRanking:
             options.get("currentTeachingWeek"),
         )
         dated = dated_topic_recency_concept_boost(concept["topics"], options.get("topicRecencyDays"))
-        exam_weight_multiplier = (concept.get("examWeight") or 1) / 3
+        exam_weight_multiplier = 1 if inputs.get("applyExamTarget") else (concept.get("examWeight") or 1) / 3
         soft_penalty = compute_recall_soft_penalty(
             current_recall, confidence, is_chronic_failure=concept["id"] in chronic
         )
@@ -159,6 +157,7 @@ def rank_concepts(inputs: dict[str, Any]) -> ConceptRanking:
             priority=priority, intervention=intervention,
         ))
 
+    resolve_learner_policy(inputs, states)
     states_by_id = {s.conceptId: s for s in states}
     concept_by_id = {c["id"]: c for c in concepts}
 
@@ -328,7 +327,9 @@ def plan_card_quota(inputs: dict[str, Any], card_ratio: float) -> dict[str, int]
     elif challenge == -2:
         target_cards = size
     else:
-        target_cards = min(size, max(math.ceil(size * card_ratio), 0))
+        core_seats = (inputs.get("targetWorkload") or {}).get("coreTargetSeats")
+        target_core = (size if core_seats is None else core_seats) if inputs.get("applyExamTarget") else 0
+        target_cards = min(size, max(math.ceil(size * card_ratio), target_core))
     coverage = (
         0
         if options.get("mode") == "crunch" or inputs.get("effectiveMaxNewCards") == 0
