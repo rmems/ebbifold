@@ -82,13 +82,14 @@ def test_concept_thread_reserves_inside_existing_freshness_tier() -> None:
 
 def test_session_marks_one_concept_followup_and_reserves_only_one() -> None:
     base = copy.deepcopy(next(c for c in SESSIONS if c["name"] == "full_session_weak_new_pristine")["snapshot"])
-    base["conceptThreadAnchors"] = [_anchor(base["nowMs"])]
+    anchor = _anchor(base["nowMs"])
+    anchor.update({"text": "Cardiac output mechanism", "topics": ["Cardiac Output"], "conceptIds": ["c-cardiac"]})
+    base["conceptThreadAnchors"] = [anchor]
     result = run_session(base)["result"]
     matches = [item for item in result["items"] if item.get("conceptThreadPolicyApplied")]
-    assert len(matches) <= 1
-    if matches:
-        assert matches[0]["interventionReason"] == "concept_followup"
-        assert matches[0]["conceptThreadAnchorEventId"] == "event-anchor"
+    assert len(matches) == 1
+    assert matches[0]["interventionReason"] == "concept_followup"
+    assert matches[0]["conceptThreadAnchorEventId"] == "event-anchor"
 
 
 

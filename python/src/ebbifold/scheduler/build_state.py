@@ -231,4 +231,8 @@ class SessionBuildState:
             for item in list(self.deferred_for_novelty.values()):
                 if len(self.selected_items) >= self.size:
                     break
-                self.add_item(item)
+                is_thread_followup = item.get("interventionReason") == "concept_followup"
+                if is_thread_followup and self.concept_thread_followup_selected:
+                    continue
+                if self.add_item(item) and is_thread_followup:
+                    self.concept_thread_followup_selected = True
