@@ -11,6 +11,7 @@ import copy
 import json
 import math
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -333,8 +334,8 @@ def test_serve_conditioning_and_repetition_slot_telemetry() -> None:
 
 
 def test_mastery_seat_allocator_and_prep_ordering() -> None:
-    from ebbifold.scheduler.exam_target import allocate_mastery_seats
-    from ebbifold.scheduler.lanes import _order_prep_candidates
+    from ebbifold.scheduler.exam_target import allocate_exam_target_concept_order, allocate_mastery_seats
+    from ebbifold.scheduler.lanes import order_prep_keys
 
     candidates = [
         {"itemKey": "card:one", "unitId": "u1", "stage": "scheduled-atomic-core"},
@@ -351,19 +352,28 @@ def test_mastery_seat_allocator_and_prep_ordering() -> None:
     assert allocation["surplusSelectedCount"] == 1
     assert [row["itemKey"] for row in allocation["selectedCandidates"]] == ["card:one", "question:three"]
 
-    items = [
-        {"type": "question", "id": "ordinary"},
-        {"type": "card", "id": "weak"},
-        {"type": "card", "id": "unseen"},
-    ]
-    ordered = _order_prep_candidates(items, {
-        "share": 0.5,
-        "itemIds": ["card:weak", "card:unseen"],
-        "weakItemIds": ["card:weak"],
-        "unseenItemIds": ["card:unseen"],
-    }, 2)
-    assert [row["id"] for row in ordered[:2]] == ["ordinary", "weak"]
-    assert ordered[-1]["id"] == "unseen"
+    ordered_keys = order_prep_keys(["card:c1", "card:c2", "question:q1"], {
+        "share": 0.4,
+        "sessions": [
+            {"share": 0.7, "itemIds": ["card:c1", "card:c2"]},
+            {"share": 0.3, "itemIds": ["question:q1"]},
+        ],
+    })
+    assert ordered_keys == ["card:c1", "card:c2", "question:q1"]
+
+    concepts = [SimpleNamespace(conceptId=key) for key in ("a", "b", "c")]
+    concept_order = allocate_exam_target_concept_order(
+        concepts=concepts, protected_concept_ids=set(), requested_discretionary_size=2,
+        concept_mappings={
+            "a": {"primaryDomainCode": "X", "targetIndex": 0.9},
+            "b": {"primaryDomainCode": "Y", "targetIndex": 0.1},
+            "c": {"primaryDomainCode": "X", "targetIndex": 0.8},
+        },
+        desired_shares={"X": 0.8, "Y": 0.2}, observed_domain_counts={"X": 0, "Y": 2},
+        influence={"allocator": "full", "maxItemRankMove": 5},
+    )
+    assert [concept.conceptId for concept in concept_order["concepts"]] == ["a", "c", "b"]
+    assert concept_order["changedMembershipCount"] == 1
 
 
 def test_pass_set_and_composed_deck_source_identity() -> None:
