@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write # Qlty coverage upload (OIDC)
 
 jobs:
   verify:
@@ -16,8 +17,10 @@ jobs:
       NEXTAUTH_URL: http://localhost:3000
       MD3_GENERATED_CONTENT_MODE: offline
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -45,7 +48,15 @@ jobs:
         run: npm run lint
       - name: Run complete FOSS USMLE contract
         working-directory: ${{ runner.temp }}/md3-foss-current
-        run: npm run foss:test
+        run: npm run foss:test -- --coverage.enabled --coverage.reporter=lcov
+      - name: Upload coverage to Qlty
+        if: ${{ !github.event.pull_request.head.repo.fork }}
+        uses: qltysh/qlty-action/coverage@56bee2d751c94b7bd8de22f64c9b5f398048e13f # v2.8.1
+        with:
+          oidc: true
+          files: ${{ runner.temp }}/md3-foss-current/coverage/lcov.info
+          strip-prefix: ${{ runner.temp }}/md3-foss-current/
+          tag: typescript
       - name: Verify public corpus release gate
         working-directory: ${{ runner.temp }}/md3-foss-current
         run: npm run usmle:corpus:release-gate
