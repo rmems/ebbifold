@@ -16,6 +16,7 @@ from . import math as smath
 from .config import DEFAULTS, RECALL_RANKING_HORIZON_DAYS, stable_target_random
 from .errors import UnsupportedSchedulerInput
 from .exam_target import (
+    ExamTargetConceptOrderRequest,
     allocate_exam_target_concept_order,
     assert_exam_target_supported,
     resolve_learner_policy,
@@ -342,14 +343,14 @@ def select_weak_concepts(
             for code, domain in (policy.get("desiredDomains") or {}).items()
         }
         snapshot_influence = ((inputs.get("runtimeTargetSnapshot") or {}).get("definition") or {}).get("influence") or {}
-        allocated = allocate_exam_target_concept_order(
+        allocated = allocate_exam_target_concept_order(ExamTargetConceptOrderRequest(
             concepts=weak, protected_concept_ids=set(inputs.get("recentFailureConceptIds") or []),
             requested_discretionary_size=workload.get("surplusSeats") or 0,
             concept_mappings=(inputs.get("conceptTargetScores") or {}).get("scores") or {},
             desired_shares=desired,
             observed_domain_counts=inputs.get("observedExamTargetDomainCounts") or {},
             influence=inputs.get("effectiveTargetInfluence") or snapshot_influence,
-        )
+        ))
         weak = allocated["concepts"]
         allocated_ranks = {state.conceptId: rank for rank, state in enumerate(weak)}
         allocation_changed = allocated["changedMembershipCount"]

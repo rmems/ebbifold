@@ -12,12 +12,39 @@ from __future__ import annotations
 
 import hashlib
 import math
+from dataclasses import dataclass
 from typing import Any
 
 from .errors import UnsupportedSchedulerInput
 
 EMPTY_ACTIVE = {"card": {}, "question": {}, "rankMove": 0}
 MASTERY_STAGES = frozenset({"scheduled-atomic-core", "applied-distinction", "breadth-exploration"})
+
+
+def _mastery_candidate_available(candidate: dict[str, Any], stage: str, eligible_units: set[str],
+                                 used_items: set[str], used_units: set[str]) -> bool:
+    return (
+        candidate.get("stage") == stage
+        and candidate.get("unitId") in eligible_units
+        and candidate.get("itemKey") not in used_items
+        and candidate.get("unitId") not in used_units
+    )
+
+
+def _select_mastery_stage(candidates: list[dict[str, Any]], stage: str, eligible_units: set[str], limit: int,
+                          selected: list[dict[str, Any]], used_items: set[str], used_units: set[str]) -> int:
+    count = 0
+    for candidate in candidates:
+        if count >= limit:
+            break
+        if not _mastery_candidate_available(candidate, stage, eligible_units, used_items, used_units):
+            continue
+        row = {"itemKey": candidate["itemKey"], "unitId": candidate["unitId"], "stage": stage}
+        selected.append(row)
+        used_items.add(row["itemKey"])
+        used_units.add(row["unitId"])
+        count += 1
+    return count
 
 
 def allocate_mastery_seats(*, candidates: list[dict[str, Any]], eligible_unit_ids_by_stage: dict[str, list[str]],
@@ -29,23 +56,7 @@ def allocate_mastery_seats(*, candidates: list[dict[str, Any]], eligible_unit_id
     used_units: set[str] = set()
 
     def select(stage: str, limit: int) -> int:
-        count = 0
-        for candidate in candidates:
-            if count >= limit:
-                break
-            if (
-                candidate.get("stage") != stage
-                or candidate.get("unitId") not in eligible[stage]
-                or candidate.get("itemKey") in used_items
-                or candidate.get("unitId") in used_units
-            ):
-                continue
-            row = {"itemKey": candidate["itemKey"], "unitId": candidate["unitId"], "stage": stage}
-            selected.append(row)
-            used_items.add(row["itemKey"])
-            used_units.add(row["unitId"])
-            count += 1
-        return count
+        return _select_mastery_stage(candidates, stage, eligible[stage], limit, selected, used_items, used_units)
 
     core = select("scheduled-atomic-core", max(0, core_target_seats))
     applied = select("applied-distinction", max(0, surplus_seats))
@@ -81,89 +92,152 @@ def _membership_delta(control: list[dict[str, Any]], target: list[dict[str, Any]
     return sum(1 for candidate in target if candidate["itemKey"] not in control_keys)
 
 
-def allocate_exam_target_seats(*, requested_size: int, candidates: list[dict[str, Any]],
-                               desired_shares: dict[str, float], observed_domain_counts: dict[str, int],
-                               influence: dict[str, Any]) -> dict[str, Any]:
-    """Port of exam-target/allocator.ts over JSON-shaped snapshots."""
+@dataclass(frozen=True)
+class ExamTargetSeatRequest:
+    requested_size: int
+    candidates: list[dict[str, Any]]
+    desired_shares: dict[str, float]
+    observed_domain_counts: dict[str, int]
+    influence: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class ExamTargetConceptOrderRequest:
+    concepts: list[Any]
+    protected_concept_ids: set[str]
+    requested_discretionary_size: int
+    concept_mappings: dict[str, Any]
+    desired_shares: dict[str, float]
+    observed_domain_counts: dict[str, int]
+    influence: dict[str, Any]
+
+
+def _split_seat_candidates(candidates: list[dict[str, Any]], requested_size: int) -> dict[str, Any]:
     requested = max(0, math.floor(requested_size))
     protected = sorted((c for c in candidates if c.get("slotClass") != "discretionary"), key=_control_key)[:requested]
-    open_seats = max(0, requested - len(protected))
     discretionary = sorted((c for c in candidates if c.get("slotClass") == "discretionary"), key=_control_key)
-    control_discretionary = discretionary[:open_seats]
-    control_selected = protected + control_discretionary
-    if open_seats == 0 or influence.get("allocator") == "shadow":
-        return {"selected": control_selected, "controlSelected": control_selected,
-                "changedMembershipCount": 0, "coverageDebtDomainCodes": []}
+    open_seats = max(0, requested - len(protected))
+    control = protected + discretionary[:open_seats]
+    return {"protected": protected, "discretionary": discretionary, "openSeats": open_seats, "control": control}
 
-    max_item_rank_move = min(5, max(0, math.floor(influence.get("maxItemRankMove") or 0)))
-    if influence.get("allocator") == "soft":
-        targeted = sorted(discretionary, key=_target_key(max_item_rank_move))[:open_seats]
-        selected = protected + targeted
-        return {"selected": selected, "controlSelected": control_selected,
-                "changedMembershipCount": _membership_delta(control_selected, selected),
-                "coverageDebtDomainCodes": []}
 
-    remaining = list(discretionary)
-    selected_discretionary: list[dict[str, Any]] = []
-    counts = dict(observed_domain_counts)
-    observed_total = sum(max(0, value) for value in counts.values())
-    next_window_size = observed_total + open_seats
-    debt = {
+def _seat_allocation_result(parts: dict[str, Any], selected: list[dict[str, Any]], debt: list[str] | None = None) -> dict[str, Any]:
+    control = parts["control"]
+    return {"selected": selected, "controlSelected": control,
+            "changedMembershipCount": _membership_delta(control, selected),
+            "coverageDebtDomainCodes": sorted(debt or [])}
+
+
+def _unchanged_seat_allocation(parts: dict[str, Any]) -> dict[str, Any]:
+    control = parts["control"]
+    return {"selected": control, "controlSelected": control,
+            "changedMembershipCount": 0, "coverageDebtDomainCodes": []}
+
+
+def _soft_seat_allocation(parts: dict[str, Any], max_item_rank_move: int) -> dict[str, Any]:
+    targeted = sorted(parts["discretionary"], key=_target_key(max_item_rank_move))[:parts["openSeats"]]
+    return _seat_allocation_result(parts, parts["protected"] + targeted)
+
+
+def _missing_domain_debt(desired_shares: dict[str, float], candidates: list[dict[str, Any]]) -> set[str]:
+    return {
         domain for domain in desired_shares
-        if not any(candidate.get("domainCode") == domain for candidate in remaining)
+        if not any(candidate.get("domainCode") == domain for candidate in candidates)
     }
 
-    while len(selected_discretionary) < open_seats and remaining:
-        feasible = [
-            domain for domain in desired_shares
-            if any(candidate.get("domainCode") == domain for candidate in remaining)
-        ]
-        chosen = None
-        if feasible:
-            deficits = {
-                domain: desired_shares.get(domain, 0) * next_window_size - counts.get(domain, 0)
-                for domain in feasible
-            }
-            chosen_domain = min(feasible, key=lambda domain, deficits=deficits: (-deficits[domain], domain))
-            chosen = min((candidate for candidate in remaining if candidate.get("domainCode") == chosen_domain),
-                         key=_target_key(max_item_rank_move), default=None)
-        if chosen is None:
-            chosen = min(remaining, key=_control_key, default=None)
+
+def _feasible_domains(desired_shares: dict[str, float], remaining: list[dict[str, Any]]) -> list[str]:
+    return [
+        domain for domain in desired_shares
+        if any(candidate.get("domainCode") == domain for candidate in remaining)
+    ]
+
+
+def _domain_deficits(feasible: list[str], desired_shares: dict[str, float],
+                     counts: dict[str, int], next_window_size: int) -> dict[str, float]:
+    return {
+        domain: desired_shares.get(domain, 0) * next_window_size - counts.get(domain, 0)
+        for domain in feasible
+    }
+
+
+def _choose_domain_candidate(remaining: list[dict[str, Any]], desired_shares: dict[str, float],
+                             counts: dict[str, int], next_window_size: int,
+                             max_item_rank_move: int) -> dict[str, Any] | None:
+    feasible = _feasible_domains(desired_shares, remaining)
+    if not feasible:
+        return None
+    deficits = _domain_deficits(feasible, desired_shares, counts, next_window_size)
+    chosen_domain = min(feasible, key=lambda domain: (-deficits[domain], domain))
+    return min((candidate for candidate in remaining if candidate.get("domainCode") == chosen_domain),
+               key=_target_key(max_item_rank_move), default=None)
+
+
+def _choose_full_candidate(remaining: list[dict[str, Any]], desired_shares: dict[str, float],
+                           counts: dict[str, int], next_window_size: int,
+                           max_item_rank_move: int) -> dict[str, Any] | None:
+    chosen = _choose_domain_candidate(remaining, desired_shares, counts, next_window_size, max_item_rank_move)
+    return chosen or min(remaining, key=_control_key, default=None)
+
+
+def _take_full_candidate(remaining: list[dict[str, Any]], counts: dict[str, int], chosen: dict[str, Any]) -> None:
+    remaining.remove(chosen)
+    if chosen.get("domainCode"):
+        counts[chosen["domainCode"]] = counts.get(chosen["domainCode"], 0) + 1
+
+
+def _full_seat_allocation(parts: dict[str, Any], request: ExamTargetSeatRequest,
+                          max_item_rank_move: int) -> dict[str, Any]:
+    remaining = list(parts["discretionary"])
+    selected_discretionary: list[dict[str, Any]] = []
+    counts = dict(request.observed_domain_counts)
+    next_window_size = sum(max(0, value) for value in counts.values()) + parts["openSeats"]
+    debt = _missing_domain_debt(request.desired_shares, remaining)
+
+    while len(selected_discretionary) < parts["openSeats"] and remaining:
+        chosen = _choose_full_candidate(remaining, request.desired_shares, counts, next_window_size, max_item_rank_move)
         if chosen is None:
             break
         selected_discretionary.append(chosen)
-        remaining.remove(chosen)
-        if chosen.get("domainCode"):
-            counts[chosen["domainCode"]] = counts.get(chosen["domainCode"], 0) + 1
+        _take_full_candidate(remaining, counts, chosen)
 
-    selected = protected + selected_discretionary
-    return {"selected": selected, "controlSelected": control_selected,
-            "changedMembershipCount": _membership_delta(control_selected, selected),
-            "coverageDebtDomainCodes": sorted(debt)}
+    return _seat_allocation_result(parts, parts["protected"] + selected_discretionary, sorted(debt))
 
 
-def allocate_exam_target_concept_order(*, concepts: list[Any], protected_concept_ids: set[str],
-                                       requested_discretionary_size: int, concept_mappings: dict[str, Any],
-                                       desired_shares: dict[str, float], observed_domain_counts: dict[str, int],
-                                       influence: dict[str, Any]) -> dict[str, Any]:
-    """Apply target allocation only to discretionary concept positions."""
+def allocate_exam_target_seats(request: ExamTargetSeatRequest) -> dict[str, Any]:
+    """Port of exam-target/allocator.ts over JSON-shaped snapshots."""
+    parts = _split_seat_candidates(request.candidates, request.requested_size)
+    allocator = request.influence.get("allocator")
+    if parts["openSeats"] == 0 or allocator == "shadow":
+        return _unchanged_seat_allocation(parts)
+
+    max_item_rank_move = min(5, max(0, math.floor(request.influence.get("maxItemRankMove") or 0)))
+    if allocator == "soft":
+        return _soft_seat_allocation(parts, max_item_rank_move)
+    return _full_seat_allocation(parts, request, max_item_rank_move)
+
+
+def _discretionary_concept_candidates(request: ExamTargetConceptOrderRequest) -> list[dict[str, Any]]:
     discretionary = []
-    for base_rank, concept in enumerate(concepts):
-        if concept.conceptId in protected_concept_ids:
+    for base_rank, concept in enumerate(request.concepts):
+        if concept.conceptId in request.protected_concept_ids:
             continue
-        mapping = concept_mappings.get(concept.conceptId) or {}
+        mapping = request.concept_mappings.get(concept.conceptId) or {}
         discretionary.append({
             "itemKey": f"concept:{concept.conceptId}", "slotClass": "discretionary",
             "domainCode": mapping.get("primaryDomainCode"), "baseRank": base_rank,
             "itemTargetIndex": mapping.get("targetIndex"), "concept": concept,
         })
-    allocated = allocate_exam_target_seats(
-        requested_size=min(len(discretionary), max(0, math.floor(requested_discretionary_size))),
-        candidates=discretionary, desired_shares=desired_shares,
-        observed_domain_counts=observed_domain_counts, influence=influence,
-    )
+    return discretionary
+
+
+def _allocated_concept_target_order(discretionary: list[dict[str, Any]], allocated: dict[str, Any]) -> list[dict[str, Any]]:
     selected_keys = {candidate["itemKey"] for candidate in allocated["selected"]}
-    target_order = allocated["selected"] + [c for c in discretionary if c["itemKey"] not in selected_keys]
+    return allocated["selected"] + [c for c in discretionary if c["itemKey"] not in selected_keys]
+
+
+def _restore_protected_concept_positions(concepts: list[Any], protected_concept_ids: set[str],
+                                         target_order: list[dict[str, Any]]) -> list[Any]:
     ordered, discretionary_index = [], 0
     for concept in concepts:
         if concept.conceptId in protected_concept_ids:
@@ -171,11 +245,29 @@ def allocate_exam_target_concept_order(*, concepts: list[Any], protected_concept
         else:
             ordered.append(target_order[discretionary_index]["concept"])
             discretionary_index += 1
+    return ordered
+
+
+def _concept_allocation_debt(discretionary: list[dict[str, Any]], allocated: dict[str, Any],
+                             desired_shares: dict[str, float]) -> list[str]:
     feasible_domains = {candidate.get("domainCode") for candidate in discretionary if candidate.get("domainCode")}
     debt = set(allocated["coverageDebtDomainCodes"])
     debt.update(domain for domain in desired_shares if domain not in feasible_domains)
+    return sorted(debt)
+
+
+def allocate_exam_target_concept_order(request: ExamTargetConceptOrderRequest) -> dict[str, Any]:
+    """Apply target allocation only to discretionary concept positions."""
+    discretionary = _discretionary_concept_candidates(request)
+    allocated = allocate_exam_target_seats(ExamTargetSeatRequest(
+        requested_size=min(len(discretionary), max(0, math.floor(request.requested_discretionary_size))),
+        candidates=discretionary, desired_shares=request.desired_shares,
+        observed_domain_counts=request.observed_domain_counts, influence=request.influence,
+    ))
+    target_order = _allocated_concept_target_order(discretionary, allocated)
+    ordered = _restore_protected_concept_positions(request.concepts, request.protected_concept_ids, target_order)
     return {"concepts": ordered, "changedMembershipCount": allocated["changedMembershipCount"],
-            "coverageDebtDomainCodes": sorted(debt)}
+            "coverageDebtDomainCodes": _concept_allocation_debt(discretionary, allocated, request.desired_shares)}
 
 
 def assert_exam_target_supported(inputs: dict[str, Any]) -> None:
