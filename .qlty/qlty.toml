@@ -73,12 +73,6 @@ name = "actionlint"
 name = "bandit"
 
 [[plugin]]
-name = "eslint"
-version = "9.38.0"
-package_file = "package.json"
-package_filters = ["eslint", "jest"]
-
-[[plugin]]
 name = "osv-scanner"
 
 [[plugin]]

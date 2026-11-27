@@ -8,34 +8,54 @@ upstream's code into a new stack).
 
 ## What this is
 
-ebbifold is a Python port of [todd866/cohort](https://github.com/todd866/cohort),
-the open-source spaced-repetition engine. The TypeScript app remains in this
-repository as the reference implementation; the port adds new code under
-`python/` and `julia/` (in progress — see the phase gates in the plan):
+ebbifold is a local-first personal AI-engineering study system. It began as a
+Python port of [todd866/cohort](https://github.com/todd866/cohort); the Python
+package is now the implementation of record and the inherited TypeScript
+application has been retired after golden-fixture parity was captured.
 
-- **Python** (`python/`, `src/ebbifold/`) — the engine: adaptive scheduling,
-  the concept-space scheduler over 3,072-dimensional embeddings, corpus
-  loaders, a CLI and a local FastAPI app with SQLite persistence.
-- **Julia** (`julia/`) — the math layer: forgetting-curve fitting
-  (`R = e^(−t/S)`), per-concept memory-strength estimation and half-life
-  regression, reached over a ZMQ boundary.
+- **Python** (`python/src/ebbifold/`) — adaptive scheduling, the concept-space
+  scheduler over embedding vectors, corpus loaders, a CLI, and a local FastAPI
+  app with SQLite persistence.
+- **Julia** (`julia/`, planned) — the math layer for forgetting-curve fitting
+  (`R = e^(−t/S)`), per-concept memory-strength estimation, and half-life
+  regression behind a ZMQ boundary.
 
-The port follows one rule above all: **parity before features** — every
-ported module ships tests proving it matches the TypeScript original on
-identical inputs before new behavior is added. The full plan, including phase
-gates, is at [docs/python-port-plan.md](docs/python-port-plan.md).
+The port follows one rule above all: **parity before features**. Golden vectors
+exported from the upstream TypeScript implementation remain committed under
+`python/tests/fixtures/`; Python tests consume those artifacts directly and
+never execute TypeScript or Node.
+
+## Local review app
+
+```bash
+cd python
+uv sync --group dev
+uv run pytest
+uv run ebbifold-review --help
+uv run ebbifold-review-api --help
+```
+
+The API binds to `127.0.0.1` by default. Learner memory is local runtime data:
+SQLite databases default to the user data directory and are gitignored.
 
 ## Datasets
 
-| | |
-|---|---|
-| **Dataset #1 — USMLE Step 1** | 556 original, citation-backed questions plus a 25-item baseline set, under `open-content/usmle/step1/` |
-| **Dataset #2 — AI Engineering blueprint** | Planned. A second exam blueprint exercising the same engine, unmodified |
+|                                           |                                                                                                        |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| **Dataset #1 — USMLE Step 1**             | 556 original, citation-backed questions plus a 25-item baseline set, under `open-content/usmle/step1/` |
+| **Dataset #2 — AI Engineering blueprint** | Planned. A second exam blueprint exercising the same engine, unmodified                                |
 
-The corpus is frozen: 1,357 JSON files under `open-content/` are the data
+The corpus is frozen: the JSON files under `open-content/` are the data
 contract. Python reads them as-is — no format conversion, no re-authoring.
 Every record carries its provenance envelope, and admission is fail-closed:
 nothing unverified enters the bank.
+
+## TypeScript cutover
+
+The upstream Next.js/PostgreSQL application, Node tooling, Prisma schema, and
+TypeScript-only CI were removed in Phase 4c. The cutover inventory and fixture
+provenance rules are in [docs/typescript-cutover.md](docs/typescript-cutover.md);
+the phase plan is in [docs/python-port-plan.md](docs/python-port-plan.md).
 
 ## Upstream
 
@@ -44,24 +64,6 @@ This repository is a fork of [todd866/cohort](https://github.com/todd866/cohort)
 content is CC BY 4.0 (`LICENSE-CONTENT.md`). Attribution to upstream is kept
 throughout the port. Upstream's live deployment is
 [cohort.md](https://cohort.md); this fork does not serve it.
-
-## The inherited app
-
-The TypeScript application (Next.js, PostgreSQL/pgvector) still lives in this
-tree and remains the parity reference. Its key pieces:
-
-- `src/lib/usmle/step1-adaptive.ts` — the public reviewer's tiered scheduler
-  (3 tiers; 2 correct moves up, 1 miss drops immediately; follow-ups come from
-  the missed concept's teaching ladder before widening).
-- `src/lib/knowledge/unified-scheduler.ts` — the concept-space scheduler over
-  the embedding manifold.
-- `src/lib/exam-target/` — blueprint targeting; ships with an empty registry.
-- `open-content/` — the frozen corpus described above.
-
-Upstream's own README-era details (quick start, seeding, embedding pipeline)
-still apply to the TypeScript app; see
-[CONTRIBUTING.md](CONTRIBUTING.md) for the rights boundary and provenance
-rules every contribution must satisfy.
 
 ## Licence and provenance
 
