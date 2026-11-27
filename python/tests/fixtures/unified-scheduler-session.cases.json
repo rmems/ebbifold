@@ -4146,26 +4146,6 @@
               "firstSightAtSelection": true
             },
             {
-              "type": "question",
-              "id": "q-top-1",
-              "rotation": "rot-main",
-              "conceptId": "rotation:q-top-1",
-              "conceptName": "Rotation fill",
-              "priority": 0.4,
-              "interventionReason": "needs_retest",
-              "conceptThreadPolicyVersion": "clinical-thread-facets-v1",
-              "conceptThreadPolicyApplied": false,
-              "variantGroupId": "tg",
-              "variantType": "contrast-set",
-              "difficulty": "medium",
-              "difficultyTier": null,
-              "predictedRecall": 0.26549999999999996,
-              "predictedRecallModel": "item-facility-v1",
-              "predictedRecallSource": "fallback",
-              "predictedRecallStatus": "telemetry-only-unvalidated",
-              "firstSightAtSelection": true
-            },
-            {
               "type": "card",
               "id": "s-glyco-2",
               "conceptId": "c-glyco",
@@ -4216,29 +4196,6 @@
               "firstSightAtSelection": false
             },
             {
-              "type": "question",
-              "id": "q-glyco-1",
-              "rotation": "rot-main",
-              "conceptId": "rotation:q-glyco-1",
-              "conceptName": "Rotation fill",
-              "priority": 0.4,
-              "interventionReason": "needs_retest",
-              "conceptThreadPolicyVersion": "clinical-thread-facets-v1",
-              "conceptThreadPolicyApplied": false,
-              "variantGroupId": null,
-              "variantType": null,
-              "difficulty": "medium",
-              "topics": [
-                "Glycolysis"
-              ],
-              "difficultyTier": "standard",
-              "predictedRecall": 0.26549999999999996,
-              "predictedRecallModel": "item-facility-v1",
-              "predictedRecallSource": "fallback",
-              "predictedRecallStatus": "telemetry-only-unvalidated",
-              "firstSightAtSelection": false
-            },
-            {
               "type": "card",
               "id": "u-orphan",
               "conceptId": "_unattached",
@@ -4260,20 +4217,67 @@
               "predictedRecallSource": "fallback",
               "predictedRecallStatus": "telemetry-only-unvalidated",
               "firstSightAtSelection": true
+            },
+            {
+              "type": "question",
+              "id": "q-top-1",
+              "rotation": "rot-main",
+              "conceptId": "rotation:q-top-1",
+              "conceptName": "Rotation fill",
+              "priority": 0.4,
+              "interventionReason": "needs_retest",
+              "conceptThreadPolicyVersion": "clinical-thread-facets-v1",
+              "conceptThreadPolicyApplied": false,
+              "variantGroupId": "tg",
+              "variantType": "contrast-set",
+              "difficulty": "medium",
+              "difficultyTier": null,
+              "predictedRecall": 0.26549999999999996,
+              "predictedRecallModel": "item-facility-v1",
+              "predictedRecallSource": "fallback",
+              "predictedRecallStatus": "telemetry-only-unvalidated",
+              "firstSightAtSelection": true
+            },
+            {
+              "type": "card",
+              "id": "u-cardiac-2",
+              "conceptId": "c-cardiac",
+              "conceptName": "C-CARDIAC",
+              "priority": 0.2,
+              "interventionReason": "reinforcement",
+              "variantGroupId": "vg-1",
+              "variantIndex": 0,
+              "variantType": "cloze",
+              "difficulty": "easy",
+              "topics": [
+                "Cardiac Output"
+              ],
+              "complexity": 2,
+              "clusterId": "cl-cardio",
+              "challengePolicyApplied": false,
+              "difficultyTier": "standard",
+              "challengePolicyVersion": "frontier-then-stepdown-v1",
+              "challengeTargetTier": "stretch",
+              "challengeDistance": 1,
+              "predictedRecall": 0.40088075430686687,
+              "predictedRecallModel": "item-facility-v1",
+              "predictedRecallSource": "fallback",
+              "predictedRecallStatus": "telemetry-only-unvalidated",
+              "firstSightAtSelection": true
             }
           ],
           "repetitionSlotContext": null,
           "noveltyQuota": {
             "required": 0,
-            "selected": 9
+            "selected": 10
           },
           "stats": {
             "totalConcepts": 5,
             "weakConcepts": 5,
-            "selectedConcepts": 8,
-            "cardCount": 8,
-            "questionCount": 6,
-            "averagePriority": 0.595,
+            "selectedConcepts": 7,
+            "cardCount": 9,
+            "questionCount": 5,
+            "averagePriority": 0.582,
             "examPressure": 0.21,
             "conceptPairingRate": 0.8,
             "dailyThroughput": 42,
@@ -4312,11 +4316,11 @@
           },
           {
             "id": "top_up_from_rotation_bank",
-            "result": 12
+            "result": 11
           },
           {
             "id": "backfill_cards_uncapped",
-            "result": 12
+            "result": 11
           },
           {
             "id": "rescue_orphans",
@@ -4335,11 +4339,11 @@
           "card:u-cardiac-1",
           "card:u-acid-1",
           "question:q-top-1",
-          "question:q-glyco-1",
           "card:s-glyco-1",
           "card:s-glyco-2",
           "card:s-orphan",
-          "card:u-orphan"
+          "card:u-orphan",
+          "card:u-cardiac-2"
         ]
       }
     },
@@ -18231,7 +18235,7 @@
               "challengePolicyApplied": true,
               "conceptId": "c-ecl",
               "conceptName": "C-ECL",
-              "priority": 0.667393349093989,
+              "priority": 0.6673933490939888,
               "interventionReason": "weak_recall",
               "variantGroupId": null,
               "variantIndex": null,
@@ -19405,7 +19409,7 @@
               "id": "u-ecl-plain",
               "conceptId": "c-ecl",
               "conceptName": "C-ECL",
-              "priority": 0.9157123304383349,
+              "priority": 0.9157123304383348,
               "interventionReason": "failure_escalation",
               "variantGroupId": null,
               "variantIndex": null,

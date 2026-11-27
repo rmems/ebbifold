@@ -77,8 +77,12 @@ def pick_bridge_card(candidates: list[dict[str, Any]], seed: str | None) -> dict
 
 
 def _bridge_candidates(pool: list[dict[str, Any]], used: set[str], now_ms: float) -> list[dict[str, Any]]:
-    window = [row for row in pool if row["id"] not in used][:BRIDGE_CANDIDATE_WINDOW]
-    return [row for row in window if is_bridge_card_eligible(row.get("progress"), now_ms)]
+    eligible = [
+        row
+        for row in pool
+        if row["id"] not in used and is_bridge_card_eligible(row.get("progress"), now_ms)
+    ]
+    return eligible[:BRIDGE_CANDIDATE_WINDOW]
 
 
 def _find_bridge_cards(history: dict[str, Any], stuck: set[str], used: set[str], now_ms: float,

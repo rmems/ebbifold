@@ -43,7 +43,9 @@ DATA = _load()
 
 def assert_parity(actual: Any, expected: Any, path: str = "$") -> None:
     """Exact on structure, strings, bools and ordering; floats within 1e-12."""
-    if isinstance(expected, bool) or expected is None or isinstance(expected, str):
+    if isinstance(expected, bool):
+        assert isinstance(actual, bool) and actual == expected, f"{path}: {actual!r} != {expected!r}"
+    elif expected is None or isinstance(expected, str):
         assert actual == expected, f"{path}: {actual!r} != {expected!r}"
     elif isinstance(expected, (int, float)):
         assert isinstance(actual, (int, float)) and not isinstance(actual, bool), f"{path}: {actual!r}"
@@ -236,6 +238,10 @@ def test_parity_comparator_rejects_drift() -> None:
     nudged["sortedPriorities"][0] += 1e-9
     with pytest.raises(AssertionError):
         assert_parity(nudged, expected)
+    with pytest.raises(AssertionError):
+        assert_parity(1, True)
+    with pytest.raises(AssertionError):
+        assert_parity(0, False)
 
 
 def test_fixture_covers_required_behaviors() -> None:
@@ -294,6 +300,27 @@ def test_session_fixture_covers_required_behaviors() -> None:
 
 def _base_session() -> dict[str, Any]:
     return copy.deepcopy(SESSIONS[0]["snapshot"])
+
+
+def test_plan_concepts_derives_concept_map_and_uses_simulation_ranks() -> None:
+    case = next(c for c in SESSIONS if c["name"] == "simulation_focus_preparation")
+    snapshot = copy.deepcopy(case["snapshot"])
+    snapshot.pop("conceptMap", None)
+    result = plan_concepts(snapshot)
+    assert result["weakConceptIds"][:4] == ["c-pe", "c-renal", "c-ecl", "c-naive"]
+    assert result["clusterRoundRobin"] == result["weakConceptIds"]
+
+
+def test_bridge_candidates_filter_eligibility_before_window() -> None:
+    from ebbifold.scheduler.struggle import _bridge_candidates
+
+    now = 1_000_000
+    pool = [
+        {"id": f"cooldown-{i}", "progress": {"lastReview": now - 1, "nextDueAt": 0}}
+        for i in range(12)
+    ]
+    pool.append({"id": "eligible", "progress": None})
+    assert [row["id"] for row in _bridge_candidates(pool, set(), now)] == ["eligible"]
 
 
 @pytest.mark.parametrize(

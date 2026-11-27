@@ -27,15 +27,33 @@ from .concepts import (
 from .scoring import build_cluster_round_robin
 
 
+def _planner_inputs(snapshot: dict[str, Any]) -> dict[str, Any]:
+    inputs = dict(snapshot)
+    inputs["options"] = dict(snapshot.get("options") or {})
+    inputs["conceptMap"] = dict(
+        snapshot.get("conceptMap") or {c["id"]: c for c in snapshot.get("concepts", [])}
+    )
+    for key in ("recentFailureConceptIds", "excludedCardIds", "excludedQuestionIds", "excludedVideoIds"):
+        inputs[key] = set(snapshot.get(key) or [])
+    return inputs
+
+
 def plan_concepts(snapshot: dict[str, Any]) -> dict[str, Any]:
-    ranking = rank_concepts(snapshot)
+    inputs = _planner_inputs(snapshot)
+    ranking = rank_concepts(inputs)
     ranked = [s.to_json() for s in ranking.conceptStates]
     clusters = {s.conceptId: ranking.getConceptCluster(s) for s in ranking.conceptStates}
-    sort_concepts_by_priority(snapshot, ranking)
-    pristine = find_pristine_concepts(snapshot)
-    selection = select_weak_concepts(snapshot, ranking, pristine)
-    quota = plan_card_quota(snapshot, selection.cardRatio)
-    round_robin = build_cluster_round_robin(selection.weakConcepts, ranking.getConceptCluster)
+    sort_concepts_by_priority(inputs, ranking)
+    pristine = find_pristine_concepts(inputs)
+    selection = select_weak_concepts(inputs, ranking, pristine)
+    quota = plan_card_quota(inputs, selection.cardRatio)
+    allocated_ranks = selection.allocatedConceptRanks
+    target_rank = None
+    if allocated_ranks is not None:
+        target_rank = lambda concept: allocated_ranks.get(concept.conceptId)
+    round_robin = build_cluster_round_robin(
+        selection.weakConcepts, ranking.getConceptCluster, target_rank
+    )
     return {
         "rankedStates": ranked,
         "conceptClusters": clusters,

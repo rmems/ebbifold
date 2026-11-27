@@ -1,8 +1,9 @@
 """Selection lanes of unified-scheduler-phase-select.ts over explicit snapshots.
 
-Lanes that only act under exam-target treatment, simulation focus or a
-session-prep blend are rejected up front by ``concepts.assert_supported``; the
-remaining no-op branches are kept so the phase order matches the facade.
+The concept-driven, intervention, simulation-focus, exam-target, rescue and
+rotation-bank lanes are ported; storage access arrives through explicit
+snapshot adapters. ``concepts.assert_supported`` still rejects inputs whose
+session-prep blend or other unported upstream lanes would change behavior.
 """
 
 from __future__ import annotations
@@ -435,7 +436,16 @@ def top_up_from_rotation_bank(inputs: dict[str, Any], plan: dict[str, Any], buil
     from .policies import freshness_tier
 
     familiarity = inputs["bulk"]["questionFamiliarity"]
-    rows = [dict(r) for r in (inputs.get("rotationTopUp") or [])][:deficit]
+    already_picked = set(build.selected_question_ids)
+    already_picked.update(i["id"] for i in build.selected_items if i["type"] == "question")
+    rows = []
+    for row in inputs.get("rotationTopUp") or []:
+        key = question_suppression_key(row)
+        if row["id"] in already_picked or (key and key in build.selected_question_variant_groups):
+            continue
+        rows.append(dict(row))
+        if len(rows) == deficit:
+            break
     build.mastered_reentry_counter["masteredServed"] += sum(1 for r in rows if freshness_tier(familiarity.get(r["id"])) == 2)
     for r in rows:
         build.selected_question_ids.add(r["id"])

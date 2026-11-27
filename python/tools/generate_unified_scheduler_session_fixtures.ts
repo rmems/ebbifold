@@ -248,7 +248,17 @@ function topUpAdapter(inputs: any, plan: any, build: any, rows: Json[]): void {
   if (build.selectedItems.length >= size) return;
   const deficit = Math.min(size - build.selectedItems.length, Math.max(0, plan.targetQuestionCount - build.selectedQuestionCount));
   if (deficit <= 0) return;
-  const selected = rows.slice(0, deficit);
+  const alreadyPicked = new Set<string>(build.selectedQuestionIds);
+  for (const item of build.selectedItems) {
+    if (item.type === 'question') alreadyPicked.add(item.id);
+  }
+  const selected: Json[] = [];
+  for (const row of rows) {
+    const key = variants.questionSuppressionKey(row);
+    if (alreadyPicked.has(row.id) || (key && build.selectedQuestionVariantGroups.has(key))) continue;
+    selected.push(row);
+    if (selected.length === deficit) break;
+  }
   build.masteredReentryCounter.masteredServed += retirement.countMastered(selected, (q: Json) => q.id, bulk.questionFamiliarity);
   for (const q of selected) {
     build.selectedQuestionIds.add(q.id);
