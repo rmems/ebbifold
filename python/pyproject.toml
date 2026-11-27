@@ -10,6 +10,9 @@ dependencies = [
     "pydantic>=2.10",
 ]
 
+[project.scripts]
+ebbifold-review = "ebbifold.review.cli:main"
+
 [dependency-groups]
 dev = [
     "pytest>=8.0",
