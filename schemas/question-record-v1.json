@@ -4,17 +4,7 @@
   "title": "ebbifold corpus question record v1",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "id",
-    "rotation",
-    "topics",
-    "moduleNodes",
-    "questionType",
-    "difficulty",
-    "stem",
-    "options",
-    "context"
-  ],
+  "required": ["id", "rotation", "topics", "moduleNodes", "questionType", "difficulty", "stem", "options", "context"],
   "properties": {
     "id": { "type": "string", "minLength": 1, "maxLength": 500 },
     "rotation": { "type": "string", "minLength": 1 },
@@ -233,14 +223,7 @@
     "publicModuleProvenance": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "schemaVersion",
-        "origin",
-        "discipline",
-        "itemText",
-        "evidence",
-        "review"
-      ],
+      "required": ["schemaVersion", "origin", "discipline", "itemText", "evidence", "review"],
       "properties": {
         "schemaVersion": { "const": 1 },
         "origin": { "enum": ["mirrored", "original"] },
