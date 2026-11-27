@@ -322,6 +322,8 @@ def _variant_blocked(build: SessionBuildState, card: dict[str, Any]) -> bool:
 
 
 def _rescue_seen_cards(inputs: dict[str, Any], build: SessionBuildState, active: dict[str, Any]) -> None:
+    if len(build.selected_items) >= inputs["size"]:
+        return
     rows = [card for card in inputs["bulk"]["seenCards"] if card["id"] not in build.selected_card_ids]
     for card in _orphan_nudge(inputs, active, rows, "card"):
         if len(build.selected_items) >= inputs["size"]:
