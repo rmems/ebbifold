@@ -104,17 +104,15 @@ class ReviewApi:
         self.store = store
         self.content_root = content_root
 
-    def repair_completed_session(self, row: Any) -> Any:
-        if row["status"] != "active" or self.current_question(row["session_id"]) is not None:
-            return row
-        self.store.complete_session(row["session_id"])
-        return self.store.session(row["session_id"])
-
-    def session_row(self, session_id: str) -> Any:
+    def session_state(self, session_id: str) -> tuple[Any, ReviewQuestion | None]:
         row = self.store.session(session_id)
         if row is None:
             raise HTTPException(status_code=404, detail="unknown review session")
-        return self.repair_completed_session(row)
+        question = self.current_question(session_id)
+        if row["status"] == "active" and question is None:
+            self.store.complete_session(session_id)
+            row = self.store.session(session_id)
+        return row, question
 
     def fresh_engine(self) -> ReviewEngine:
         return ReviewEngine(self.engine.snapshot, days_to_exam=self.engine.days_to_exam)
@@ -133,12 +131,12 @@ class ReviewApi:
         }
 
     def inspect_session(self, session_id: str) -> dict[str, Any]:
-        row = self.session_row(session_id)
+        row, _ = self.session_state(session_id)
         return _session_payload(row, self.store.attempts(session_id))
 
     def inspect_current(self, session_id: str) -> dict[str, Any]:
-        self.session_row(session_id)
-        return {"item": _question_payload(self.current_question(session_id))}
+        _, question = self.session_state(session_id)
+        return {"item": _question_payload(question)}
 
     def validate_answer_target(self, answer: AnswerIn, question: ReviewQuestion | None) -> ReviewQuestion:
         if question is None:
@@ -150,8 +148,8 @@ class ReviewApi:
         return question
 
     def submit_answer(self, session_id: str, answer: AnswerIn) -> dict[str, Any]:
-        self.session_row(session_id)
-        question = self.validate_answer_target(answer, self.current_question(session_id))
+        _, current = self.session_state(session_id)
+        question = self.validate_answer_target(answer, current)
         correct = ReviewEngine.grade(question, answer.selected_label)
         try:
             attempt_id = self.store.record_attempt(

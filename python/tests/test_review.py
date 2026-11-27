@@ -5,6 +5,8 @@ from unittest.mock import Mock
 import argparse
 import sqlite3
 
+import pytest
+
 from ebbifold.corpus import load_corpus
 from ebbifold.review.cli import CliContext, _read_answer, run
 import ebbifold.review.engine as engine_module
@@ -38,14 +40,13 @@ def test_review_store_persists_attempts_across_restarts(tmp_path):
     assert attempts[0]["is_correct"] == 1
 
 
-def test_review_store_repairs_duplicate_attempts_on_open(tmp_path):
+def test_review_store_preserves_legacy_duplicate_attempts_on_open(tmp_path):
     path = tmp_path / "review.sqlite3"
     store = SQLiteReviewStore(path)
     session_id = store.create_session("validation-corpus")
     _attempt(store, session_id, "item-1", True)
 
     with sqlite3.connect(path) as conn:
-        conn.execute("DROP INDEX attempts_session_item_unique")
         conn.execute(
             """
             INSERT INTO attempts(
@@ -57,8 +58,18 @@ def test_review_store_repairs_duplicate_attempts_on_open(tmp_path):
 
     reopened = SQLiteReviewStore(path)
     attempts = reopened.attempts(session_id)
-    assert len(attempts) == 1
-    assert attempts[0]["item_id"] == "item-1"
+    assert len(attempts) == 2
+    assert {row["attempt_number"] for row in attempts} == {1, 2}
+
+    with sqlite3.connect(path) as conn, pytest.raises(sqlite3.IntegrityError):
+        conn.execute(
+            """
+            INSERT INTO attempts(
+                attempt_id, session_id, item_id, selected_label, is_correct, attempt_number, answered_at
+            ) VALUES ('overlapping-attempt', ?, 'item-1', 'B', 0, 1, ?)
+            """,
+            (session_id, datetime.now(UTC).isoformat()),
+        )
 
 
 def test_review_engine_uses_persisted_attempts_for_next_item(tmp_path, monkeypatch):

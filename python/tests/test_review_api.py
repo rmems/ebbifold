@@ -2,8 +2,10 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from ebbifold.review.api import build_parser, create_app
-from ebbifold.review.store import default_store_path
+from ebbifold.corpus import load_corpus
+from ebbifold.review.api import ReviewApi, build_parser, create_app
+from ebbifold.review.engine import ReviewEngine
+from ebbifold.review.store import SQLiteReviewStore, default_store_path
 
 
 def _client(db_path):
@@ -64,6 +66,20 @@ def test_api_serves_corpus_figures_and_rejects_traversal(tmp_path):
     assert figure.headers["content-type"].startswith("image/svg+xml")
     assert client.get("/figures/usmle/step1/..").status_code in {404, 422}
     assert client.get("/figures/usmle/step1/missing.svg").status_code == 404
+
+
+def test_session_state_repairs_exhausted_session(tmp_path, monkeypatch):
+    repo_root = Path(__file__).resolve().parents[2]
+    store = SQLiteReviewStore(tmp_path / "review.sqlite3")
+    api = ReviewApi(ReviewEngine(load_corpus(repo_root)), store, repo_root)
+    session_id = store.create_session(str(repo_root))
+    monkeypatch.setattr(api, "current_question", lambda _: None)
+
+    row, question = api.session_state(session_id)
+
+    assert question is None
+    assert row["status"] == "completed"
+    assert store.session(session_id)["status"] == "completed"
 
 
 def test_default_memory_path_is_outside_repository():
