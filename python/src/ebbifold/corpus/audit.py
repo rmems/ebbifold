@@ -97,28 +97,42 @@ def _required_coverage(question_count: int) -> int:
     return 0
 
 
-def _answer_key_issues(
-    question_count: int,
-    represented: int,
-    maximum_count: int,
-    maximum_share: float,
-    longest: int,
-) -> list[dict[str, Any]]:
+@dataclass(frozen=True)
+class _AnswerKeyMetrics:
+    question_count: int
+    represented: int
+    maximum_count: int
+    maximum_share: float
+    longest: int
+
+
+def _answer_key_issues(metrics: _AnswerKeyMetrics) -> list[dict[str, Any]]:
     issues: list[dict[str, Any]] = []
-    required_coverage = _required_coverage(question_count)
-    if represented < required_coverage:
-        issues.append({"code": "label-coverage", "actual": represented, "required": required_coverage})
-    if question_count >= MINIMUM_AUDIT_SIZE and maximum_count > question_count * MAXIMUM_LABEL_SHARE:
+    required_coverage = _required_coverage(metrics.question_count)
+    if metrics.represented < required_coverage:
+        issues.append(
+            {"code": "label-coverage", "actual": metrics.represented, "required": required_coverage}
+        )
+    if (
+        metrics.question_count >= MINIMUM_AUDIT_SIZE
+        and metrics.maximum_count > metrics.question_count * MAXIMUM_LABEL_SHARE
+    ):
         issues.append(
             {
                 "code": "label-concentration",
-                "actualCount": maximum_count,
-                "actualShare": maximum_share,
+                "actualCount": metrics.maximum_count,
+                "actualShare": metrics.maximum_share,
                 "maximumShare": MAXIMUM_LABEL_SHARE,
             }
         )
-    if question_count >= MINIMUM_AUDIT_SIZE and longest > MAXIMUM_SAME_LABEL_STREAK:
-        issues.append({"code": "label-streak", "actual": longest, "maximum": MAXIMUM_SAME_LABEL_STREAK})
+    if metrics.question_count >= MINIMUM_AUDIT_SIZE and metrics.longest > MAXIMUM_SAME_LABEL_STREAK:
+        issues.append(
+            {
+                "code": "label-streak",
+                "actual": metrics.longest,
+                "maximum": MAXIMUM_SAME_LABEL_STREAK,
+            }
+        )
     return issues
 
 
@@ -134,13 +148,18 @@ def audit_answer_key(questions: list[Any] | tuple[Any, ...]) -> AnswerKeyAudit:
     maximum_count = max(counts.values(), default=0)
     maximum_share = maximum_count / question_count if question_count else 0.0
     longest = _longest_streak(labels)
+    metrics = _AnswerKeyMetrics(
+        question_count=question_count,
+        represented=represented,
+        maximum_count=maximum_count,
+        maximum_share=maximum_share,
+        longest=longest,
+    )
     return AnswerKeyAudit(
         question_count=question_count,
         represented_label_count=represented,
         maximum_label_count=maximum_count,
         maximum_label_share=maximum_share,
         longest_same_label_streak=longest,
-        issues=_answer_key_issues(
-            question_count, represented, maximum_count, maximum_share, longest
-        ),
+        issues=_answer_key_issues(metrics),
     )
