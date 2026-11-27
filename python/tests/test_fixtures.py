@@ -49,7 +49,10 @@ def test_case_structure(cases: list[dict]) -> None:
         assert questions, f"{case['name']}: empty question pool"
         ids = [q["id"] for q in questions]
         assert len(ids) == len(set(ids)), f"{case['name']}: duplicate question ids"
-        assert REQUIRED_QUESTION_KEYS <= questions[0].keys()
+        for q in questions:
+            assert REQUIRED_QUESTION_KEYS <= q.keys(), (
+                f"{case['name']}: question missing required keys: {q}"
+            )
         for row in case["input"]["history"]:
             assert REQUIRED_HISTORY_KEYS <= row.keys()
             # ISO 8601 strings, not epoch numbers — Date is not JSON-portable.
