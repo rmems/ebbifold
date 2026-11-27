@@ -6,9 +6,10 @@ reliability record, which must be absent from the snapshot."""
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 from typing import Any
 
-from .delivery import build_repetition_slot_context, build_serve_conditioning, shadow_for_due_id
+from .delivery import RepetitionSlotContextRequest, build_repetition_slot_context, build_serve_conditioning, shadow_for_due_id
 from .difficulty import get_effective_question_difficulty
 from .exam_target import exam_target_decision, exam_target_stats
 from .policies import recent_neighbor_signal
@@ -126,46 +127,87 @@ def _apply_recall_telemetry(
     item["predictedRecallStatus"] = ITEM_RECALL_MODEL_STATUS
 
 
-def attach_delivery_telemetry(inputs: dict[str, Any], plan: dict[str, Any], build: Any,
-                              final: list[dict[str, Any]], card_meta: dict[str, dict[str, Any]]) -> dict[str, Any] | None:
+@dataclass(frozen=True)
+class DeliveryTelemetryContext:
+    inputs: dict[str, Any]
+    plan: dict[str, Any]
+    build: Any
+    bulk: dict[str, Any]
+    overlay: dict[str, Any] | None
+    repetition_context: dict[str, Any] | None
+    unseen: set[str]
+    recent_ids: set[str] | None
+    card_meta: dict[str, dict[str, Any]]
+
+
+def _delivery_telemetry_context(inputs: dict[str, Any], plan: dict[str, Any], build: Any,
+                                card_meta: dict[str, dict[str, Any]]) -> DeliveryTelemetryContext:
     bulk = inputs["bulk"]
     cards = bulk["unseenCards"] + bulk["seenCards"]
     overlay = inputs.get("proximityOverlay")
-    repetition_context = build_repetition_slot_context(
+    repetition_context = build_repetition_slot_context(RepetitionSlotContextRequest(
         cards=cards,
         grades=bulk.get("cardGradeById") or {},
         seen_card_ids=[card["id"] for card in bulk["seenCards"]],
         variant_group_history=bulk["cardVariantGroupHistory"],
         seen_question_ids=list(bulk["questionFamiliarity"].keys()),
         overlay=overlay,
+    ))
+    return DeliveryTelemetryContext(
+        inputs=inputs, plan=plan, build=build, bulk=bulk, overlay=overlay,
+        repetition_context=repetition_context, unseen={card["id"] for card in bulk["unseenCards"]},
+        recent_ids=(inputs.get("penaltyContext") or {}).get("recentCardIds"), card_meta=card_meta,
     )
-    unseen = {c["id"] for c in bulk["unseenCards"]}
-    recent_ids = (inputs.get("penaltyContext") or {}).get("recentCardIds")
+
+
+def _item_serve_state(inputs: dict[str, Any], plan: dict[str, Any], item: dict[str, Any]) -> tuple[dict[str, Any], Any]:
+    raw = inputs["stateMap"].get(item["conceptId"]) or {}
+    return raw, plan["statesById"].get(item["conceptId"])
+
+
+def _item_metadata(context: DeliveryTelemetryContext, item: dict[str, Any]) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    q_meta = context.bulk["questionMap"].get(item["id"]) if item["type"] == "question" else None
+    c_meta = context.card_meta.get(item["id"]) if item["type"] == "card" else None
+    return q_meta, c_meta
+
+
+def _attach_card_delivery_snapshots(context: DeliveryTelemetryContext, item: dict[str, Any],
+                                    c_meta: dict[str, Any] | None) -> None:
+    if item["type"] != "card" or not c_meta:
+        return
+    conditioning = build_serve_conditioning(context.inputs.get("ratingReliability"), context.overlay, c_meta.get("stableId"))
+    if conditioning:
+        item["conditioning"] = conditioning
+    repetition_slot = shadow_for_due_id(item["id"], context.repetition_context)
+    if repetition_slot:
+        item["repetitionSlot"] = repetition_slot
+
+
+def _attach_item_delivery_telemetry(context: DeliveryTelemetryContext, item: dict[str, Any]) -> None:
+    raw, state = _item_serve_state(context.inputs, context.plan, item)
+    serve_recall = state.currentRecall if state else raw.get("recallProbability", 0)
+    serve_exposures = state.exposureCount if state else raw.get("exposureCount", 0)
+    q_meta, c_meta = _item_metadata(context, item)
+    _attach_card_delivery_snapshots(context, item, c_meta)
+
+    applied = item.get("challengePolicyApplied") is True
+    item.pop("challengePolicyApplied", None)
+    descriptive = state.currentRecall if state else raw.get("recallProbability")
+    challenge_recall = context.build.challenge_recall_at_selection.get(item["id"]) if applied else descriptive
+    tier = _delivery_tier(item, q_meta, c_meta)
+    item["difficultyTier"] = tier
+    synthetic = is_synthetic_concept_attribution(item["conceptId"])
+    _apply_challenge_telemetry(item, tier, challenge_recall, applied, synthetic)
+    _apply_novelty_telemetry(context.inputs, item, c_meta, applied, synthetic, context.unseen, context.recent_ids)
+    _apply_recall_telemetry(item, q_meta, c_meta, serve_recall, serve_exposures)
+
+
+def attach_delivery_telemetry(inputs: dict[str, Any], plan: dict[str, Any], build: Any,
+                              final: list[dict[str, Any]], card_meta: dict[str, dict[str, Any]]) -> dict[str, Any] | None:
+    context = _delivery_telemetry_context(inputs, plan, build, card_meta)
     for item in final:
-        raw = inputs["stateMap"].get(item["conceptId"]) or {}
-        state = plan["statesById"].get(item["conceptId"])
-        serve_recall = state.currentRecall if state else raw.get("recallProbability", 0)
-        serve_exposures = state.exposureCount if state else raw.get("exposureCount", 0)
-        q_meta = bulk["questionMap"].get(item["id"]) if item["type"] == "question" else None
-        c_meta = card_meta.get(item["id"]) if item["type"] == "card" else None
-        if item["type"] == "card" and c_meta:
-            conditioning = build_serve_conditioning(inputs.get("ratingReliability"), overlay, c_meta.get("stableId"))
-            if conditioning:
-                item["conditioning"] = conditioning
-            repetition_slot = shadow_for_due_id(item["id"], repetition_context)
-            if repetition_slot:
-                item["repetitionSlot"] = repetition_slot
-        applied = item.get("challengePolicyApplied") is True
-        item.pop("challengePolicyApplied", None)
-        descriptive = state.currentRecall if state else raw.get("recallProbability")
-        challenge_recall = build.challenge_recall_at_selection.get(item["id"]) if applied else descriptive
-        tier = _delivery_tier(item, q_meta, c_meta)
-        item["difficultyTier"] = tier
-        synthetic = is_synthetic_concept_attribution(item["conceptId"])
-        _apply_challenge_telemetry(item, tier, challenge_recall, applied, synthetic)
-        _apply_novelty_telemetry(inputs, item, c_meta, applied, synthetic, unseen, recent_ids)
-        _apply_recall_telemetry(item, q_meta, c_meta, serve_recall, serve_exposures)
-    return repetition_context
+        _attach_item_delivery_telemetry(context, item)
+    return context.repetition_context
 
 
 def assemble_session_result(inputs: dict[str, Any], plan: dict[str, Any], build: Any,
