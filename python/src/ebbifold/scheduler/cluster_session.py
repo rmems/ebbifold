@@ -171,7 +171,8 @@ def _finish_cluster_session(inputs: dict[str, Any], ctx: dict[str, Any]) -> dict
         items[:] = (first + [i for i in items if (i["type"], i["id"]) not in reserved])[:size]
     ordered = order_by_manifold_walk(items, inputs.get("itemEmbeddings") or {})
     scaffolds = [] if ctx["maxNew"] == 0 else [c for c in (inputs.get("clusterScaffolds") or [])
-                                               if c["id"] not in ctx["selCards"]]
+                                               if c["id"] not in ctx["selCards"]
+                                               and c.get("clusterId") in ctx["selectedClusters"]]
     paired = _cluster_scaffolds(ordered, scaffolds, inputs["rotation"], inputs["servingRotationSeed"],
                                 0 if ctx["maxNew"] == 0 else None)
     meta = {c["id"]: c for c in scaffolds}

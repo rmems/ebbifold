@@ -35,7 +35,7 @@ class FrozenDate extends RealDate {
   }
 }
 (globalThis as any).Date = FrozenDate;
-const fakeDb = { embeddings: new Map<string, number[]>(), struggle: {} as Json };
+const fakeDb = { embeddings: new Map<string, number[]>(), struggle: {} as Json, cluster: {} as Json };
 const at = (ms: number | null | undefined) => (ms == null ? null : new Date(ms));
 const cardOfTopics = (topics: string[] | undefined) => (topics?.[0] ?? '').replace(/^__card:/, '');
 const sameTopics = (a: string[], b: string[]) => JSON.stringify(a) === JSON.stringify(b);
@@ -96,6 +96,34 @@ const bridgePool = async ({ where, take }: Json) => {
 };
 
 const K = '../../src/lib/knowledge/';
+
+// Cluster-fallback storage reads are snapshot adapters: swap the query modules
+// in the require cache before the scheduler modules first import them.
+function stubModule(path: string, overrides: Json): void {
+  const resolved = require.resolve(path);
+  const real = require(resolved);
+  require.cache[resolved]!.exports = { ...real, ...overrides };
+}
+const clusterSnapshot = () => fakeDb.cluster;
+stubModule('../../src/lib/manifold/clustering', {
+  getClusterMastery: async () => clusterSnapshot().clusterMastery ?? [],
+});
+stubModule(`${K}unified-scheduler-queries`, {
+  getCardsForCluster: async (_u: string, _r: string, clusterId: string, max: number, opts: Json) =>
+    (clusterSnapshot().clusterCards?.[clusterId] ?? [])
+      .filter((row: Json) => !opts.selectedCardIds.has(row.id))
+      .slice(0, max),
+  getQuestionsForRotation: async (_u: string, _r: string, limit: number, opts: Json) =>
+    (clusterSnapshot().clusterQuestions ?? [])
+      .filter((row: Json) => !opts.selectedQuestionIds.has(row.id))
+      .slice(0, limit),
+  getUnseenScaffoldsForClusters: async (_u: string, _r: string, clusterIds: string[], selected: Set<string>) =>
+    (clusterSnapshot().clusterScaffolds ?? [])
+      .filter((row: Json) => clusterIds.includes(row.clusterId) && !selected.has(row.id)),
+});
+stubModule(`${K}bulk-candidates`, {
+  loadQuestionFamiliarity: async () => new Map(Object.entries(clusterSnapshot().questionFamiliarity ?? {})),
+});
 const concepts = require(`${K}unified-scheduler-phase-concepts`);
 const select = require(`${K}unified-scheduler-phase-select`);
 const backfill = require(`${K}unified-scheduler-phase-backfill`);
@@ -225,6 +253,7 @@ function topUpAdapter(inputs: any, plan: any, build: any, rows: Json[]): void {
 async function runSession(s: Json): Promise<Json> {
   fakeDb.embeddings = new Map(Object.entries<number[]>(s.itemEmbeddings ?? {}));
   fakeDb.struggle = s.struggleHistory ?? {};
+  fakeDb.cluster = s;
   const inputs = toSessionInputs(s);
   if (inputs.concepts.length === 0) {
     const result = await clusterSession.constructClusterSession('fixture-user', {
@@ -424,6 +453,38 @@ function struggleSession(s: Json, withLookups: boolean): void {
   };
 }
 
+function clusterFallbackSession(s: Json): void {
+  s.concepts = [];
+  const card = (id: string, clusterId: string, complexity: number, firstSight: boolean, group: string | null = null) => ({
+    id, rotation: 'rot-main', clusterId, similarCards: [], topics: [`Topic ${id}`], sourceFile: `${clusterId}.md`,
+    importance: 3, complexity, variantGroupId: group, variantIndex: group ? 0 : null, variantType: group ? 'cloze' : null,
+    firstSightAtSelection: firstSight,
+  });
+  const mastery = (clusterId: string, clusterName: string, m: number, cardCount: number, cardsReviewed: number, needsAttention: boolean) => ({
+    clusterId, clusterName, mastery: m, cardCount, cardsReviewed, avgRetrieval: m, needsAttention,
+  });
+  s.clusterMastery = [
+    mastery('cl-acid', 'Acid-base', 0, 0, 0, false),
+    mastery('cl-renal', 'Renal', 0.2, 10, 2, true),
+    mastery('cl-cardiac', 'Cardiac', 0.7, 8, 6, false),
+  ];
+  s.clusterCards = {
+    'cl-renal': [card('k-renal-1', 'cl-renal', 2, true, 'g-renal'), card('k-renal-2', 'cl-renal', 2, false, 'g-renal'),
+      card('k-renal-3', 'cl-renal', 3, false), card('k-renal-4', 'cl-renal', 4, true)],
+    'cl-cardiac': [card('k-card-1', 'cl-cardiac', 2, false), card('k-card-2', 'cl-cardiac', 3, true), card('k-card-3', 'cl-cardiac', 4, false)],
+    'cl-acid': [card('k-acid-1', 'cl-acid', 2, true)],
+  };
+  s.clusterQuestions = ['cq-1', 'cq-2', 'cq-3', 'cq-4'].map((id, i) => ({
+    id, rotation: 'rot-main', topics: [`Question ${id}`], variantGroupId: i < 2 ? 'qg-1' : null, variantType: i < 2 ? 'mcq' : null,
+  }));
+  s.questionFamiliarity = { 'cq-2': { attempts: 2, correct: 1 } };
+  s.clusterScaffolds = [
+    { ...card('sc-renal', 'cl-renal', 1, true), topics: ['Topic k-renal-1'] },
+    { ...card('sc-cardiac', 'cl-cardiac', 1, true), topics: ['Topic k-card-2'] },
+    { ...card('sc-other', 'cl-other', 1, true), topics: ['Topic k-acid-1'] },
+  ];
+}
+
 const sessionCases = [
   sessionVariant('full_session_weak_new_pristine'),
   sessionVariant('empty_pools', s => { s.bulk = { rotationQuestions: [], unseenCards: [], seenCards: [] }; s.itemEmbeddings = {}; }),
@@ -467,6 +528,12 @@ const sessionCases = [
   sessionVariant('struggle_history_interventions', s => { struggleSession(s, true); s.size = 16; }),
   sessionVariant('struggle_history_lookups_missing', s => { struggleSession(s, false); s.size = 16; }),
   sessionVariant('empty_concepts_cluster_fallback', s => { s.concepts = []; }),
+  sessionVariant('cluster_present_fallback', s => { clusterFallbackSession(s); s.size = 10; }),
+  sessionVariant('cluster_present_first_sight_quota', s => {
+    clusterFallbackSession(s);
+    s.size = 6;
+    s.options.minFirstSightItems = 3;
+  }),
 ];
 
 const fixture = {

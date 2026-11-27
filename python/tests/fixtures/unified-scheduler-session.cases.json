@@ -24197,6 +24197,2003 @@
           }
         }
       }
+    },
+    {
+      "name": "cluster_present_fallback",
+      "snapshot": {
+        "userId": "fixture-user",
+        "nowMs": 1768478400000,
+        "daysToExam": 30,
+        "examPressure": 0.20587037180094736,
+        "size": 10,
+        "cardRatio": 0.7,
+        "rotation": "rot-main",
+        "effectiveMaxNewCards": null,
+        "interferenceThreshold": 0.85,
+        "includeVideos": true,
+        "servingRotationSeed": "serving:a3f1c9e2b7d4058e6a1f3c5d7e9b2a4c6e8f0a1b3c5d7e9f1a2b3c4d5e6f7a8b",
+        "budget": {
+          "dailyThroughput": 41.6,
+          "totalRemaining": 812.4,
+          "sessionsRemaining": 9
+        },
+        "options": {
+          "examTargetTieBreakSeed": "a3f1c9e2b7d4058e6a1f3c5d7e9b2a4c6e8f0a1b3c5d7e9f1a2b3c4d5e6f7a8b"
+        },
+        "concepts": [],
+        "stateMap": {
+          "c-renal": {
+            "recallProbability": 0.3,
+            "confidence": 0.4,
+            "exposureCount": 5,
+            "probeCount": 5,
+            "recentFailRate": 0,
+            "lastExposureAt": 1768305600000,
+            "lastProbeAt": 1768132800000
+          },
+          "c-cardiac": {
+            "recallProbability": 0.55,
+            "confidence": 0.2,
+            "exposureCount": 2,
+            "probeCount": 2,
+            "recentFailRate": 0,
+            "lastExposureAt": 1767960000000,
+            "lastProbeAt": 1767960000000
+          },
+          "c-acid": {
+            "recallProbability": 0.97,
+            "confidence": 0.9,
+            "exposureCount": 12,
+            "probeCount": 12,
+            "recentFailRate": 0,
+            "lastExposureAt": 1768392000000,
+            "lastProbeAt": 1767700800000
+          },
+          "c-glyco": {
+            "recallProbability": 0.6,
+            "confidence": 0.75,
+            "exposureCount": 8,
+            "probeCount": 8,
+            "recentFailRate": 0,
+            "lastExposureAt": 1768219200000,
+            "lastProbeAt": 1768046400000
+          }
+        },
+        "recentFailureConceptIds": [
+          "c-renal"
+        ],
+        "bulk": {
+          "unseenCards": [
+            {
+              "id": "u-renal-1",
+              "stableId": "u-renal-1",
+              "rotation": "rot-main",
+              "clusterId": "cl-renal",
+              "similarCards": null,
+              "topics": [
+                "Renal Tubular Acidosis"
+              ],
+              "sourceFile": "week2-u-renal-1",
+              "imageUrl": null,
+              "clipId": null,
+              "importance": 3,
+              "complexity": 3,
+              "facilityIndex": null,
+              "sampleSize": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null
+            },
+            {
+              "id": "u-renal-2",
+              "stableId": "u-renal-2",
+              "rotation": "rot-main",
+              "clusterId": "cl-renal",
+              "similarCards": [
+                {
+                  "cardId": "u-renal-1",
+                  "similarity": 0.93
+                }
+              ],
+              "topics": [
+                "renal tubular acidosis"
+              ],
+              "sourceFile": "week2-u-renal-2",
+              "imageUrl": null,
+              "clipId": null,
+              "importance": 1,
+              "complexity": 4,
+              "facilityIndex": null,
+              "sampleSize": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null
+            },
+            {
+              "id": "u-renal-s",
+              "stableId": "u-renal-s",
+              "rotation": "rot-main",
+              "clusterId": "cl-renal",
+              "similarCards": null,
+              "topics": [
+                "Renal Tubular Acidosis"
+              ],
+              "sourceFile": "week2-u-renal-s",
+              "imageUrl": null,
+              "clipId": null,
+              "importance": 1,
+              "complexity": 1,
+              "facilityIndex": null,
+              "sampleSize": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null
+            },
+            {
+              "id": "u-cardiac-1",
+              "stableId": "u-cardiac-1",
+              "rotation": "rot-main",
+              "clusterId": "cl-cardio",
+              "similarCards": null,
+              "topics": [
+                "Cardiac Output"
+              ],
+              "sourceFile": "week2-u-cardiac-1",
+              "imageUrl": "fig-1.png",
+              "clipId": null,
+              "importance": 1,
+              "complexity": 2,
+              "facilityIndex": null,
+              "sampleSize": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null
+            },
+            {
+              "id": "u-cardiac-2",
+              "stableId": "u-cardiac-2",
+              "rotation": "rot-main",
+              "clusterId": "cl-cardio",
+              "similarCards": null,
+              "topics": [
+                "Cardiac Output"
+              ],
+              "sourceFile": "week2-u-cardiac-2",
+              "imageUrl": null,
+              "clipId": null,
+              "importance": 1,
+              "complexity": 2,
+              "facilityIndex": null,
+              "sampleSize": null,
+              "variantGroupId": "vg-1",
+              "variantIndex": 0,
+              "variantType": "cloze"
+            },
+            {
+              "id": "u-cardiac-3",
+              "stableId": "u-cardiac-3",
+              "rotation": "rot-main",
+              "clusterId": "cl-cardio",
+              "similarCards": null,
+              "topics": [
+                "Cardiac Output"
+              ],
+              "sourceFile": "week2-u-cardiac-3",
+              "imageUrl": null,
+              "clipId": null,
+              "importance": 1,
+              "complexity": 2,
+              "facilityIndex": null,
+              "sampleSize": null,
+              "variantGroupId": "vg-1",
+              "variantIndex": 1,
+              "variantType": "cloze"
+            },
+            {
+              "id": "u-acid-1",
+              "stableId": "u-acid-1",
+              "rotation": "rot-main",
+              "clusterId": null,
+              "similarCards": null,
+              "topics": [
+                "Acid-Base"
+              ],
+              "sourceFile": "week2-u-acid-1",
+              "imageUrl": null,
+              "clipId": null,
+              "importance": 2,
+              "complexity": 2,
+              "facilityIndex": null,
+              "sampleSize": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null
+            },
+            {
+              "id": "u-sickle-s",
+              "stableId": "u-sickle-s",
+              "rotation": "rot-main",
+              "clusterId": null,
+              "similarCards": null,
+              "topics": [
+                "Sickle Cell"
+              ],
+              "sourceFile": "week2-u-sickle-s",
+              "imageUrl": null,
+              "clipId": null,
+              "importance": 1,
+              "complexity": 1,
+              "facilityIndex": null,
+              "sampleSize": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null
+            },
+            {
+              "id": "u-orphan",
+              "stableId": "u-orphan",
+              "rotation": "rot-main",
+              "clusterId": null,
+              "similarCards": null,
+              "topics": [
+                "Unrelated Topic"
+              ],
+              "sourceFile": "week2-u-orphan",
+              "imageUrl": null,
+              "clipId": null,
+              "importance": 2,
+              "complexity": 2,
+              "facilityIndex": null,
+              "sampleSize": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null
+            }
+          ],
+          "seenCards": [
+            {
+              "id": "s-glyco-1",
+              "stableId": "s-glyco-1",
+              "rotation": "rot-main",
+              "clusterId": "cl-metab",
+              "similarCards": null,
+              "topics": [
+                "Glycolysis"
+              ],
+              "sourceFile": "bank-cards",
+              "imageUrl": null,
+              "clipId": null,
+              "importance": 1,
+              "complexity": 2,
+              "facilityIndex": null,
+              "sampleSize": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null
+            },
+            {
+              "id": "s-glyco-2",
+              "stableId": "s-glyco-2",
+              "rotation": "rot-main",
+              "clusterId": "cl-metab",
+              "similarCards": null,
+              "topics": [
+                "Glycolysis"
+              ],
+              "sourceFile": "week2-s-glyco-2",
+              "imageUrl": null,
+              "clipId": null,
+              "importance": 1,
+              "complexity": 2,
+              "facilityIndex": 0.8,
+              "sampleSize": 30,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null
+            },
+            {
+              "id": "s-renal-1",
+              "stableId": "s-renal-1",
+              "rotation": "rot-main",
+              "clusterId": "cl-renal",
+              "similarCards": null,
+              "topics": [
+                "Renal Tubular Acidosis"
+              ],
+              "sourceFile": "week2-s-renal-1",
+              "imageUrl": null,
+              "clipId": null,
+              "importance": 1,
+              "complexity": 5,
+              "facilityIndex": null,
+              "sampleSize": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null
+            },
+            {
+              "id": "s-orphan",
+              "stableId": "s-orphan",
+              "rotation": "rot-main",
+              "clusterId": null,
+              "similarCards": null,
+              "topics": [
+                "Lonely Topic"
+              ],
+              "sourceFile": "week2-s-orphan",
+              "imageUrl": null,
+              "clipId": null,
+              "importance": 1,
+              "complexity": 2,
+              "facilityIndex": null,
+              "sampleSize": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null
+            }
+          ],
+          "seenCardReviewCounts": {
+            "s-glyco-1": 2
+          },
+          "fragileSeenCards": [
+            "s-glyco-2"
+          ],
+          "rotationQuestions": [
+            {
+              "id": "q-renal-1",
+              "rotation": "rot-main",
+              "stem": "stem q-renal-1",
+              "questionType": "diagnosis",
+              "difficulty": " Hard ",
+              "variantGroupId": null,
+              "variantType": null,
+              "format": null,
+              "facilityIndex": null,
+              "totalAttempts": null,
+              "source": "bank",
+              "topics": [
+                "Renal Tubular Acidosis"
+              ],
+              "examRelevance": null,
+              "examRelevancePct": null
+            },
+            {
+              "id": "q-renal-2",
+              "rotation": "rot-main",
+              "stem": "stem q-renal-2",
+              "questionType": "diagnosis",
+              "difficulty": "easy",
+              "variantGroupId": null,
+              "variantType": null,
+              "format": null,
+              "facilityIndex": 0.2,
+              "totalAttempts": 40,
+              "source": "bank",
+              "topics": [
+                "Renal Tubular Acidosis"
+              ],
+              "examRelevance": null,
+              "examRelevancePct": null
+            },
+            {
+              "id": "q-cardiac-1",
+              "rotation": "rot-main",
+              "stem": "stem q-cardiac-1",
+              "questionType": "diagnosis",
+              "difficulty": "bogus",
+              "variantGroupId": "qg-1",
+              "variantType": "near-duplicate",
+              "format": null,
+              "facilityIndex": null,
+              "totalAttempts": null,
+              "source": "bank",
+              "topics": [
+                "Cardiac Output"
+              ],
+              "examRelevance": null,
+              "examRelevancePct": null
+            },
+            {
+              "id": "q-cardiac-2",
+              "rotation": "rot-main",
+              "stem": "stem q-cardiac-2",
+              "questionType": "diagnosis",
+              "difficulty": "medium",
+              "variantGroupId": "qg-1",
+              "variantType": "near-duplicate",
+              "format": null,
+              "facilityIndex": null,
+              "totalAttempts": null,
+              "source": "bank",
+              "topics": [
+                "Cardiac Output"
+              ],
+              "examRelevance": null,
+              "examRelevancePct": null
+            },
+            {
+              "id": "q-acid-1",
+              "rotation": "rot-main",
+              "stem": "stem q-acid-1",
+              "questionType": "diagnosis",
+              "difficulty": "hard",
+              "variantGroupId": null,
+              "variantType": null,
+              "format": null,
+              "facilityIndex": null,
+              "totalAttempts": null,
+              "source": "generated",
+              "topics": [
+                "Acid-Base"
+              ],
+              "examRelevance": null,
+              "examRelevancePct": null
+            },
+            {
+              "id": "q-glyco-1",
+              "rotation": "rot-main",
+              "stem": "stem q-glyco-1",
+              "questionType": "diagnosis",
+              "difficulty": "medium",
+              "variantGroupId": null,
+              "variantType": null,
+              "format": "cloze",
+              "facilityIndex": null,
+              "totalAttempts": null,
+              "source": "bank",
+              "topics": [
+                "Glycolysis"
+              ],
+              "examRelevance": null,
+              "examRelevancePct": null
+            },
+            {
+              "id": "q-orphan",
+              "rotation": "rot-main",
+              "stem": "stem q-orphan",
+              "questionType": "diagnosis",
+              "difficulty": "medium",
+              "variantGroupId": null,
+              "variantType": null,
+              "format": null,
+              "facilityIndex": null,
+              "totalAttempts": null,
+              "source": "bank",
+              "topics": [
+                "Other Topic"
+              ],
+              "examRelevance": null,
+              "examRelevancePct": null
+            }
+          ],
+          "questionConceptLinks": [
+            {
+              "questionId": "q-renal-1",
+              "conceptId": "c-renal",
+              "isPrimary": true
+            },
+            {
+              "questionId": "q-cardiac-1",
+              "conceptId": "c-cardiac",
+              "isPrimary": false
+            }
+          ],
+          "rotationVideos": [
+            {
+              "id": "vid-c-renal",
+              "title": "RTA",
+              "thumbnailR2Key": "t.png",
+              "durationSecs": 300,
+              "r2Key": "v.mp4",
+              "creatorName": null
+            }
+          ],
+          "videoConceptLinks": [],
+          "cardScores": {
+            "c-cardiac": {
+              "u-cardiac-2": 0.9,
+              "u-cardiac-1": 0.7
+            }
+          },
+          "questionScores": {
+            "c-renal": {
+              "q-renal-1": 0.4
+            }
+          },
+          "questionFamiliarity": {
+            "q-glyco-1": {
+              "lastSeenAtMs": 1768219200000,
+              "corrects": 1
+            }
+          }
+        },
+        "itemEmbeddings": {
+          "u-renal-1": [
+            0.9,
+            0.1,
+            0,
+            0.1
+          ],
+          "u-cardiac-1": [
+            0.1,
+            0.9,
+            0.1,
+            0
+          ],
+          "u-acid-1": [
+            0.5,
+            0.5,
+            0.2,
+            0.1
+          ],
+          "q-renal-1": [
+            0.8,
+            0.2,
+            0.1,
+            0.3
+          ],
+          "s-glyco-1": [
+            0,
+            0.2,
+            0.9,
+            0.1
+          ],
+          "u-sickle-s": [
+            0.3,
+            0.1,
+            0.2,
+            0.9
+          ]
+        },
+        "rotationTopUp": [],
+        "clusterMastery": [
+          {
+            "clusterId": "cl-acid",
+            "clusterName": "Acid-base",
+            "mastery": 0,
+            "cardCount": 0,
+            "cardsReviewed": 0,
+            "avgRetrieval": 0,
+            "needsAttention": false
+          },
+          {
+            "clusterId": "cl-renal",
+            "clusterName": "Renal",
+            "mastery": 0.2,
+            "cardCount": 10,
+            "cardsReviewed": 2,
+            "avgRetrieval": 0.2,
+            "needsAttention": true
+          },
+          {
+            "clusterId": "cl-cardiac",
+            "clusterName": "Cardiac",
+            "mastery": 0.7,
+            "cardCount": 8,
+            "cardsReviewed": 6,
+            "avgRetrieval": 0.7,
+            "needsAttention": false
+          }
+        ],
+        "clusterCards": {
+          "cl-renal": [
+            {
+              "id": "k-renal-1",
+              "rotation": "rot-main",
+              "clusterId": "cl-renal",
+              "similarCards": [],
+              "topics": [
+                "Topic k-renal-1"
+              ],
+              "sourceFile": "cl-renal.md",
+              "importance": 3,
+              "complexity": 2,
+              "variantGroupId": "g-renal",
+              "variantIndex": 0,
+              "variantType": "cloze",
+              "firstSightAtSelection": true
+            },
+            {
+              "id": "k-renal-2",
+              "rotation": "rot-main",
+              "clusterId": "cl-renal",
+              "similarCards": [],
+              "topics": [
+                "Topic k-renal-2"
+              ],
+              "sourceFile": "cl-renal.md",
+              "importance": 3,
+              "complexity": 2,
+              "variantGroupId": "g-renal",
+              "variantIndex": 0,
+              "variantType": "cloze",
+              "firstSightAtSelection": false
+            },
+            {
+              "id": "k-renal-3",
+              "rotation": "rot-main",
+              "clusterId": "cl-renal",
+              "similarCards": [],
+              "topics": [
+                "Topic k-renal-3"
+              ],
+              "sourceFile": "cl-renal.md",
+              "importance": 3,
+              "complexity": 3,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "firstSightAtSelection": false
+            },
+            {
+              "id": "k-renal-4",
+              "rotation": "rot-main",
+              "clusterId": "cl-renal",
+              "similarCards": [],
+              "topics": [
+                "Topic k-renal-4"
+              ],
+              "sourceFile": "cl-renal.md",
+              "importance": 3,
+              "complexity": 4,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "firstSightAtSelection": true
+            }
+          ],
+          "cl-cardiac": [
+            {
+              "id": "k-card-1",
+              "rotation": "rot-main",
+              "clusterId": "cl-cardiac",
+              "similarCards": [],
+              "topics": [
+                "Topic k-card-1"
+              ],
+              "sourceFile": "cl-cardiac.md",
+              "importance": 3,
+              "complexity": 2,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "firstSightAtSelection": false
+            },
+            {
+              "id": "k-card-2",
+              "rotation": "rot-main",
+              "clusterId": "cl-cardiac",
+              "similarCards": [],
+              "topics": [
+                "Topic k-card-2"
+              ],
+              "sourceFile": "cl-cardiac.md",
+              "importance": 3,
+              "complexity": 3,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "firstSightAtSelection": true
+            },
+            {
+              "id": "k-card-3",
+              "rotation": "rot-main",
+              "clusterId": "cl-cardiac",
+              "similarCards": [],
+              "topics": [
+                "Topic k-card-3"
+              ],
+              "sourceFile": "cl-cardiac.md",
+              "importance": 3,
+              "complexity": 4,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "firstSightAtSelection": false
+            }
+          ],
+          "cl-acid": [
+            {
+              "id": "k-acid-1",
+              "rotation": "rot-main",
+              "clusterId": "cl-acid",
+              "similarCards": [],
+              "topics": [
+                "Topic k-acid-1"
+              ],
+              "sourceFile": "cl-acid.md",
+              "importance": 3,
+              "complexity": 2,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "firstSightAtSelection": true
+            }
+          ]
+        },
+        "clusterQuestions": [
+          {
+            "id": "cq-1",
+            "rotation": "rot-main",
+            "topics": [
+              "Question cq-1"
+            ],
+            "variantGroupId": "qg-1",
+            "variantType": "mcq"
+          },
+          {
+            "id": "cq-2",
+            "rotation": "rot-main",
+            "topics": [
+              "Question cq-2"
+            ],
+            "variantGroupId": "qg-1",
+            "variantType": "mcq"
+          },
+          {
+            "id": "cq-3",
+            "rotation": "rot-main",
+            "topics": [
+              "Question cq-3"
+            ],
+            "variantGroupId": null,
+            "variantType": null
+          },
+          {
+            "id": "cq-4",
+            "rotation": "rot-main",
+            "topics": [
+              "Question cq-4"
+            ],
+            "variantGroupId": null,
+            "variantType": null
+          }
+        ],
+        "questionFamiliarity": {
+          "cq-2": {
+            "attempts": 2,
+            "correct": 1
+          }
+        },
+        "clusterScaffolds": [
+          {
+            "id": "sc-renal",
+            "rotation": "rot-main",
+            "clusterId": "cl-renal",
+            "similarCards": [],
+            "topics": [
+              "Topic k-renal-1"
+            ],
+            "sourceFile": "cl-renal.md",
+            "importance": 3,
+            "complexity": 1,
+            "variantGroupId": null,
+            "variantIndex": null,
+            "variantType": null,
+            "firstSightAtSelection": true
+          },
+          {
+            "id": "sc-cardiac",
+            "rotation": "rot-main",
+            "clusterId": "cl-cardiac",
+            "similarCards": [],
+            "topics": [
+              "Topic k-card-2"
+            ],
+            "sourceFile": "cl-cardiac.md",
+            "importance": 3,
+            "complexity": 1,
+            "variantGroupId": null,
+            "variantIndex": null,
+            "variantType": null,
+            "firstSightAtSelection": true
+          },
+          {
+            "id": "sc-other",
+            "rotation": "rot-main",
+            "clusterId": "cl-other",
+            "similarCards": [],
+            "topics": [
+              "Topic k-acid-1"
+            ],
+            "sourceFile": "cl-other.md",
+            "importance": 3,
+            "complexity": 1,
+            "variantGroupId": null,
+            "variantIndex": null,
+            "variantType": null,
+            "firstSightAtSelection": true
+          }
+        ]
+      },
+      "expected": {
+        "result": {
+          "items": [
+            {
+              "type": "card",
+              "id": "k-renal-1",
+              "conceptId": "cl-renal",
+              "conceptName": "Renal",
+              "priority": 0.9,
+              "interventionReason": "weak_recall",
+              "rotation": "rot-main",
+              "topics": [
+                "Topic k-renal-1"
+              ],
+              "complexity": 2,
+              "clusterId": "cl-renal",
+              "variantGroupId": "g-renal",
+              "variantIndex": 0,
+              "variantType": "cloze",
+              "firstSightAtSelection": true
+            },
+            {
+              "type": "card",
+              "id": "sc-renal",
+              "rotation": "rot-main",
+              "priority": 0.5,
+              "conceptId": "cl-renal",
+              "conceptName": "Renal",
+              "topics": [
+                "Topic k-renal-1"
+              ],
+              "complexity": 1,
+              "clusterId": "cl-renal",
+              "variantGroupId": null,
+              "interventionReason": "preemptive_scaffold",
+              "struggleIntervention": {
+                "strategy": "preemptive",
+                "isScaffold": true,
+                "targetCardId": "k-renal-1"
+              },
+              "variantIndex": null,
+              "variantType": null,
+              "firstSightAtSelection": true
+            },
+            {
+              "type": "card",
+              "id": "k-acid-1",
+              "conceptId": "cl-acid",
+              "conceptName": "Acid-base",
+              "priority": 0.4,
+              "interventionReason": "weak_recall",
+              "rotation": "rot-main",
+              "topics": [
+                "Topic k-acid-1"
+              ],
+              "complexity": 2,
+              "clusterId": "cl-acid",
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "firstSightAtSelection": true
+            },
+            {
+              "type": "card",
+              "id": "k-card-1",
+              "conceptId": "cl-cardiac",
+              "conceptName": "Cardiac",
+              "priority": 0.27,
+              "interventionReason": "reinforcement",
+              "rotation": "rot-main",
+              "topics": [
+                "Topic k-card-1"
+              ],
+              "complexity": 2,
+              "clusterId": "cl-cardiac",
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "firstSightAtSelection": false
+            },
+            {
+              "type": "card",
+              "id": "sc-cardiac",
+              "rotation": "rot-main",
+              "priority": 0.5,
+              "conceptId": "cl-cardiac",
+              "conceptName": "Cardiac",
+              "topics": [
+                "Topic k-card-2"
+              ],
+              "complexity": 1,
+              "clusterId": "cl-cardiac",
+              "variantGroupId": null,
+              "interventionReason": "preemptive_scaffold",
+              "struggleIntervention": {
+                "strategy": "preemptive",
+                "isScaffold": true,
+                "targetCardId": "k-card-1"
+              },
+              "variantIndex": null,
+              "variantType": null,
+              "firstSightAtSelection": true
+            },
+            {
+              "type": "question",
+              "id": "cq-1",
+              "conceptId": "question:cq-1",
+              "conceptName": "Rotation probe",
+              "priority": 0.5,
+              "interventionReason": "needs_retest",
+              "conceptThreadPolicyVersion": "clinical-thread-facets-v1",
+              "conceptThreadPolicyApplied": false,
+              "rotation": "rot-main",
+              "topics": [
+                "Question cq-1"
+              ],
+              "variantGroupId": "qg-1",
+              "variantType": "mcq",
+              "firstSightAtSelection": true
+            },
+            {
+              "type": "card",
+              "id": "k-card-2",
+              "conceptId": "cl-cardiac",
+              "conceptName": "Cardiac",
+              "priority": 0.27,
+              "interventionReason": "reinforcement",
+              "rotation": "rot-main",
+              "topics": [
+                "Topic k-card-2"
+              ],
+              "complexity": 3,
+              "clusterId": "cl-cardiac",
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "firstSightAtSelection": true
+            },
+            {
+              "type": "card",
+              "id": "k-renal-3",
+              "conceptId": "cl-renal",
+              "conceptName": "Renal",
+              "priority": 0.9,
+              "interventionReason": "weak_recall",
+              "rotation": "rot-main",
+              "topics": [
+                "Topic k-renal-3"
+              ],
+              "complexity": 3,
+              "clusterId": "cl-renal",
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "firstSightAtSelection": false
+            },
+            {
+              "type": "question",
+              "id": "cq-2",
+              "conceptId": "question:cq-2",
+              "conceptName": "Rotation probe",
+              "priority": 0.5,
+              "interventionReason": "needs_retest",
+              "conceptThreadPolicyVersion": "clinical-thread-facets-v1",
+              "conceptThreadPolicyApplied": false,
+              "rotation": "rot-main",
+              "topics": [
+                "Question cq-2"
+              ],
+              "variantGroupId": "qg-1",
+              "variantType": "mcq",
+              "firstSightAtSelection": false
+            },
+            {
+              "type": "question",
+              "id": "cq-3",
+              "conceptId": "question:cq-3",
+              "conceptName": "Rotation probe",
+              "priority": 0.5,
+              "interventionReason": "needs_retest",
+              "conceptThreadPolicyVersion": "clinical-thread-facets-v1",
+              "conceptThreadPolicyApplied": false,
+              "rotation": "rot-main",
+              "topics": [
+                "Question cq-3"
+              ],
+              "variantGroupId": null,
+              "variantType": null,
+              "firstSightAtSelection": true
+            }
+          ],
+          "noveltyQuota": {
+            "required": 0,
+            "selected": 7
+          },
+          "stats": {
+            "totalConcepts": 3,
+            "weakConcepts": 3,
+            "selectedConcepts": 3,
+            "cardCount": 7,
+            "questionCount": 3,
+            "averagePriority": 0.524,
+            "conceptPairingRate": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "cluster_present_first_sight_quota",
+      "snapshot": {
+        "userId": "fixture-user",
+        "nowMs": 1768478400000,
+        "daysToExam": 30,
+        "examPressure": 0.20587037180094736,
+        "size": 6,
+        "cardRatio": 0.7,
+        "rotation": "rot-main",
+        "effectiveMaxNewCards": null,
+        "interferenceThreshold": 0.85,
+        "includeVideos": true,
+        "servingRotationSeed": "serving:a3f1c9e2b7d4058e6a1f3c5d7e9b2a4c6e8f0a1b3c5d7e9f1a2b3c4d5e6f7a8b",
+        "budget": {
+          "dailyThroughput": 41.6,
+          "totalRemaining": 812.4,
+          "sessionsRemaining": 9
+        },
+        "options": {
+          "examTargetTieBreakSeed": "a3f1c9e2b7d4058e6a1f3c5d7e9b2a4c6e8f0a1b3c5d7e9f1a2b3c4d5e6f7a8b",
+          "minFirstSightItems": 3
+        },
+        "concepts": [],
+        "stateMap": {
+          "c-renal": {
+            "recallProbability": 0.3,
+            "confidence": 0.4,
+            "exposureCount": 5,
+            "probeCount": 5,
+            "recentFailRate": 0,
+            "lastExposureAt": 1768305600000,
+            "lastProbeAt": 1768132800000
+          },
+          "c-cardiac": {
+            "recallProbability": 0.55,
+            "confidence": 0.2,
+            "exposureCount": 2,
+            "probeCount": 2,
+            "recentFailRate": 0,
+            "lastExposureAt": 1767960000000,
+            "lastProbeAt": 1767960000000
+          },
+          "c-acid": {
+            "recallProbability": 0.97,
+            "confidence": 0.9,
+            "exposureCount": 12,
+            "probeCount": 12,
+            "recentFailRate": 0,
+            "lastExposureAt": 1768392000000,
+            "lastProbeAt": 1767700800000
+          },
+          "c-glyco": {
+            "recallProbability": 0.6,
+            "confidence": 0.75,
+            "exposureCount": 8,
+            "probeCount": 8,
+            "recentFailRate": 0,
+            "lastExposureAt": 1768219200000,
+            "lastProbeAt": 1768046400000
+          }
+        },
+        "recentFailureConceptIds": [
+          "c-renal"
+        ],
+        "bulk": {
+          "unseenCards": [
+            {
+              "id": "u-renal-1",
+              "stableId": "u-renal-1",
+              "rotation": "rot-main",
+              "clusterId": "cl-renal",
+              "similarCards": null,
+              "topics": [
+                "Renal Tubular Acidosis"
+              ],
+              "sourceFile": "week2-u-renal-1",
+              "imageUrl": null,
+              "clipId": null,
+              "importance": 3,
+              "complexity": 3,
+              "facilityIndex": null,
+              "sampleSize": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null
+            },
+            {
+              "id": "u-renal-2",
+              "stableId": "u-renal-2",
+              "rotation": "rot-main",
+              "clusterId": "cl-renal",
+              "similarCards": [
+                {
+                  "cardId": "u-renal-1",
+                  "similarity": 0.93
+                }
+              ],
+              "topics": [
+                "renal tubular acidosis"
+              ],
+              "sourceFile": "week2-u-renal-2",
+              "imageUrl": null,
+              "clipId": null,
+              "importance": 1,
+              "complexity": 4,
+              "facilityIndex": null,
+              "sampleSize": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null
+            },
+            {
+              "id": "u-renal-s",
+              "stableId": "u-renal-s",
+              "rotation": "rot-main",
+              "clusterId": "cl-renal",
+              "similarCards": null,
+              "topics": [
+                "Renal Tubular Acidosis"
+              ],
+              "sourceFile": "week2-u-renal-s",
+              "imageUrl": null,
+              "clipId": null,
+              "importance": 1,
+              "complexity": 1,
+              "facilityIndex": null,
+              "sampleSize": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null
+            },
+            {
+              "id": "u-cardiac-1",
+              "stableId": "u-cardiac-1",
+              "rotation": "rot-main",
+              "clusterId": "cl-cardio",
+              "similarCards": null,
+              "topics": [
+                "Cardiac Output"
+              ],
+              "sourceFile": "week2-u-cardiac-1",
+              "imageUrl": "fig-1.png",
+              "clipId": null,
+              "importance": 1,
+              "complexity": 2,
+              "facilityIndex": null,
+              "sampleSize": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null
+            },
+            {
+              "id": "u-cardiac-2",
+              "stableId": "u-cardiac-2",
+              "rotation": "rot-main",
+              "clusterId": "cl-cardio",
+              "similarCards": null,
+              "topics": [
+                "Cardiac Output"
+              ],
+              "sourceFile": "week2-u-cardiac-2",
+              "imageUrl": null,
+              "clipId": null,
+              "importance": 1,
+              "complexity": 2,
+              "facilityIndex": null,
+              "sampleSize": null,
+              "variantGroupId": "vg-1",
+              "variantIndex": 0,
+              "variantType": "cloze"
+            },
+            {
+              "id": "u-cardiac-3",
+              "stableId": "u-cardiac-3",
+              "rotation": "rot-main",
+              "clusterId": "cl-cardio",
+              "similarCards": null,
+              "topics": [
+                "Cardiac Output"
+              ],
+              "sourceFile": "week2-u-cardiac-3",
+              "imageUrl": null,
+              "clipId": null,
+              "importance": 1,
+              "complexity": 2,
+              "facilityIndex": null,
+              "sampleSize": null,
+              "variantGroupId": "vg-1",
+              "variantIndex": 1,
+              "variantType": "cloze"
+            },
+            {
+              "id": "u-acid-1",
+              "stableId": "u-acid-1",
+              "rotation": "rot-main",
+              "clusterId": null,
+              "similarCards": null,
+              "topics": [
+                "Acid-Base"
+              ],
+              "sourceFile": "week2-u-acid-1",
+              "imageUrl": null,
+              "clipId": null,
+              "importance": 2,
+              "complexity": 2,
+              "facilityIndex": null,
+              "sampleSize": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null
+            },
+            {
+              "id": "u-sickle-s",
+              "stableId": "u-sickle-s",
+              "rotation": "rot-main",
+              "clusterId": null,
+              "similarCards": null,
+              "topics": [
+                "Sickle Cell"
+              ],
+              "sourceFile": "week2-u-sickle-s",
+              "imageUrl": null,
+              "clipId": null,
+              "importance": 1,
+              "complexity": 1,
+              "facilityIndex": null,
+              "sampleSize": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null
+            },
+            {
+              "id": "u-orphan",
+              "stableId": "u-orphan",
+              "rotation": "rot-main",
+              "clusterId": null,
+              "similarCards": null,
+              "topics": [
+                "Unrelated Topic"
+              ],
+              "sourceFile": "week2-u-orphan",
+              "imageUrl": null,
+              "clipId": null,
+              "importance": 2,
+              "complexity": 2,
+              "facilityIndex": null,
+              "sampleSize": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null
+            }
+          ],
+          "seenCards": [
+            {
+              "id": "s-glyco-1",
+              "stableId": "s-glyco-1",
+              "rotation": "rot-main",
+              "clusterId": "cl-metab",
+              "similarCards": null,
+              "topics": [
+                "Glycolysis"
+              ],
+              "sourceFile": "bank-cards",
+              "imageUrl": null,
+              "clipId": null,
+              "importance": 1,
+              "complexity": 2,
+              "facilityIndex": null,
+              "sampleSize": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null
+            },
+            {
+              "id": "s-glyco-2",
+              "stableId": "s-glyco-2",
+              "rotation": "rot-main",
+              "clusterId": "cl-metab",
+              "similarCards": null,
+              "topics": [
+                "Glycolysis"
+              ],
+              "sourceFile": "week2-s-glyco-2",
+              "imageUrl": null,
+              "clipId": null,
+              "importance": 1,
+              "complexity": 2,
+              "facilityIndex": 0.8,
+              "sampleSize": 30,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null
+            },
+            {
+              "id": "s-renal-1",
+              "stableId": "s-renal-1",
+              "rotation": "rot-main",
+              "clusterId": "cl-renal",
+              "similarCards": null,
+              "topics": [
+                "Renal Tubular Acidosis"
+              ],
+              "sourceFile": "week2-s-renal-1",
+              "imageUrl": null,
+              "clipId": null,
+              "importance": 1,
+              "complexity": 5,
+              "facilityIndex": null,
+              "sampleSize": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null
+            },
+            {
+              "id": "s-orphan",
+              "stableId": "s-orphan",
+              "rotation": "rot-main",
+              "clusterId": null,
+              "similarCards": null,
+              "topics": [
+                "Lonely Topic"
+              ],
+              "sourceFile": "week2-s-orphan",
+              "imageUrl": null,
+              "clipId": null,
+              "importance": 1,
+              "complexity": 2,
+              "facilityIndex": null,
+              "sampleSize": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null
+            }
+          ],
+          "seenCardReviewCounts": {
+            "s-glyco-1": 2
+          },
+          "fragileSeenCards": [
+            "s-glyco-2"
+          ],
+          "rotationQuestions": [
+            {
+              "id": "q-renal-1",
+              "rotation": "rot-main",
+              "stem": "stem q-renal-1",
+              "questionType": "diagnosis",
+              "difficulty": " Hard ",
+              "variantGroupId": null,
+              "variantType": null,
+              "format": null,
+              "facilityIndex": null,
+              "totalAttempts": null,
+              "source": "bank",
+              "topics": [
+                "Renal Tubular Acidosis"
+              ],
+              "examRelevance": null,
+              "examRelevancePct": null
+            },
+            {
+              "id": "q-renal-2",
+              "rotation": "rot-main",
+              "stem": "stem q-renal-2",
+              "questionType": "diagnosis",
+              "difficulty": "easy",
+              "variantGroupId": null,
+              "variantType": null,
+              "format": null,
+              "facilityIndex": 0.2,
+              "totalAttempts": 40,
+              "source": "bank",
+              "topics": [
+                "Renal Tubular Acidosis"
+              ],
+              "examRelevance": null,
+              "examRelevancePct": null
+            },
+            {
+              "id": "q-cardiac-1",
+              "rotation": "rot-main",
+              "stem": "stem q-cardiac-1",
+              "questionType": "diagnosis",
+              "difficulty": "bogus",
+              "variantGroupId": "qg-1",
+              "variantType": "near-duplicate",
+              "format": null,
+              "facilityIndex": null,
+              "totalAttempts": null,
+              "source": "bank",
+              "topics": [
+                "Cardiac Output"
+              ],
+              "examRelevance": null,
+              "examRelevancePct": null
+            },
+            {
+              "id": "q-cardiac-2",
+              "rotation": "rot-main",
+              "stem": "stem q-cardiac-2",
+              "questionType": "diagnosis",
+              "difficulty": "medium",
+              "variantGroupId": "qg-1",
+              "variantType": "near-duplicate",
+              "format": null,
+              "facilityIndex": null,
+              "totalAttempts": null,
+              "source": "bank",
+              "topics": [
+                "Cardiac Output"
+              ],
+              "examRelevance": null,
+              "examRelevancePct": null
+            },
+            {
+              "id": "q-acid-1",
+              "rotation": "rot-main",
+              "stem": "stem q-acid-1",
+              "questionType": "diagnosis",
+              "difficulty": "hard",
+              "variantGroupId": null,
+              "variantType": null,
+              "format": null,
+              "facilityIndex": null,
+              "totalAttempts": null,
+              "source": "generated",
+              "topics": [
+                "Acid-Base"
+              ],
+              "examRelevance": null,
+              "examRelevancePct": null
+            },
+            {
+              "id": "q-glyco-1",
+              "rotation": "rot-main",
+              "stem": "stem q-glyco-1",
+              "questionType": "diagnosis",
+              "difficulty": "medium",
+              "variantGroupId": null,
+              "variantType": null,
+              "format": "cloze",
+              "facilityIndex": null,
+              "totalAttempts": null,
+              "source": "bank",
+              "topics": [
+                "Glycolysis"
+              ],
+              "examRelevance": null,
+              "examRelevancePct": null
+            },
+            {
+              "id": "q-orphan",
+              "rotation": "rot-main",
+              "stem": "stem q-orphan",
+              "questionType": "diagnosis",
+              "difficulty": "medium",
+              "variantGroupId": null,
+              "variantType": null,
+              "format": null,
+              "facilityIndex": null,
+              "totalAttempts": null,
+              "source": "bank",
+              "topics": [
+                "Other Topic"
+              ],
+              "examRelevance": null,
+              "examRelevancePct": null
+            }
+          ],
+          "questionConceptLinks": [
+            {
+              "questionId": "q-renal-1",
+              "conceptId": "c-renal",
+              "isPrimary": true
+            },
+            {
+              "questionId": "q-cardiac-1",
+              "conceptId": "c-cardiac",
+              "isPrimary": false
+            }
+          ],
+          "rotationVideos": [
+            {
+              "id": "vid-c-renal",
+              "title": "RTA",
+              "thumbnailR2Key": "t.png",
+              "durationSecs": 300,
+              "r2Key": "v.mp4",
+              "creatorName": null
+            }
+          ],
+          "videoConceptLinks": [],
+          "cardScores": {
+            "c-cardiac": {
+              "u-cardiac-2": 0.9,
+              "u-cardiac-1": 0.7
+            }
+          },
+          "questionScores": {
+            "c-renal": {
+              "q-renal-1": 0.4
+            }
+          },
+          "questionFamiliarity": {
+            "q-glyco-1": {
+              "lastSeenAtMs": 1768219200000,
+              "corrects": 1
+            }
+          }
+        },
+        "itemEmbeddings": {
+          "u-renal-1": [
+            0.9,
+            0.1,
+            0,
+            0.1
+          ],
+          "u-cardiac-1": [
+            0.1,
+            0.9,
+            0.1,
+            0
+          ],
+          "u-acid-1": [
+            0.5,
+            0.5,
+            0.2,
+            0.1
+          ],
+          "q-renal-1": [
+            0.8,
+            0.2,
+            0.1,
+            0.3
+          ],
+          "s-glyco-1": [
+            0,
+            0.2,
+            0.9,
+            0.1
+          ],
+          "u-sickle-s": [
+            0.3,
+            0.1,
+            0.2,
+            0.9
+          ]
+        },
+        "rotationTopUp": [],
+        "clusterMastery": [
+          {
+            "clusterId": "cl-acid",
+            "clusterName": "Acid-base",
+            "mastery": 0,
+            "cardCount": 0,
+            "cardsReviewed": 0,
+            "avgRetrieval": 0,
+            "needsAttention": false
+          },
+          {
+            "clusterId": "cl-renal",
+            "clusterName": "Renal",
+            "mastery": 0.2,
+            "cardCount": 10,
+            "cardsReviewed": 2,
+            "avgRetrieval": 0.2,
+            "needsAttention": true
+          },
+          {
+            "clusterId": "cl-cardiac",
+            "clusterName": "Cardiac",
+            "mastery": 0.7,
+            "cardCount": 8,
+            "cardsReviewed": 6,
+            "avgRetrieval": 0.7,
+            "needsAttention": false
+          }
+        ],
+        "clusterCards": {
+          "cl-renal": [
+            {
+              "id": "k-renal-1",
+              "rotation": "rot-main",
+              "clusterId": "cl-renal",
+              "similarCards": [],
+              "topics": [
+                "Topic k-renal-1"
+              ],
+              "sourceFile": "cl-renal.md",
+              "importance": 3,
+              "complexity": 2,
+              "variantGroupId": "g-renal",
+              "variantIndex": 0,
+              "variantType": "cloze",
+              "firstSightAtSelection": true
+            },
+            {
+              "id": "k-renal-2",
+              "rotation": "rot-main",
+              "clusterId": "cl-renal",
+              "similarCards": [],
+              "topics": [
+                "Topic k-renal-2"
+              ],
+              "sourceFile": "cl-renal.md",
+              "importance": 3,
+              "complexity": 2,
+              "variantGroupId": "g-renal",
+              "variantIndex": 0,
+              "variantType": "cloze",
+              "firstSightAtSelection": false
+            },
+            {
+              "id": "k-renal-3",
+              "rotation": "rot-main",
+              "clusterId": "cl-renal",
+              "similarCards": [],
+              "topics": [
+                "Topic k-renal-3"
+              ],
+              "sourceFile": "cl-renal.md",
+              "importance": 3,
+              "complexity": 3,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "firstSightAtSelection": false
+            },
+            {
+              "id": "k-renal-4",
+              "rotation": "rot-main",
+              "clusterId": "cl-renal",
+              "similarCards": [],
+              "topics": [
+                "Topic k-renal-4"
+              ],
+              "sourceFile": "cl-renal.md",
+              "importance": 3,
+              "complexity": 4,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "firstSightAtSelection": true
+            }
+          ],
+          "cl-cardiac": [
+            {
+              "id": "k-card-1",
+              "rotation": "rot-main",
+              "clusterId": "cl-cardiac",
+              "similarCards": [],
+              "topics": [
+                "Topic k-card-1"
+              ],
+              "sourceFile": "cl-cardiac.md",
+              "importance": 3,
+              "complexity": 2,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "firstSightAtSelection": false
+            },
+            {
+              "id": "k-card-2",
+              "rotation": "rot-main",
+              "clusterId": "cl-cardiac",
+              "similarCards": [],
+              "topics": [
+                "Topic k-card-2"
+              ],
+              "sourceFile": "cl-cardiac.md",
+              "importance": 3,
+              "complexity": 3,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "firstSightAtSelection": true
+            },
+            {
+              "id": "k-card-3",
+              "rotation": "rot-main",
+              "clusterId": "cl-cardiac",
+              "similarCards": [],
+              "topics": [
+                "Topic k-card-3"
+              ],
+              "sourceFile": "cl-cardiac.md",
+              "importance": 3,
+              "complexity": 4,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "firstSightAtSelection": false
+            }
+          ],
+          "cl-acid": [
+            {
+              "id": "k-acid-1",
+              "rotation": "rot-main",
+              "clusterId": "cl-acid",
+              "similarCards": [],
+              "topics": [
+                "Topic k-acid-1"
+              ],
+              "sourceFile": "cl-acid.md",
+              "importance": 3,
+              "complexity": 2,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "firstSightAtSelection": true
+            }
+          ]
+        },
+        "clusterQuestions": [
+          {
+            "id": "cq-1",
+            "rotation": "rot-main",
+            "topics": [
+              "Question cq-1"
+            ],
+            "variantGroupId": "qg-1",
+            "variantType": "mcq"
+          },
+          {
+            "id": "cq-2",
+            "rotation": "rot-main",
+            "topics": [
+              "Question cq-2"
+            ],
+            "variantGroupId": "qg-1",
+            "variantType": "mcq"
+          },
+          {
+            "id": "cq-3",
+            "rotation": "rot-main",
+            "topics": [
+              "Question cq-3"
+            ],
+            "variantGroupId": null,
+            "variantType": null
+          },
+          {
+            "id": "cq-4",
+            "rotation": "rot-main",
+            "topics": [
+              "Question cq-4"
+            ],
+            "variantGroupId": null,
+            "variantType": null
+          }
+        ],
+        "questionFamiliarity": {
+          "cq-2": {
+            "attempts": 2,
+            "correct": 1
+          }
+        },
+        "clusterScaffolds": [
+          {
+            "id": "sc-renal",
+            "rotation": "rot-main",
+            "clusterId": "cl-renal",
+            "similarCards": [],
+            "topics": [
+              "Topic k-renal-1"
+            ],
+            "sourceFile": "cl-renal.md",
+            "importance": 3,
+            "complexity": 1,
+            "variantGroupId": null,
+            "variantIndex": null,
+            "variantType": null,
+            "firstSightAtSelection": true
+          },
+          {
+            "id": "sc-cardiac",
+            "rotation": "rot-main",
+            "clusterId": "cl-cardiac",
+            "similarCards": [],
+            "topics": [
+              "Topic k-card-2"
+            ],
+            "sourceFile": "cl-cardiac.md",
+            "importance": 3,
+            "complexity": 1,
+            "variantGroupId": null,
+            "variantIndex": null,
+            "variantType": null,
+            "firstSightAtSelection": true
+          },
+          {
+            "id": "sc-other",
+            "rotation": "rot-main",
+            "clusterId": "cl-other",
+            "similarCards": [],
+            "topics": [
+              "Topic k-acid-1"
+            ],
+            "sourceFile": "cl-other.md",
+            "importance": 3,
+            "complexity": 1,
+            "variantGroupId": null,
+            "variantIndex": null,
+            "variantType": null,
+            "firstSightAtSelection": true
+          }
+        ]
+      },
+      "expected": {
+        "result": {
+          "items": [
+            {
+              "type": "card",
+              "id": "k-renal-1",
+              "conceptId": "cl-renal",
+              "conceptName": "Renal",
+              "priority": 0.9,
+              "interventionReason": "weak_recall",
+              "rotation": "rot-main",
+              "topics": [
+                "Topic k-renal-1"
+              ],
+              "complexity": 2,
+              "clusterId": "cl-renal",
+              "variantGroupId": "g-renal",
+              "variantIndex": 0,
+              "variantType": "cloze",
+              "firstSightAtSelection": true
+            },
+            {
+              "type": "card",
+              "id": "sc-renal",
+              "rotation": "rot-main",
+              "priority": 0.5,
+              "conceptId": "cl-renal",
+              "conceptName": "Renal",
+              "topics": [
+                "Topic k-renal-1"
+              ],
+              "complexity": 1,
+              "clusterId": "cl-renal",
+              "variantGroupId": null,
+              "interventionReason": "preemptive_scaffold",
+              "struggleIntervention": {
+                "strategy": "preemptive",
+                "isScaffold": true,
+                "targetCardId": "k-renal-1"
+              },
+              "variantIndex": null,
+              "variantType": null,
+              "firstSightAtSelection": true
+            },
+            {
+              "type": "card",
+              "id": "k-acid-1",
+              "conceptId": "cl-acid",
+              "conceptName": "Acid-base",
+              "priority": 0.4,
+              "interventionReason": "weak_recall",
+              "rotation": "rot-main",
+              "topics": [
+                "Topic k-acid-1"
+              ],
+              "complexity": 2,
+              "clusterId": "cl-acid",
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "firstSightAtSelection": true
+            },
+            {
+              "type": "card",
+              "id": "k-card-2",
+              "conceptId": "cl-cardiac",
+              "conceptName": "Cardiac",
+              "priority": 0.27,
+              "interventionReason": "reinforcement",
+              "rotation": "rot-main",
+              "topics": [
+                "Topic k-card-2"
+              ],
+              "complexity": 3,
+              "clusterId": "cl-cardiac",
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "firstSightAtSelection": true
+            },
+            {
+              "type": "card",
+              "id": "sc-cardiac",
+              "rotation": "rot-main",
+              "priority": 0.5,
+              "conceptId": "cl-cardiac",
+              "conceptName": "Cardiac",
+              "topics": [
+                "Topic k-card-2"
+              ],
+              "complexity": 1,
+              "clusterId": "cl-cardiac",
+              "variantGroupId": null,
+              "interventionReason": "preemptive_scaffold",
+              "struggleIntervention": {
+                "strategy": "preemptive",
+                "isScaffold": true,
+                "targetCardId": "k-card-2"
+              },
+              "variantIndex": null,
+              "variantType": null,
+              "firstSightAtSelection": true
+            },
+            {
+              "type": "question",
+              "id": "cq-1",
+              "conceptId": "question:cq-1",
+              "conceptName": "Rotation probe",
+              "priority": 0.5,
+              "interventionReason": "needs_retest",
+              "conceptThreadPolicyVersion": "clinical-thread-facets-v1",
+              "conceptThreadPolicyApplied": false,
+              "rotation": "rot-main",
+              "topics": [
+                "Question cq-1"
+              ],
+              "variantGroupId": "qg-1",
+              "variantType": "mcq",
+              "firstSightAtSelection": true
+            },
+            {
+              "type": "card",
+              "id": "k-renal-3",
+              "conceptId": "cl-renal",
+              "conceptName": "Renal",
+              "priority": 0.9,
+              "interventionReason": "weak_recall",
+              "rotation": "rot-main",
+              "topics": [
+                "Topic k-renal-3"
+              ],
+              "complexity": 3,
+              "clusterId": "cl-renal",
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "firstSightAtSelection": false
+            },
+            {
+              "type": "card",
+              "id": "k-card-1",
+              "conceptId": "cl-cardiac",
+              "conceptName": "Cardiac",
+              "priority": 0.27,
+              "interventionReason": "reinforcement",
+              "rotation": "rot-main",
+              "topics": [
+                "Topic k-card-1"
+              ],
+              "complexity": 2,
+              "clusterId": "cl-cardiac",
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "firstSightAtSelection": false
+            }
+          ],
+          "noveltyQuota": {
+            "required": 3,
+            "selected": 6
+          },
+          "stats": {
+            "totalConcepts": 3,
+            "weakConcepts": 3,
+            "selectedConcepts": 3,
+            "cardCount": 7,
+            "questionCount": 1,
+            "averagePriority": 0.53,
+            "conceptPairingRate": 1
+          }
+        }
+      }
     }
   ]
 }
