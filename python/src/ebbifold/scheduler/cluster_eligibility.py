@@ -26,13 +26,13 @@ def week_eligible(inputs: dict[str, Any], row: dict[str, Any]) -> bool:
 def media_eligible(media: str | None, row: dict[str, Any]) -> bool:
     if not media:
         return True
-    image = bool((row.get("imageUrl") or "").strip())
-    video = bool((row.get("clipId") or "").strip() or (row.get("clip") or {}).get("url"))
-    if media == "image":
-        return image
-    if media == "video":
-        return video
-    return media == "any" and (image or video)
+    present = {
+        "image": bool((row.get("imageUrl") or "").strip()),
+        "video": bool((row.get("clipId") or "").strip() or (row.get("clip") or {}).get("url")),
+    }
+    if media in present:
+        return present[media]
+    return media == "any" and any(present.values())
 
 
 def eligible_row(inputs: dict[str, Any], row: dict[str, Any]) -> bool:

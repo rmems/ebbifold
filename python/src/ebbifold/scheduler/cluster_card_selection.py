@@ -100,12 +100,15 @@ class ClusterCardSelection:
         picked = sum(1 for item in self.selected_items if f"card:{item['id']}" in self.prep_ids)
         return int((len(self.selected_items) + 1) * self.prep_seats / max(1, self.target_cards)) > picked
 
+    def _targeted_prep_rows(self, candidates: list[dict[str, Any]], target_ids: set[str]) -> list[dict[str, Any]]:
+        present = {row["id"] for row in candidates}
+        return [row for row in self.rows if row["id"] in target_ids and row["id"] not in present]
+
     def ordered_candidates(self, cluster_id: str, wants_prep: bool) -> list[dict[str, Any]]:
         candidates = [row for row in self.rows if str(row.get("clusterId")) == cluster_id][:12]
         target_ids = set(self.prep_by_cluster.get(cluster_id, []))
         if wants_prep and target_ids:
-            present = {row["id"] for row in candidates}
-            candidates += [row for row in self.rows if row["id"] in target_ids and row["id"] not in present]
+            candidates += self._targeted_prep_rows(candidates, target_ids)
         candidates = [row for row in candidates if row["id"] not in self.selected_ids]
         if not self.prep_ids:
             return candidates
@@ -184,13 +187,13 @@ def _wrap_card(inputs: dict[str, Any], cluster: dict[str, Any], row: dict[str, A
             "firstSightAtSelection": row["firstSightAtSelection"]}
 
 
-def select_cluster_cards(inputs: dict[str, Any], states: list[dict[str, Any]], target_cards: int) -> tuple[list[dict[str, Any]], set[str], dict[str, dict[str, Any]]]:
+def _selection_context(inputs: dict[str, Any], states: list[dict[str, Any]], target_cards: int) -> ClusterCardSelection:
     flat_rows = [row for cluster_rows in (inputs.get("clusterCards") or {}).values() for row in cluster_rows]
     rows = eligible_rows(inputs, flat_rows)
     plan = inputs["options"].get("sessionPrepBlend") or {}
     prep_ids = set(plan.get("itemIds") or [])
     mix = inputs.get("deckStrandMix")
-    selection = ClusterCardSelection(
+    return ClusterCardSelection(
         inputs=inputs, states=states, target_cards=target_cards, rows=rows,
         prep_ids=prep_ids, prep_weak_ids=set(plan.get("weakItemIds") or []),
         prep_by_cluster=_prep_cluster_map(rows, plan, prep_ids),
@@ -198,6 +201,10 @@ def select_cluster_cards(inputs: dict[str, Any], states: list[dict[str, Any]], t
         seats=strand_seat_targets(mix, target_cards) if mix else {},
         selected_ids=set(inputs["excludedCardIds"]),
     )
+
+
+def select_cluster_cards(inputs: dict[str, Any], states: list[dict[str, Any]], target_cards: int) -> tuple[list[dict[str, Any]], set[str], dict[str, dict[str, Any]]]:
+    selection = _selection_context(inputs, states, target_cards)
     selection.run()
     by_cluster = {str(state["clusterId"]): state for state in states}
     wrapped = [_wrap_card(inputs, by_cluster[str(row.get("clusterId"))], row) for row in selection.selected_items]
