@@ -121,7 +121,9 @@ class TeachingRemovalContext:
 
 def _ordinary_teaching_removable(context: TeachingRemovalContext, index: int) -> bool:
     item = context.items[index]
-    if index in context.scaffold or index in context.mastery_core or item["id"] in context.protected_ids:
+    if index in context.scaffold or index in context.mastery_core:
+        return False
+    if item["id"] in context.protected_ids:
         return False
     return not bool(context.preserve and context.preserve(item))
 
