@@ -10,6 +10,7 @@ miss drops a tier immediately. After a miss, follow-ups come from the missed
 concept's teaching ladder before widening to its domain, then everything else.
 """
 
+import math
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
@@ -49,7 +50,15 @@ def normalise_difficulty(raw: str | None) -> DifficultyTier:
     anything unrecognised lands in the middle too: guessing 'easy' strands a
     strong reader, guessing 'hard' buries a weak one.
     """
-    value = (raw or "").strip().lower()
+    # Match ECMAScript String.trim, not Python's default whitespace set:
+    # JS strips U+FEFF but not U+0085; Python does the reverse.
+    js_whitespace = (
+        "\t\n\v\f\r "
+        "\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005"
+        "\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f"
+        "\u3000\ufeff"
+    )
+    value = (raw or "").strip(js_whitespace).lower()
     if value == "easy":
         return "easy"
     if value == "hard":
@@ -70,9 +79,67 @@ def next_tier(current: DifficultyTier, was_correct: bool) -> DifficultyTier:
 def _preference_rank(question: AdaptiveQuestion) -> float:
     """Mirror Number.isFinite(q.preferenceRank) ? q.preferenceRank : 0."""
     rank = question.preference_rank
-    if rank is None or rank != rank or rank in (float("inf"), float("-inf")):
+    if rank is None or not math.isfinite(rank):
         return 0.0
     return rank
+
+
+def _epoch(row: AdaptiveHistoryRow) -> float:
+    """Instant comparison, matching JS epoch-millisecond semantics.
+
+    Comparing Python datetimes directly is wrong across a repeated local hour
+    when both share one tzinfo object (wall times compare, folds collapse).
+    JavaScript Dates always compare as instants, so convert to epoch seconds.
+    """
+    return row.created_at.timestamp()
+
+
+def _resolve_target_and_scaffold(
+    history: list[AdaptiveHistoryRow],
+    by_id: dict[str, AdaptiveQuestion],
+) -> tuple[DifficultyTier, str | None, str | None]:
+    """Compute the target tier and the missed-concept scaffold signals.
+
+    Returns (target, scaffold_ladder, scaffold_domain). The scaffold pair is
+    set only when the learner just got something WRONG: stepping down to an
+    easier question is not teaching — they need groundwork for what they
+    missed. On the way UP the concept is proved, so breadth beats drilling.
+    """
+    # JS: history.reduce((a, b) => (b.createdAt >= a.createdAt ? b : a))
+    # — on a timestamp tie the LATER row in the array wins.
+    latest = history[0]
+    for row in history[1:]:
+        if _epoch(row) >= _epoch(latest):
+            latest = row
+    asked = by_id.get(latest.question_id)
+    asked_tier = normalise_difficulty(asked.difficulty if asked else None)
+    # Count the run of consecutive correct answers ending here, at this tier.
+    # A miss, or an answer at a different tier, ends the run. Iterate the
+    # ascending stable sort backwards, exactly like the TS original — among
+    # equal timestamps the later-indexed row is visited first.
+    streak = 0
+    ordered = sorted(history, key=_epoch)
+    for row in ordered[::-1]:
+        if not row.is_correct:
+            break
+        tier = normalise_difficulty(
+            (by_id.get(row.question_id).difficulty)
+            if row.question_id in by_id
+            else None
+        )
+        if tier != asked_tier:
+            break
+        streak += 1
+    target = (
+        asked_tier
+        if latest.is_correct and streak < PROMOTION_STREAK
+        else next_tier(asked_tier, latest.is_correct)
+    )
+    if latest.is_correct:
+        return target, None, None
+    scaffold_ladder = asked.ladder_id if asked else None
+    scaffold_domain = asked.domain if asked else None
+    return target, scaffold_ladder, scaffold_domain
 
 
 def rank_adaptive(
@@ -88,44 +155,12 @@ def rank_adaptive(
     by_id = {q.id: q for q in questions}
     answered = {row.question_id for row in history}
 
-    target: DifficultyTier = "medium"
-    # Set only when the learner just got something WRONG. Stepping down to an
-    # easier question is not teaching: they need groundwork for what they
-    # missed. On the way UP the concept is proved, so breadth beats drilling.
-    scaffold_domain: str | None = None
-    scaffold_ladder: str | None = None
     if history:
-        # JS: history.reduce((a, b) => (b.createdAt >= a.createdAt ? b : a))
-        # — on a timestamp tie the LATER row in the array wins.
-        latest = history[0]
-        for row in history[1:]:
-            if row.created_at >= latest.created_at:
-                latest = row
-        asked = by_id.get(latest.question_id)
-        asked_tier = normalise_difficulty(asked.difficulty if asked else None)
-        # Count the run of consecutive correct answers ending here, at this
-        # tier. A miss, or an answer at a different tier, ends the run.
-        streak = 0
-        ordered = sorted(history, key=lambda r: r.created_at)
-        for row in reversed(ordered):
-            if not row.is_correct:
-                break
-            tier = normalise_difficulty(
-                (by_id.get(row.question_id).difficulty)
-                if row.question_id in by_id
-                else None
-            )
-            if tier != asked_tier:
-                break
-            streak += 1
-        target = (
-            asked_tier
-            if latest.is_correct and streak < PROMOTION_STREAK
-            else next_tier(asked_tier, latest.is_correct)
+        target, scaffold_ladder, scaffold_domain = _resolve_target_and_scaffold(
+            history, by_id
         )
-        if not latest.is_correct:
-            scaffold_ladder = asked.ladder_id if asked else None
-            scaffold_domain = asked.domain if asked else None
+    else:
+        target, scaffold_ladder, scaffold_domain = "medium", None, None
     target_index = DIFFICULTY_TIERS.index(target)
 
     def sort_key(q: AdaptiveQuestion) -> tuple[float, int, int, float, str]:
