@@ -97,7 +97,8 @@ def build_cluster_round_robin(
 
 
 def _teaching_cap_removals(
-    items: Sequence[Mapping[str, Any]], indexes: list[int], cap_value: float
+    items: Sequence[Mapping[str, Any]], indexes: list[int], cap_value: float,
+    preserve: Callable[[Mapping[str, Any]], bool] | None = None,
 ) -> set[int]:
     cap = max(0, math.floor(cap_value))
     excess = len(indexes) - cap
@@ -122,7 +123,7 @@ def _teaching_cap_removals(
             removed.add(index)
             excess -= 1
 
-    remove_where(lambda i: i not in scaffold and i not in mastery_core and items[i]["id"] not in protected_ids)
+    remove_where(lambda i: i not in scaffold and i not in mastery_core and items[i]["id"] not in protected_ids and not (preserve and preserve(items[i])))
     remove_where(lambda i: i in scaffold)
     remove_where(lambda i: i not in mastery_core)
     remove_where(lambda i: True)
@@ -130,7 +131,8 @@ def _teaching_cap_removals(
 
 
 def enforce_concept_teaching_caps(
-    items: Sequence[Mapping[str, Any]], cap_for: Callable[[str], float]
+    items: Sequence[Mapping[str, Any]], cap_for: Callable[[str], float],
+    preserve: Callable[[Mapping[str, Any]], bool] | None = None,
 ) -> list[Mapping[str, Any]]:
     groups: dict[str, list[int]] = {}
     for index, item in enumerate(items):
@@ -141,7 +143,7 @@ def enforce_concept_teaching_caps(
 
     removed: set[int] = set()
     for concept_id, indexes in groups.items():
-        removed.update(_teaching_cap_removals(items, indexes, cap_for(concept_id)))
+        removed.update(_teaching_cap_removals(items, indexes, cap_for(concept_id), preserve))
     return [item for index, item in enumerate(items) if index not in removed]
 
 

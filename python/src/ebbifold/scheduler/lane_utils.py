@@ -43,6 +43,7 @@ class QuestionPoolRequest:
     concept: dict[str, Any]
     difficulty: str
     slot: int | None = None
+    allow_concept_thread: bool = True
 
 
 @dataclass(frozen=True)
@@ -96,8 +97,12 @@ def question_pool(request: QuestionPoolRequest) -> list[dict[str, Any]]:
     if inputs.get("applyExamTarget"):
         active = active_targets(inputs)
         exam = {"exam_target_scores": active["question"], "exam_target_max_rank_move": active["rankMove"]}
+    bulk = dict(inputs["bulk"])
+    matcher = request.build.available_concept_thread_matcher() if request.allow_concept_thread else None
+    if matcher is not None:
+        bulk["conceptThreadMatcher"] = matcher
     return get_questions_from_bulk(
-        request.concept_id, request.concept, 1, inputs["bulk"],
+        request.concept_id, request.concept, 1, bulk,
         selected_question_ids=request.build.selected_question_ids,
         selected_question_variant_groups=request.build.selected_question_variant_groups,
         difficulty_plan=[request.difficulty],
@@ -172,6 +177,12 @@ def _missing_required_mastery_evidence(inputs: dict[str, Any], requirement: int)
 def create_session_build(inputs: dict[str, Any], plan: dict[str, Any]) -> SessionBuildState:
     size, bulk = inputs["size"], inputs["bulk"]
     build = _initial_build_state(inputs, plan, size, bulk)
+    if inputs.get("conceptThreadAnchors"):
+        from .concept_thread import prepare_concept_thread_matcher
+
+        build.prepared_concept_thread_matcher = prepare_concept_thread_matcher(
+            list(inputs["conceptThreadAnchors"]), inputs["nowMs"]
+        )
     build.mastered_reentry_counter = {"masteredServed": 0}
     build.selected_core_target_seats = 0
     build.selected_surplus_target_seats = 0
@@ -245,5 +256,27 @@ def _simulation_registry(inputs: dict[str, Any]):
 CONCEPT_THREAD_POLICY_VERSION = "clinical-thread-facets-v1"
 
 
-def thread_trace() -> dict[str, Any]:
-    return {"conceptThreadPolicyVersion": CONCEPT_THREAD_POLICY_VERSION, "conceptThreadPolicyApplied": False}
+def question_thread_fields(question: dict[str, Any], fallback_reason: str) -> dict[str, Any]:
+    match = question.get("conceptThreadMatch")
+    return {"interventionReason": "concept_followup" if match else fallback_reason, **thread_trace(match)}
+
+
+def record_question_thread_selection(build: SessionBuildState, question: dict[str, Any], added: bool) -> None:
+    if added and question.get("conceptThreadMatch"):
+        build.concept_thread_followup_selected = True
+
+
+def thread_trace(match: dict[str, Any] | None = None) -> dict[str, Any]:
+    trace = {"conceptThreadPolicyVersion": CONCEPT_THREAD_POLICY_VERSION, "conceptThreadPolicyApplied": False}
+    if match:
+        trace.update({
+            "conceptThreadPolicyApplied": True,
+            "conceptThreadAnchorEventId": match["anchorEventId"],
+            "conceptThreadAnchorItemId": match["anchorItemId"],
+            "conceptThreadAnchorFacet": match["anchorFacet"],
+            "conceptThreadTargetFacet": match["targetFacet"],
+            "conceptThreadSharedTopic": match["sharedTopic"],
+            "conceptThreadAgeMs": match["ageMs"],
+            "conceptThreadInterveningExposures": match["interveningExposures"],
+        })
+    return trace

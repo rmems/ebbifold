@@ -13,18 +13,19 @@ import math
 from typing import Any
 
 from .build_state import TEACHING_ARC_TARGET_ITEMS, question_suppression_key
-from .errors import UnsupportedSchedulerInput
-from .lanes import thread_trace
+from .cluster_card_selection import select_cluster_cards
+from .cluster_eligibility import eligible_rows, restricted
+from .deck_strand_mix import order_by_deck_strands
+from .lane_utils import thread_trace
+from .prep_allocation import order_session_prep_candidates
 from .queue import break_modality_runs, compute_concept_pairing_rate, order_by_manifold_walk
 from .scoring import classify_teaching_state, enforce_concept_teaching_caps
 
 
 def _check(inputs: dict[str, Any]) -> None:
-    options = inputs["options"]
-    if inputs.get("deckStrandMix") or options.get("sessionPrepBlend") or options.get("media") is not None:
-        raise UnsupportedSchedulerInput("cluster fallback strand/prep/media lanes are not ported in Phase 3a")
-    if options.get("crossSourceRotations") or inputs.get("week") is not None:
-        raise UnsupportedSchedulerInput("cluster fallback eligibility restriction is not ported in Phase 3a")
+    mix = inputs.get("deckStrandMix")
+    if mix is not None and not isinstance(mix.get("strands"), list):
+        raise ValueError("deckStrandMix must be a serializable strand mapping")
 
 
 def _cluster_states(clusters: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -38,77 +39,33 @@ def _cluster_states(clusters: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return states
 
 
-def _next_cluster_card(inputs: dict[str, Any], cluster: dict[str, Any], sel_cards: set[str], groups: set[str]) -> dict[str, Any] | None:
-    pool = [r for r in (inputs.get("clusterCards") or {}).get(cluster["clusterId"], []) if r["id"] not in sel_cards][:12]
-    return next((r for r in pool if not r.get("variantGroupId") or r["variantGroupId"] not in groups), None)
-
-
-def _cluster_card_item(inputs: dict[str, Any], cluster: dict[str, Any], picked: dict[str, Any]) -> dict[str, Any]:
-    return {"type": "card", "id": picked["id"], "conceptId": cluster["clusterId"],
-            "conceptName": cluster["clusterName"], "priority": cluster["priority"],
-            "interventionReason": "weak_recall" if cluster["mastery"] < 0.6 else "reinforcement",
-            "rotation": inputs["rotation"], "topics": picked["topics"], "complexity": picked.get("complexity"),
-            "clusterId": picked.get("clusterId"), "variantGroupId": picked.get("variantGroupId"),
-            "variantIndex": picked.get("variantIndex"), "variantType": picked.get("variantType"),
-            "firstSightAtSelection": picked["firstSightAtSelection"]}
-
-
-def _select_cluster_cards(
-    inputs: dict[str, Any], states: list[dict[str, Any]], target_cards: int, sel_cards: set[str]
-) -> tuple[list[dict[str, Any]], set[str], dict[str, int], set[str], int]:
-    items: list[dict[str, Any]] = []
-    card_groups: set[str] = set()
-    per_cluster: dict[str, int] = {}
-    selected_clusters: set[str] = set()
-    card_count = 0
-    pass_no = 0
-    while card_count < target_cards:
-        added = 0
-        for cluster in states:
-            if card_count >= target_cards:
-                break
-            already = per_cluster.get(cluster["clusterId"], 0)
-            if already >= 2 + pass_no:
-                continue
-            picked = _next_cluster_card(inputs, cluster, sel_cards, card_groups)
-            if picked is None:
-                continue
-            items.append(_cluster_card_item(inputs, cluster, picked))
-            sel_cards.add(picked["id"])
-            if picked.get("variantGroupId"):
-                card_groups.add(picked["variantGroupId"])
-            card_count += 1
-            per_cluster[cluster["clusterId"]] = already + 1
-            selected_clusters.add(cluster["clusterId"])
-            added += 1
-        if added == 0:
-            break
-        pass_no += 1
-    return items, card_groups, per_cluster, selected_clusters, card_count
-
-
 def construct_cluster_session(inputs: dict[str, Any]) -> dict[str, Any]:
     _check(inputs)
     size, card_ratio = inputs["size"], inputs["cardRatio"]
     max_new = inputs["effectiveMaxNewCards"]
     required = min(size, max(0, math.floor(inputs["options"].get("minFirstSightItems") or 0)))
     clusters = list(inputs.get("clusterMastery") or [])
-    if not clusters:
+    if not clusters and inputs["options"].get("media") is None:
         return {"items": [], "noveltyQuota": {"required": required, "selected": 0},
                 "stats": {"totalConcepts": 0, "weakConcepts": 0, "selectedConcepts": 0, "cardCount": 0,
                           "questionCount": 0, "averagePriority": 0}}
     states = _cluster_states(clusters)
+    if restricted(inputs):
+        states = [s for s in states if eligible_rows(inputs, (inputs.get("clusterCards") or {}).get(s["clusterId"], []))]
     target_cards = math.ceil(size * card_ratio)
     target_questions = size - target_cards
     sel_cards = set(inputs["excludedCardIds"])
     sel_questions = set(inputs["excludedQuestionIds"])
     question_groups: set[str] = set()
-    items, card_groups, per_cluster, selected_clusters, card_count = _select_cluster_cards(
-        inputs, states, target_cards, sel_cards
-    )
+    if restricted(inputs) and not states and inputs["options"].get("media") is None:
+        return {"items": [], "noveltyQuota": {"required": required, "selected": 0},
+                "stats": {"totalConcepts": 0, "weakConcepts": 0, "selectedConcepts": 0, "cardCount": 0,
+                          "questionCount": 0, "averagePriority": 0}}
+    items, selected_clusters, strand_identities = select_cluster_cards(inputs, states, target_cards)
     ctx = {"states": states, "items": items, "required": required, "selectedClusters": selected_clusters,
            "selCards": sel_cards, "questionGroups": question_groups, "selQuestions": sel_questions,
-           "targetQuestions": target_questions, "maxNew": max_new, "size": size}
+           "targetQuestions": target_questions, "maxNew": max_new, "size": size,
+           "strandIdentities": strand_identities}
     return _finish_cluster_session(inputs, ctx)
 
 
@@ -191,11 +148,12 @@ def _cluster_scaffolds(items: list[dict[str, Any]], pool: list[dict[str, Any]], 
 
 
 def _append_cluster_questions(inputs: dict[str, Any], ctx: dict[str, Any], first_sight_q: set[str]) -> None:
-    count = max(ctx["targetQuestions"], ctx["required"])
+    count = max(ctx["size"] if inputs["options"].get("media") else ctx["targetQuestions"], ctx["required"])
     if count <= 0:
         return
     familiarity = inputs.get("questionFamiliarity") or {}
-    rows = [r for r in (inputs.get("clusterQuestions") or []) if r["id"] not in ctx["selQuestions"]][:count]
+    eligible = eligible_rows(inputs, inputs.get("clusterQuestions") or [])
+    rows = [r for r in eligible if r["id"] not in ctx["selQuestions"]][:count]
     for q in rows:
         if q["id"] not in familiarity:
             first_sight_q.add(q["id"])
@@ -260,6 +218,36 @@ def _reconcile_first_sight_quota(
         fs += 1
 
 
+def _strand_identity_map(inputs: dict[str, Any]) -> dict[tuple[str, str], dict[str, Any]]:
+    identities: dict[tuple[str, str], dict[str, Any]] = {}
+    for rows in (inputs.get("clusterCards") or {}).values():
+        for row in rows:
+            identities[("card", row["id"])] = {"rotation": row.get("rotation"), "sourceFile": row.get("sourceFile")}
+    for row in inputs.get("clusterQuestions") or []:
+        identities[("question", row["id"])] = {"rotation": row.get("rotation"), "sourceFile": row.get("sourceFile")}
+    for row in inputs.get("clusterScaffolds") or []:
+        identities[("card", row["id"])] = {"rotation": row.get("rotation"), "sourceFile": row.get("sourceFile")}
+    return identities
+
+
+def _order_cluster_strands(inputs: dict[str, Any], items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    mix = inputs.get("deckStrandMix")
+    if not mix or not mix.get("strands"):
+        return items
+    identities = _strand_identity_map(inputs)
+
+    def identify(item: dict[str, Any]) -> dict[str, Any]:
+        return identities.get((item["type"], item["id"])) or {
+            "rotation": item.get("rotation") or inputs["rotation"], "sourceFile": None,
+        }
+
+    return order_by_deck_strands(
+        items, mix, seed=inputs["servingRotationSeed"], identify=identify,
+        keep_with_previous=lambda item: item.get("interventionReason") == "preemptive_scaffold",
+        share_basis="present",
+    )
+
+
 def _finish_cluster_session(inputs: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
     items, required, size = ctx["items"], ctx["required"], ctx["size"]
     first_sight_q: set[str] = set()
@@ -268,7 +256,7 @@ def _finish_cluster_session(inputs: dict[str, Any], ctx: dict[str, Any]) -> dict
     _trim_to_first_sight_quota(items, required, size)
     ordered = order_by_manifold_walk(items, inputs.get("itemEmbeddings") or {})
     scaffolds = [] if ctx["maxNew"] == 0 else [
-        c for c in (inputs.get("clusterScaffolds") or [])
+        c for c in eligible_rows(inputs, inputs.get("clusterScaffolds") or [])
         if c["id"] not in ctx["selCards"] and c.get("clusterId") in ctx["selectedClusters"]
     ]
     paired = _cluster_scaffolds(
@@ -279,15 +267,24 @@ def _finish_cluster_session(inputs: dict[str, Any], ctx: dict[str, Any]) -> dict
         s["clusterId"]: TEACHING_ARC_TARGET_ITEMS[classify_teaching_state(s["cardsReviewed"], s["mastery"], s["mastery"])]
         for s in ctx["states"]
     }
-    reconciled = list(enforce_concept_teaching_caps(paired, lambda cid: caps.get(cid, 3)))
+    prep_keys = set((inputs["options"].get("sessionPrepBlend") or {}).get("itemIds") or [])
+    reconciled = list(enforce_concept_teaching_caps(
+        paired, lambda cid: caps.get(cid, 3),
+        preserve=lambda item: f"{item['type']}:{item['id']}" in prep_keys,
+    ))
     _reconcile_first_sight_quota(reconciled, quota_candidates, required, size, caps)
-    final = break_modality_runs(reconciled)
+    final = break_modality_runs(_order_cluster_strands(inputs, reconciled))
     unseen_scaffolds = {c["id"] for c in scaffolds}
     tagged = [
         {**i, "firstSightAtSelection": i["firstSightAtSelection"] if i.get("firstSightAtSelection") is not None
          else i["id"] in unseen_scaffolds}
         for i in final
     ]
+    tagged = order_session_prep_candidates(
+        tagged, inputs["options"].get("sessionPrepBlend"), size=size,
+        key=lambda item: f"{item['type']}:{item['id']}",
+        protected=lambda item: item.get("interventionReason") in {"failure_escalation", "needs_retest"},
+    )
     avg = sum(i["priority"] for i in tagged) / len(tagged) if tagged else 0
     return {"items": tagged, "noveltyQuota": {"required": required,
                                               "selected": sum(1 for i in tagged if i["firstSightAtSelection"])},

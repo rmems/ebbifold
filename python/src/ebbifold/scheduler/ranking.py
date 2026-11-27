@@ -12,6 +12,7 @@ import math
 from collections.abc import Mapping
 from typing import Any
 
+from .concept_thread_ranking import attach_thread_matches, find_thread_matches, promote_thread_matches
 from .difficulty import QUESTION_DIFFICULTIES, build_difficulty_plan, get_effective_question_difficulty
 from .errors import UnsupportedSchedulerInput
 from .policies import (
@@ -414,8 +415,13 @@ def get_questions_from_bulk(
     review_challenge_gap: bool | None = None,
     challenge_slot_index: int = 0,
 ) -> list[dict[str, Any]]:
-    if concept_thread_anchors:
-        raise UnsupportedSchedulerInput("concept-thread question matching is not ported in Phase 3a")
+    if concept_thread_anchors and not bulk.get("conceptThreadMatcher"):
+        now_ms = bulk.get("conceptThreadNowMs")
+        if now_ms is None:
+            raise UnsupportedSchedulerInput("raw concept-thread anchors require a prepared matcher or conceptThreadNowMs")
+        from .concept_thread import prepare_concept_thread_matcher
+
+        bulk = {**bulk, "conceptThreadMatcher": prepare_concept_thread_matcher(concept_thread_anchors, now_ms)}
     if not question_eligible_for_review_learning(
         review_challenge, demonstrated_gap=review_challenge_gap, difficulty="hard" if review_challenge == 2 else None
     ):
@@ -463,11 +469,14 @@ def get_questions_from_bulk(
             by_difficulty[d] = [c for c in rows if not (c.get("format") and c["format"] in seen_formats)] + [
                 c for c in rows if c.get("format") and c["format"] in seen_formats
             ]
+    thread_matches = find_thread_matches(by_difficulty, bulk.get("conceptThreadMatcher"), concept_id)
+
     familiarity = bulk["questionFamiliarity"]
     if familiarity:
         for d, rows in by_difficulty.items():
             fresh = partition_by_freshness(rows, lambda c: c["id"], familiarity)
             by_difficulty[d] = prioritize_least_recently_served_contrast_siblings(fresh, lambda c: c["id"], familiarity)
+    promote_thread_matches(by_difficulty, thread_matches, familiarity)
     if review_challenge:
         for d, rows in by_difficulty.items():
             unseen = [c for c in rows if c["id"] not in familiarity]
@@ -478,13 +487,14 @@ def get_questions_from_bulk(
             pref.sort(key=lambda r: (r[0], r[1]))
             it = iter(pref)
             by_difficulty[d] = [c if c["id"] in familiarity else next(it)[2] for c in rows]
-    return _take_questions(
+    selected = _take_questions(
         by_difficulty, endpoint_plan, limit, familiarity, selected_question_ids, selected_question_variant_groups,
-        mastered_reentry_counter, review_challenge, challenge_slot_index,
+        mastered_reentry_counter, review_challenge, challenge_slot_index, thread_matches,
     )
+    return attach_thread_matches(selected, thread_matches)
 
 
-def _take_questions(by_difficulty, endpoint_plan, limit, familiarity, selected_ids, selected_groups, counter, level, slot):
+def _take_questions(by_difficulty, endpoint_plan, limit, familiarity, selected_ids, selected_groups, counter, level, slot, thread_matches=None):
     def take_next(difficulty: str, unseen_only: bool = False) -> dict[str, Any] | None:
         rows = by_difficulty.get(difficulty)
         if not rows:
@@ -519,7 +529,10 @@ def _take_questions(by_difficulty, endpoint_plan, limit, familiarity, selected_i
             if c["id"] not in selected_ids and not ((g := _suppression_key(c)) and g in selected_groups)
         ), None)
         shifted = shift_question_difficulty(difficulty, level or 0, slot + len(selected))
-        may_shift = baseline is not None and baseline["id"] not in familiarity
+        may_shift = (
+            baseline is not None and baseline["id"] not in familiarity
+            and baseline["id"] not in (thread_matches or {})
+        )
         if level == 2:
             picked = take_next(shifted, True) or take_next(shifted)
         elif may_shift and shifted != difficulty:

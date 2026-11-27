@@ -59,8 +59,8 @@ class SessionBuildState:
         weak_concepts: Sequence[Any] = (),
         concept_thread_anchors: Sequence[Any] = (),
     ) -> None:
-        if concept_thread_anchors:
-            raise UnsupportedSchedulerInput("concept-thread follow-up matching is not ported in Phase 3a")
+        from .concept_thread import prepare_concept_thread_matcher
+
         self.size = size
         self.min_first_sight_items = min_first_sight_items
         self.max_new_cards = max_new_cards
@@ -90,10 +90,17 @@ class SessionBuildState:
         self.first_sight_selected = 0
         self.enforce_first_sight_reservation = min_first_sight_items > 0
         self.deferred_for_novelty: dict[str, dict[str, Any]] = {}
+        self.concept_thread_followup_selected = False
+        self.prepared_concept_thread_matcher = prepare_concept_thread_matcher(list(concept_thread_anchors), 0)
         self.trace: list[dict[str, Any]] = []
         for cs in weak_concepts:
             state = classify_teaching_state(cs.exposureCount, cs.recallOnExamDay, cs.confidence)
             self.concept_teaching_cap[cs.conceptId] = TEACHING_ARC_TARGET_ITEMS[state]
+
+    def available_concept_thread_matcher(self):
+        if self.concept_thread_followup_selected:
+            return None
+        return self.prepared_concept_thread_matcher
 
     def is_first_sight_item(self, item: Mapping[str, Any]) -> bool:
         if item["type"] == "card":
@@ -224,4 +231,8 @@ class SessionBuildState:
             for item in list(self.deferred_for_novelty.values()):
                 if len(self.selected_items) >= self.size:
                     break
-                self.add_item(item)
+                is_thread_followup = item.get("interventionReason") == "concept_followup"
+                if is_thread_followup and self.concept_thread_followup_selected:
+                    continue
+                if self.add_item(item) and is_thread_followup:
+                    self.concept_thread_followup_selected = True
