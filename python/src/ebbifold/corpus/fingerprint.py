@@ -107,16 +107,32 @@ _COMPARISON_RE = re.compile(
     r"\bdistinguishe?s?\b|\bdifferentiate\b|\bcompared to\b|\bcompared with\b|\b versus \b|\b vs\.? \b|\b(?:more|less) likely than\b|\bbetter discriminat(?:es|ing)\b|\bbest discriminator\b",
     re.IGNORECASE,
 )
-_MECHANISM_RE = re.compile(
-    r"\bwhat is the (?:underlying )?mechanism\b|\bwhy does\b|\bwhy is\b|\bwhy are\b|\bwhat causes\b|\bwhich (?:mediator|cytokine|receptor|channel|enzyme|pathway)\b|\bvia which receptor\b|\bbest explains? the (?:cause|mechanism|pathophysiology)\b|\bwhat (?:is|are) responsible for\b|\bwhat underlies\b|\bwhat drives the\b|\bprimary driver\b|^why\b|\bwhy\??\s*$",
-    re.IGNORECASE,
+def _compile_all(patterns: tuple[str, ...]) -> tuple[re.Pattern[str], ...]:
+    return tuple(re.compile(pattern, re.IGNORECASE) for pattern in patterns)
+
+
+def _matches_any(patterns: tuple[re.Pattern[str], ...], text: str) -> bool:
+    return any(pattern.search(text) for pattern in patterns)
+
+
+_MECHANISM_RES = _compile_all(
+    (
+        r"\bwhat is the (?:underlying )?mechanism\b|\bwhat causes\b",
+        r"\bwhy does\b|\bwhy is\b|\bwhy are\b|^why\b|\bwhy\??\s*$",
+        r"\bwhich (?:mediator|cytokine|receptor|channel|enzyme|pathway)\b|\bvia which receptor\b",
+        r"\bbest explains? the (?:cause|mechanism|pathophysiology)\b",
+        r"\bwhat (?:is|are) responsible for\b|\bwhat underlies\b|\bwhat drives the\b|\bprimary driver\b",
+    )
 )
 _LAB_TABLE_RE = re.compile(r"\|\s*[^|\n]+\|[^|\n]+\|")
-_LAB_VALUES_RE = re.compile(
-    r"\bABG\b|\bVBG\b|\bblood gas\b|\bPaCO[₂2]?\b|\bPaO[₂2]?\b|\bHCO[₃3]?\b|\bspo[₂2]\b|\bsao[₂2]\b|\bfio[₂2]\b|\betco[₂2]\b|\banion gap\b|\blactate\b",
-    re.IGNORECASE,
+_LAB_VALUES_RES = _compile_all(
+    (
+        r"\bABG\b|\bVBG\b|\bblood gas\b|\banion gap\b|\blactate\b",
+        r"\bPaCO[₂2]?\b|\bPaO[₂2]?\b|\bHCO[₃3]?\b",
+        r"\bspo[₂2]\b|\bsao[₂2]\b|\bfio[₂2]\b|\betco[₂2]\b",
+    )
 )
-_INLINE_LAB_RE = re.compile(r"\bpH\s*\d+\.\d+\b|\bpH\s*\d{1}\.?\d?\b", re.IGNORECASE)
+_INLINE_LAB_RE = re.compile(r"\bpH\s*(?:\d+\.\d+|\d\.?\d?)\b", re.IGNORECASE)
 _INTERPRET_CUE_RE = re.compile(
     r"\binterpret(?:ation)?\b|\bmost likely interpretation\b|\bspirometry results\b|\bflow[/\\-]volume loop\b|\bECG (?:shows|demonstrates)\b|\bCXR (?:shows|demonstrates)\b",
     re.IGNORECASE,
@@ -124,9 +140,13 @@ _INTERPRET_CUE_RE = re.compile(
 _AGE_VIGNETTE_RE = re.compile(
     r"^\s*(?:a |an )?\d+[\-\s/]*(?:year|month|week|day)[\s-]*old\b", re.IGNORECASE
 )
-_PATIENT_VIGNETTE_RE = re.compile(
-    r"^\s*(?:a |an )\s*(?:[\w-]+\s+){0,3}(?:woman|man|child|infant|baby|newborn|girl|boy|patient|adolescent|teenager|elderly|pregnant|gravida|primigravida|multigravida)\b",
-    re.IGNORECASE,
+_PATIENT_VIGNETTE_RES = _compile_all(
+    (
+        r"^\s*(?:a |an )\s*(?:[\w-]+\s+){0,3}(?:woman|man|child|patient)\b",
+        r"^\s*(?:a |an )\s*(?:[\w-]+\s+){0,3}(?:infant|baby|newborn|girl|boy)\b",
+        r"^\s*(?:a |an )\s*(?:[\w-]+\s+){0,3}(?:adolescent|teenager|elderly)\b",
+        r"^\s*(?:a |an )\s*(?:[\w-]+\s+){0,3}(?:pregnant|gravida|primigravida|multigravida)\b",
+    )
 )
 _PROFESSIONAL_NARRATIVE_RE = re.compile(
     r"^\s*you are (?:a |an |the )?(?:gp|doctor|nurse|consultant|registrar|intern|resident|midwife|paramedic)\b",
@@ -138,38 +158,42 @@ _RECALL_OPENER_RE = re.compile(
 )
 
 
+def _is_interpretation(stripped: str, lower: str) -> bool:
+    return bool(
+        _LAB_TABLE_RE.search(stripped)
+        or _INTERPRET_CUE_RE.search(lower)
+        or (_INLINE_LAB_RE.search(stripped) and _matches_any(_LAB_VALUES_RES, lower))
+    )
+
+
+def _is_scenario(stripped: str) -> bool:
+    return bool(
+        _AGE_VIGNETTE_RE.search(stripped)
+        or _matches_any(_PATIENT_VIGNETTE_RES, stripped)
+        or _PROFESSIONAL_NARRATIVE_RE.search(stripped)
+    )
+
+
 def tag_format(stem: str, topics: list[str] | None, question_type: str | None) -> str:
     """Port of upstream's deterministic question-format heuristic."""
     stripped = (stem or "").strip()
-    lower = stripped.lower()
-    topic_values = [topic.lower() for topic in topics or []]
     if not stripped:
         return "unknown"
-    if _CLOZE_RE.search(stripped):
-        return "cloze"
-    if "trap" in topic_values or _TRAP_RE.search(lower):
-        return "trap"
-    if _COMPARISON_RE.search(lower):
-        return "comparison"
-    if _MECHANISM_RE.search(lower):
-        return "mechanism"
-    if _LAB_TABLE_RE.search(stripped):
-        return "interpretation"
-    if _INTERPRET_CUE_RE.search(lower):
-        return "interpretation"
-    if _INLINE_LAB_RE.search(stripped) and _LAB_VALUES_RE.search(lower):
-        return "interpretation"
-    if _AGE_VIGNETTE_RE.search(stripped):
-        return "scenario"
-    if _PATIENT_VIGNETTE_RE.search(stripped):
-        return "scenario"
-    if _PROFESSIONAL_NARRATIVE_RE.search(stripped):
-        return "scenario"
-    if _RECALL_OPENER_RE.search(stripped):
-        return "recall"
-    if question_type == "recall":
-        return "recall"
-    return "unknown"
+    lower = stripped.lower()
+    topic_values = [topic.lower() for topic in topics or []]
+    rules = (
+        ("cloze", lambda: bool(_CLOZE_RE.search(stripped))),
+        ("trap", lambda: "trap" in topic_values or bool(_TRAP_RE.search(lower))),
+        ("comparison", lambda: bool(_COMPARISON_RE.search(lower))),
+        ("mechanism", lambda: _matches_any(_MECHANISM_RES, lower)),
+        ("interpretation", lambda: _is_interpretation(stripped, lower)),
+        ("scenario", lambda: _is_scenario(stripped)),
+        ("recall", lambda: bool(_RECALL_OPENER_RE.search(stripped))),
+    )
+    for tag, matches in rules:
+        if matches():
+            return tag
+    return "recall" if question_type == "recall" else "unknown"
 
 
 def citation_envelope(question: dict[str, Any]) -> dict[str, Any] | None:

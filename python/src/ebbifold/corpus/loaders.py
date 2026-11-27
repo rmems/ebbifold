@@ -82,6 +82,7 @@ EXPECTED_CORPUS_COUNTS = {
     "module_questions": 392,
     "cloze_cards": 2136,
 }
+JSON_GLOB = "*.json"
 PUBLIC_TEXT_LICENCES = frozenset({"CC-BY-4.0", "CC-BY-SA-4.0", "CC0-1.0"})
 PUBLIC_EVIDENCE_LICENCE_IDS = frozenset(
     {
@@ -224,62 +225,87 @@ def admit_attempt_payload(
         raise CorpusAdmissionError(_validation_error_messages(source, error)) from error
 
 
-def _question_audit_errors(
-    record: CorpusQuestion, raw: dict[str, Any], source: str
-) -> list[str]:
+def _answer_key_errors(record: CorpusQuestion, source: str) -> list[str]:
     errors: list[str] = []
     labels = [option.label for option in record.options]
     if len(labels) != len(set(labels)):
         errors.append(f"{source}: answer-key integrity: duplicate option label")
-    correct = [option for option in record.options if option.is_correct]
-    if len(correct) != 1:
+    correct_count = sum(1 for option in record.options if option.is_correct)
+    if correct_count != 1:
         errors.append(
-            f"{source}: answer-key integrity: expected exactly one correct option, found {len(correct)}"
+            f"{source}: answer-key integrity: expected exactly one correct option, found {correct_count}"
         )
     if any(not option.explanation or not option.explanation.strip() for option in record.options):
         errors.append(f"{source}: every option requires an explanation")
+    return errors
 
+
+def _step1_evidence_errors(record: Step1QuestionRecord, source: str) -> list[str]:
+    evidence = record.public_usmle.evidence
+    if not isinstance(evidence, PassageEvidence):
+        return [f"{source}: citation presence: public Step 1 evidence must be a passage"]
+    licence = evidence.licence
+    if licence.cls != "foss" or licence.id.lower() not in PUBLIC_EVIDENCE_LICENCE_IDS:
+        return [f"{source}: evidence licence {licence.cls}/{licence.id} is not approved FOSS"]
+    return []
+
+
+def _step1_media_errors(record: Step1QuestionRecord, source: str) -> list[str]:
+    media = record.public_usmle.media
+    if not record.image_url:
+        if media is not None and media.kind == "asset":
+            return [f"{source}: media asset declared without imageUrl"]
+        return []
+    if media is None or media.kind != "asset":
+        return [f"{source}: image-bearing item lacks asset media provenance"]
+    licence = media.licence
+    if licence.cls != "foss" or licence.id.lower() not in PUBLIC_EVIDENCE_LICENCE_IDS:
+        return [f"{source}: media licence {licence.cls}/{licence.id} is not approved FOSS"]
+    return []
+
+
+def _step1_question_errors(record: Step1QuestionRecord, source: str) -> list[str]:
+    errors: list[str] = []
+    if not record.cite.strip():
+        errors.append(f"{source}: citation presence: Step 1 item has no cite")
+    provenance = record.public_usmle
+    if provenance.origin not in {"authored", "generated"}:
+        errors.append(f"{source}: provenance origin {provenance.origin} is not public")
+    if provenance.item_text.licence not in PUBLIC_TEXT_LICENCES:
+        errors.append(
+            f"{source}: item text licence {provenance.item_text.licence} is not distributable"
+        )
+    errors.extend(_step1_evidence_errors(record, source))
+    errors.extend(_step1_media_errors(record, source))
+    return errors
+
+
+def _module_question_errors(
+    record: ModuleQuestionRecord, raw: dict[str, Any], source: str
+) -> list[str]:
+    errors: list[str] = []
+    provenance = record.public_module
+    if provenance.discipline not in COHORT_DISCIPLINES:
+        errors.append(f"{source}: unknown module discipline {provenance.discipline}")
+    if f"cohort/{provenance.discipline}" not in record.module_nodes:
+        errors.append(f"{source}: moduleNodes missing cohort/{provenance.discipline}")
+    if record.image_url:
+        errors.append(f"{source}: module questions do not admit images in this release")
+    if provenance.review.verdict != "passed":
+        errors.append(f"{source}: module review has not passed")
+    if provenance.review.content_hash != module_item_content_hash(raw):
+        errors.append(f"{source}: module review content hash is stale")
+    return errors
+
+
+def _question_audit_errors(
+    record: CorpusQuestion, raw: dict[str, Any], source: str
+) -> list[str]:
+    errors = _answer_key_errors(record, source)
     if isinstance(record, Step1QuestionRecord):
-        if not record.cite.strip():
-            errors.append(f"{source}: citation presence: Step 1 item has no cite")
-        provenance = record.public_usmle
-        if provenance.origin not in {"authored", "generated"}:
-            errors.append(f"{source}: provenance origin {provenance.origin} is not public")
-        if provenance.item_text.licence not in PUBLIC_TEXT_LICENCES:
-            errors.append(
-                f"{source}: item text licence {provenance.item_text.licence} is not distributable"
-            )
-        if not isinstance(provenance.evidence, PassageEvidence):
-            errors.append(f"{source}: citation presence: public Step 1 evidence must be a passage")
-        else:
-            licence = provenance.evidence.licence
-            if licence.cls != "foss" or licence.id.lower() not in PUBLIC_EVIDENCE_LICENCE_IDS:
-                errors.append(
-                    f"{source}: evidence licence {licence.cls}/{licence.id} is not approved FOSS"
-                )
-        media = provenance.media
-        if record.image_url:
-            if media is None or media.kind != "asset":
-                errors.append(f"{source}: image-bearing item lacks asset media provenance")
-            elif media.licence.cls != "foss" or media.licence.id.lower() not in PUBLIC_EVIDENCE_LICENCE_IDS:
-                errors.append(
-                    f"{source}: media licence {media.licence.cls}/{media.licence.id} is not approved FOSS"
-                )
-        elif media is not None and media.kind == "asset":
-            errors.append(f"{source}: media asset declared without imageUrl")
+        errors.extend(_step1_question_errors(record, source))
     elif isinstance(record, ModuleQuestionRecord):
-        provenance = record.public_module
-        if provenance.discipline not in COHORT_DISCIPLINES:
-            errors.append(f"{source}: unknown module discipline {provenance.discipline}")
-        if f"cohort/{provenance.discipline}" not in record.module_nodes:
-            errors.append(f"{source}: moduleNodes missing cohort/{provenance.discipline}")
-        if record.image_url:
-            errors.append(f"{source}: module questions do not admit images in this release")
-        if provenance.review.verdict != "passed":
-            errors.append(f"{source}: module review has not passed")
-        actual_hash = module_item_content_hash(raw)
-        if provenance.review.content_hash != actual_hash:
-            errors.append(f"{source}: module review content hash is stale")
+        errors.extend(_module_question_errors(record, raw, source))
     return errors
 
 
@@ -290,7 +316,7 @@ def _load_question_tree(
 ) -> tuple[list[LoadedQuestion], list[str]]:
     errors: list[str] = []
     loaded: list[LoadedQuestion] = []
-    for path in sorted(directory.rglob("*.json")):
+    for path in sorted(directory.rglob(JSON_GLOB)):
         source = _repo_relative(path, repo_root)
         try:
             raw = _read_json(path)
@@ -331,152 +357,188 @@ def _id_list(raw: Any, key: str, path: Path) -> tuple[list[str], list[str]]:
     return list(value), errors
 
 
-def _validate_step1_registry(
-    registry_path: Path, questions: list[LoadedQuestion]
-) -> tuple[int, list[str]]:
-    errors: list[str] = []
+def _read_step1_registry(registry_path: Path) -> tuple[list[Any] | None, list[str]]:
     try:
         registry = _read_json(registry_path)
     except (OSError, json.JSONDecodeError) as error:
-        return 0, [f"{registry_path}: invalid source registry ({error})"]
-    errors.extend(_expect_manifest_object(registry, registry_path, 1))
+        return None, [f"{registry_path}: invalid source registry ({error})"]
+    errors = _expect_manifest_object(registry, registry_path, 1)
     sources = registry.get("sources") if isinstance(registry, dict) else None
     if not isinstance(sources, list):
-        return 0, [*errors, f"{registry_path}: sources must be an array"]
+        return None, [*errors, f"{registry_path}: sources must be an array"]
     if registry.get("quoteSetSha256") != open_usmle_quote_set_sha256(sources):
         errors.append(f"{registry_path}: quote-set digest does not match sources")
-    if registry.get("registrySha256") != open_usmle_registry_sha256(registry.get("verifiedAt", ""), sources):
+    if registry.get("registrySha256") != open_usmle_registry_sha256(
+        registry.get("verifiedAt", ""), sources
+    ):
         errors.append(f"{registry_path}: registry digest does not match sources")
+    return sources, errors
 
+
+def _index_step1_sources(
+    registry_path: Path, sources: list[Any]
+) -> tuple[dict[str, dict[str, Any]], set[str], list[str]]:
+    errors: list[str] = []
     source_by_id: dict[str, dict[str, Any]] = {}
     passage_keys: set[str] = set()
     for source in sources:
         if not isinstance(source, dict) or not isinstance(source.get("id"), str):
             errors.append(f"{registry_path}: source entry missing id")
             continue
-        if source["id"] in source_by_id:
-            errors.append(f"{registry_path}: duplicate source id {source['id']}")
-        source_by_id[source["id"]] = source
-        source_passage_ids: set[str] = set()
+        source_id = source["id"]
+        if source_id in source_by_id:
+            errors.append(f"{registry_path}: duplicate source id {source_id}")
+        source_by_id[source_id] = source
+        passage_ids: set[str] = set()
         for passage in source.get("passages", []):
-            if isinstance(passage, dict) and isinstance(passage.get("id"), str):
-                if passage["id"] in source_passage_ids:
-                    errors.append(
-                        f"{registry_path}: duplicate passage id {passage['id']} for source {source['id']}"
-                    )
-                source_passage_ids.add(passage["id"])
-                passage_keys.add(f"{source['id']}:{passage['id']}")
+            if not isinstance(passage, dict) or not isinstance(passage.get("id"), str):
+                continue
+            passage_id = passage["id"]
+            if passage_id in passage_ids:
+                errors.append(
+                    f"{registry_path}: duplicate passage id {passage_id} for source {source_id}"
+                )
+            passage_ids.add(passage_id)
+            passage_keys.add(f"{source_id}:{passage_id}")
+    return source_by_id, passage_keys, errors
 
+
+def _registered_passage(source: dict[str, Any], passage_id: str) -> dict[str, Any]:
+    return next(
+        passage
+        for passage in source.get("passages", [])
+        if isinstance(passage, dict) and passage.get("id") == passage_id
+    )
+
+
+def _step1_citation_errors(
+    item: LoadedQuestion,
+    evidence: PassageEvidence,
+    source_by_id: dict[str, dict[str, Any]],
+    passage_keys: set[str],
+) -> list[str]:
+    errors: list[str] = []
+    record = item.record
+    expected_cite = f"{evidence.source_id}#{evidence.passage_id}"
+    if record.cite != expected_cite:
+        errors.append(
+            f"{item.source_file}: citation presence: cite {record.cite!r} does not match evidence pointer {expected_cite!r}"
+        )
+    source = source_by_id.get(evidence.source_id)
+    if source is None:
+        errors.append(f"{item.source_file}: unknown evidence source {evidence.source_id}")
+        return errors
+
+    registered = source.get("licence", {})
+    if evidence.licence.cls != registered.get("cls") or evidence.licence.id.lower() != str(
+        registered.get("id", "")
+    ).lower():
+        errors.append(f"{item.source_file}: evidence licence differs from source registry")
+    key = f"{evidence.source_id}:{evidence.passage_id}"
+    if key not in passage_keys:
+        errors.append(f"{item.source_file}: unknown evidence passage {evidence.passage_id}")
+    elif not _registered_passage(source, evidence.passage_id).get("quote"):
+        errors.append(f"{item.source_file}: evidence passage has no checked-in quote")
+    return errors
+
+
+def _validate_step1_citations(
+    questions: list[LoadedQuestion],
+    source_by_id: dict[str, dict[str, Any]],
+    passage_keys: set[str],
+) -> tuple[int, list[str]]:
     checked = 0
+    errors: list[str] = []
     for item in questions:
         record = item.record
         if not isinstance(record, Step1QuestionRecord) or not isinstance(
             record.public_usmle.evidence, PassageEvidence
         ):
             continue
-        evidence = record.public_usmle.evidence
         checked += 1
-        expected_cite = f"{evidence.source_id}#{evidence.passage_id}"
-        if record.cite != expected_cite:
-            errors.append(
-                f"{item.source_file}: citation presence: cite {record.cite!r} does not match evidence pointer {expected_cite!r}"
-            )
-        source = source_by_id.get(evidence.source_id)
-        if source is None:
-            errors.append(f"{item.source_file}: unknown evidence source {evidence.source_id}")
-            continue
-        registered = source.get("licence", {})
-        if evidence.licence.cls != registered.get("cls") or evidence.licence.id.lower() != str(
-            registered.get("id", "")
-        ).lower():
-            errors.append(f"{item.source_file}: evidence licence differs from source registry")
-        key = f"{evidence.source_id}:{evidence.passage_id}"
-        if key not in passage_keys:
-            errors.append(f"{item.source_file}: unknown evidence passage {evidence.passage_id}")
-        else:
-            passage = next(
-                passage
-                for passage in source.get("passages", [])
-                if passage.get("id") == evidence.passage_id
-            )
-            if not passage.get("quote"):
-                errors.append(f"{item.source_file}: evidence passage has no checked-in quote")
+        errors.extend(
+            _step1_citation_errors(item, record.public_usmle.evidence, source_by_id, passage_keys)
+        )
     return checked, errors
 
 
-def load_step1_corpus(root: str | Path | None = None) -> Step1Corpus:
-    content_root = open_content_root(root)
-    repo_root = content_root.parent
-    step1_root = content_root / "usmle" / "step1"
-    loaded, errors = _load_question_tree(step1_root / "questions", repo_root=repo_root)
+def _validate_step1_registry(
+    registry_path: Path, questions: list[LoadedQuestion]
+) -> tuple[int, list[str]]:
+    sources, errors = _read_step1_registry(registry_path)
+    if sources is None:
+        return 0, errors
+    source_by_id, passage_keys, index_errors = _index_step1_sources(registry_path, sources)
+    errors.extend(index_errors)
+    checked, citation_errors = _validate_step1_citations(questions, source_by_id, passage_keys)
+    errors.extend(citation_errors)
+    return checked, errors
 
-    baseline_path = step1_root / "baseline-v1.json"
-    release_path = step1_root / "release-v1.json"
-    baseline_ids: list[str] = []
-    release_ids: list[str] = []
-    try:
-        baseline_raw = _read_json(baseline_path)
-        errors.extend(_expect_manifest_object(baseline_raw, baseline_path, 1))
-        baseline_ids, baseline_errors = _id_list(baseline_raw, "questionIds", baseline_path)
-        errors.extend(baseline_errors)
-    except (OSError, json.JSONDecodeError) as error:
-        errors.append(f"{baseline_path}: invalid baseline manifest ({error})")
-    try:
-        release_raw = _read_json(release_path)
-        errors.extend(_expect_manifest_object(release_raw, release_path, 2))
-        release_ids, release_errors = _id_list(release_raw, "questionIds", release_path)
-        errors.extend(release_errors)
-    except (OSError, json.JSONDecodeError) as error:
-        release_raw = {}
-        errors.append(f"{release_path}: invalid release manifest ({error})")
 
-    question_ids = {item.record.id for item in loaded}
-    errors.extend(
-        f"{baseline_path}: unknown baseline question {question_id}"
-        for question_id in baseline_ids
-        if question_id not in question_ids
-    )
+def _read_question_manifest(
+    path: Path, version: int, invalid_label: str
+) -> tuple[Any, list[str], list[str]]:
+    try:
+        raw = _read_json(path)
+    except (OSError, json.JSONDecodeError) as error:
+        return {}, [], [f"{path}: invalid {invalid_label} ({error})"]
+    errors = _expect_manifest_object(raw, path, version)
+    question_ids, id_errors = _id_list(raw, "questionIds", path)
+    errors.extend(id_errors)
+    return raw, question_ids, errors
+
+
+def _step1_membership_errors(
+    baseline_path: Path,
+    release_path: Path,
+    question_ids: set[str],
+    baseline_ids: list[str],
+    release_ids: list[str],
+) -> list[str]:
     release_id_set = set(release_ids)
-    errors.extend(
-        f"{release_path}: unknown release question {question_id}"
-        for question_id in release_ids
-        if question_id not in question_ids
-    )
-    errors.extend(
-        f"{release_path}: unreleased source question {question_id}"
-        for question_id in sorted(question_ids)
-        if question_id not in release_id_set
-    )
+    return [
+        *(f"{baseline_path}: unknown baseline question {question_id}"
+          for question_id in baseline_ids if question_id not in question_ids),
+        *(f"{release_path}: unknown release question {question_id}"
+          for question_id in release_ids if question_id not in question_ids),
+        *(f"{release_path}: unreleased source question {question_id}"
+          for question_id in sorted(question_ids) if question_id not in release_id_set),
+    ]
 
+
+def _step1_fingerprint_errors(
+    release_raw: Any,
+    release_path: Path,
+    loaded: list[LoadedQuestion],
+    release_id_set: set[str],
+    baseline_ids: list[str],
+) -> list[str]:
     fingerprints = release_raw.get("questionFingerprints") if isinstance(release_raw, dict) else None
     if not isinstance(fingerprints, dict):
-        errors.append(f"{release_path}: questionFingerprints must be an object")
-    else:
-        baseline_id_set = set(baseline_ids)
-        for item in loaded:
-            expected = fingerprints.get(item.record.id)
-            if item.record.id not in release_id_set:
-                continue
-            if not expected:
-                errors.append(f"{release_path}: missing release fingerprint {item.record.id}")
-                continue
-            actual = public_serving_fingerprint(
-                item.raw,
-                source_file=item.source_file,
-                baseline_question_ids=baseline_id_set,
-            )
-            if actual != expected:
-                errors.append(f"{release_path}: release fingerprint differs from source {item.record.id}")
+        return [f"{release_path}: questionFingerprints must be an object"]
 
-    citations_checked, registry_errors = _validate_step1_registry(
-        step1_root / "sources.json", loaded
-    )
-    errors.extend(registry_errors)
-    if citations_checked != len(loaded):
-        errors.append("citation presence: not every Step 1 question resolved a passage citation")
+    errors: list[str] = []
+    baseline_id_set = set(baseline_ids)
+    for item in loaded:
+        if item.record.id not in release_id_set:
+            continue
+        expected = fingerprints.get(item.record.id)
+        if not expected:
+            errors.append(f"{release_path}: missing release fingerprint {item.record.id}")
+            continue
+        actual = public_serving_fingerprint(
+            item.raw,
+            source_file=item.source_file,
+            baseline_question_ids=baseline_id_set,
+        )
+        if actual != expected:
+            errors.append(f"{release_path}: release fingerprint differs from source {item.record.id}")
+    return errors
 
-    if errors:
-        raise CorpusAdmissionError(errors)
+
+def _project_step1_questions(
+    loaded: list[LoadedQuestion], baseline_ids: list[str]
+) -> list[Step1QuestionRecord]:
     baseline_id_set = set(baseline_ids)
     questions: list[Step1QuestionRecord] = []
     for item in loaded:
@@ -488,8 +550,49 @@ def load_step1_corpus(root: str | Path | None = None) -> Step1Corpus:
                 update={"module_nodes": [*record.module_nodes, BASELINE_MODULE]}
             )
         questions.append(record)
+    return questions
+
+
+def load_step1_corpus(root: str | Path | None = None) -> Step1Corpus:
+    content_root = open_content_root(root)
+    repo_root = content_root.parent
+    step1_root = content_root / "usmle" / "step1"
+    loaded, errors = _load_question_tree(step1_root / "questions", repo_root=repo_root)
+
+    baseline_path = step1_root / "baseline-v1.json"
+    release_path = step1_root / "release-v1.json"
+    _, baseline_ids, baseline_errors = _read_question_manifest(
+        baseline_path, 1, "baseline manifest"
+    )
+    release_raw, release_ids, release_errors = _read_question_manifest(
+        release_path, 2, "release manifest"
+    )
+    errors.extend(baseline_errors)
+    errors.extend(release_errors)
+
+    question_ids = {item.record.id for item in loaded}
+    errors.extend(
+        _step1_membership_errors(
+            baseline_path, release_path, question_ids, baseline_ids, release_ids
+        )
+    )
+    errors.extend(
+        _step1_fingerprint_errors(
+            release_raw, release_path, loaded, set(release_ids), baseline_ids
+        )
+    )
+
+    citations_checked, registry_errors = _validate_step1_registry(
+        step1_root / "sources.json", loaded
+    )
+    errors.extend(registry_errors)
+    if citations_checked != len(loaded):
+        errors.append("citation presence: not every Step 1 question resolved a passage citation")
+
+    if errors:
+        raise CorpusAdmissionError(errors)
     return Step1Corpus(
-        questions=tuple(questions),
+        questions=tuple(_project_step1_questions(loaded, baseline_ids)),
         baseline_question_ids=tuple(baseline_ids),
         release_question_ids=tuple(release_ids),
         raw_questions=tuple(item.raw for item in loaded),
@@ -508,6 +611,88 @@ def load_step1_baseline(root: str | Path | None = None) -> list[Step1QuestionRec
     return [by_id[question_id] for question_id in corpus.baseline_question_ids]
 
 
+def _read_module_registry(registry_path: Path) -> tuple[dict[str, Any], list[str]]:
+    try:
+        registry = _read_json(registry_path)
+    except (OSError, json.JSONDecodeError) as error:
+        return {}, [f"{registry_path}: invalid source registry ({error})"]
+    sources = registry.get("sources")
+    if registry.get("schemaVersion") != 1 or not isinstance(sources, dict):
+        return {}, [f"{registry_path}: expected schemaVersion 1 with a sources map"]
+    return sources, []
+
+
+def _module_membership_errors(
+    release_path: Path, on_disk: set[str], release_ids: list[str]
+) -> list[str]:
+    released = set(release_ids)
+    return [
+        *(f"{release_path}: {question_id} is on disk but not in the release"
+          for question_id in sorted(on_disk) if question_id not in released),
+        *(f"{release_path}: {question_id} is released but its file is missing"
+          for question_id in release_ids if question_id not in on_disk),
+    ]
+
+
+def _module_release_maps(
+    release: Any, release_path: Path
+) -> tuple[dict[str, Any], dict[str, Any], Any, list[str]]:
+    fingerprints = release.get("questionFingerprints") if isinstance(release, dict) else None
+    release_sources = release.get("questionSources") if isinstance(release, dict) else None
+    source_fingerprints = (
+        release.get("questionSourceFingerprints") if isinstance(release, dict) else None
+    )
+    errors: list[str] = []
+    if not isinstance(fingerprints, dict):
+        errors.append(f"{release_path}: questionFingerprints must be an object")
+        fingerprints = {}
+    if not isinstance(release_sources, dict):
+        errors.append(f"{release_path}: questionSources must be an object")
+        release_sources = {}
+    return fingerprints, release_sources, source_fingerprints, errors
+
+
+def _module_source_error(source: Any) -> bool:
+    return (
+        not isinstance(source, dict)
+        or not str(source.get("url", "")).startswith("https://")
+        or not source.get("verifiedAt")
+    )
+
+
+def _module_item_errors(
+    item: LoadedQuestion,
+    *,
+    release_path: Path,
+    released: set[str],
+    fingerprints: dict[str, Any],
+    release_sources: dict[str, Any],
+    source_fingerprints: Any,
+    sources: dict[str, Any],
+    original: bool,
+) -> list[str]:
+    record = item.record
+    if not isinstance(record, ModuleQuestionRecord):
+        return []
+    errors: list[str] = []
+    actual = public_serving_fingerprint(item.raw, source_file=item.source_file)
+    if record.id in released and fingerprints.get(record.id) != actual:
+        errors.append(f"{release_path}: {record.id} serving fingerprint does not match its file")
+    cited = record.public_module.evidence.source_id
+    if record.id in released and release_sources.get(record.id) != cited:
+        errors.append(f"{release_path}: {record.id} release source differs from its file")
+    source = sources.get(cited)
+    if _module_source_error(source):
+        errors.append(f"{item.source_file}: cited source is absent from the checked-in registry")
+    elif original:
+        expected = (
+            source_fingerprints.get(record.id) if isinstance(source_fingerprints, dict) else None
+        )
+        if expected != module_source_fingerprint(cited, source):
+            errors.append(f"{release_path}: {record.id} citation differs from its reviewed release")
+    return errors
+
+
 def _validate_module_lane(
     items: list[LoadedQuestion],
     *,
@@ -515,68 +700,33 @@ def _validate_module_lane(
     registry_path: Path,
     original: bool,
 ) -> tuple[list[str], list[str]]:
-    errors: list[str] = []
-    try:
-        registry = _read_json(registry_path)
-        sources = registry.get("sources")
-        if registry.get("schemaVersion") != 1 or not isinstance(sources, dict):
-            errors.append(f"{registry_path}: expected schemaVersion 1 with a sources map")
-            sources = {}
-    except (OSError, json.JSONDecodeError) as error:
-        errors.append(f"{registry_path}: invalid source registry ({error})")
-        sources = {}
-    try:
-        release = _read_json(release_path)
-        errors.extend(_expect_manifest_object(release, release_path, 1))
-        release_ids, id_errors = _id_list(release, "questionIds", release_path)
-        errors.extend(id_errors)
-    except (OSError, json.JSONDecodeError) as error:
-        errors.append(f"{release_path}: invalid release manifest ({error})")
-        release = {}
-        release_ids = []
+    sources, errors = _read_module_registry(registry_path)
+    release, release_ids, manifest_errors = _read_question_manifest(
+        release_path, 1, "release manifest"
+    )
+    errors.extend(manifest_errors)
 
     on_disk = {item.record.id for item in items}
     released = set(release_ids)
-    errors.extend(
-        f"{release_path}: {question_id} is on disk but not in the release"
-        for question_id in sorted(on_disk)
-        if question_id not in released
+    errors.extend(_module_membership_errors(release_path, on_disk, release_ids))
+    fingerprints, release_sources, source_fingerprints, map_errors = _module_release_maps(
+        release, release_path
     )
-    errors.extend(
-        f"{release_path}: {question_id} is released but its file is missing"
-        for question_id in release_ids
-        if question_id not in on_disk
-    )
-
-    fingerprints = release.get("questionFingerprints") if isinstance(release, dict) else None
-    release_sources = release.get("questionSources") if isinstance(release, dict) else None
-    source_fingerprints = release.get("questionSourceFingerprints") if isinstance(release, dict) else None
-    if not isinstance(fingerprints, dict):
-        errors.append(f"{release_path}: questionFingerprints must be an object")
-        fingerprints = {}
-    if not isinstance(release_sources, dict):
-        errors.append(f"{release_path}: questionSources must be an object")
-        release_sources = {}
+    errors.extend(map_errors)
 
     for item in items:
-        record = item.record
-        if not isinstance(record, ModuleQuestionRecord):
-            continue
-        fingerprint = fingerprints.get(record.id)
-        actual = public_serving_fingerprint(item.raw, source_file=item.source_file)
-        if record.id in released and fingerprint != actual:
-            errors.append(f"{release_path}: {record.id} serving fingerprint does not match its file")
-        cited = record.public_module.evidence.source_id
-        if record.id in released and release_sources.get(record.id) != cited:
-            errors.append(f"{release_path}: {record.id} release source differs from its file")
-        source = sources.get(cited)
-        if not isinstance(source, dict) or not str(source.get("url", "")).startswith("https://") or not source.get("verifiedAt"):
-            errors.append(f"{item.source_file}: cited source is absent from the checked-in registry")
-        elif original:
-            expected_source_fingerprint = source_fingerprints.get(record.id) if isinstance(source_fingerprints, dict) else None
-            actual_source_fingerprint = module_source_fingerprint(cited, source)
-            if expected_source_fingerprint != actual_source_fingerprint:
-                errors.append(f"{release_path}: {record.id} citation differs from its reviewed release")
+        errors.extend(
+            _module_item_errors(
+                item,
+                release_path=release_path,
+                released=released,
+                fingerprints=fingerprints,
+                release_sources=release_sources,
+                source_fingerprints=source_fingerprints,
+                sources=sources,
+                original=original,
+            )
+        )
     return release_ids, errors
 
 
@@ -639,6 +789,93 @@ def _card_shard_suffix(card: ClozeCardRecord) -> str:
     return f"open-content/modules/cards/{card.discipline}/{match.group(1)}.json"
 
 
+def _card_placement_errors(
+    card: ClozeCardRecord, shard: ClozeCardShard, source: str
+) -> list[str]:
+    errors: list[str] = []
+    try:
+        expected_suffix = _card_shard_suffix(card)
+    except ValueError as error:
+        errors.append(f"{source}: {card.id}: {error}")
+        expected_suffix = None
+    if card.discipline != shard.discipline:
+        errors.append(f"{source}: {card.id}: discipline does not match shard")
+    if expected_suffix is not None and source != expected_suffix:
+        errors.append(f"{source}: {card.id}: belongs in {expected_suffix}")
+    return errors
+
+
+def _load_card_shard(
+    path: Path, repo_root: Path
+) -> tuple[list[tuple[ClozeCardRecord, dict[str, Any], str]], list[str]]:
+    source = _repo_relative(path, repo_root)
+    try:
+        raw_shard = _read_json(path)
+        shard = ClozeCardShard.model_validate(raw_shard)
+    except (OSError, json.JSONDecodeError) as error:
+        return [], [f"{source}: invalid JSON ({error})"]
+    except ValidationError as error:
+        return [], _validation_error_messages(source, error)
+
+    errors: list[str] = []
+    cards: list[tuple[ClozeCardRecord, dict[str, Any], str]] = []
+    for raw_card, card in zip(raw_shard.get("cards", []), shard.cards, strict=True):
+        errors.extend(_card_placement_errors(card, shard, source))
+        cards.append((card, raw_card, source))
+    return cards, errors
+
+
+def _read_card_release(release_path: Path) -> tuple[Any, list[str], list[str]]:
+    try:
+        release = _read_json(release_path)
+    except (OSError, json.JSONDecodeError) as error:
+        return {}, [], [f"{release_path}: invalid card release ({error})"]
+    errors = _expect_manifest_object(release, release_path, 1)
+    release_ids, id_errors = _id_list(release, "cardIds", release_path)
+    errors.extend(id_errors)
+    return release, release_ids, errors
+
+
+def _index_cards(
+    cards: list[tuple[ClozeCardRecord, dict[str, Any], str]]
+) -> tuple[dict[str, tuple[ClozeCardRecord, dict[str, Any], str]], list[str]]:
+    errors: list[str] = []
+    on_disk: dict[str, tuple[ClozeCardRecord, dict[str, Any], str]] = {}
+    for card, raw, source in cards:
+        if card.id in on_disk:
+            errors.append(f"{source}: duplicate card id {card.id}")
+        on_disk[card.id] = (card, raw, source)
+    return on_disk, errors
+
+
+def _card_membership_errors(
+    release_path: Path,
+    on_disk: dict[str, tuple[ClozeCardRecord, dict[str, Any], str]],
+    release_ids: list[str],
+) -> list[str]:
+    released = set(release_ids)
+    return [
+        *(f"{release_path}: {card_id} is on disk but not in the release"
+          for card_id in sorted(on_disk) if card_id not in released),
+        *(f"{release_path}: {card_id} is released but its file is missing"
+          for card_id in release_ids if card_id not in on_disk),
+    ]
+
+
+def _card_fingerprint_errors(
+    release_path: Path,
+    on_disk: dict[str, tuple[ClozeCardRecord, dict[str, Any], str]],
+    release_ids: list[str],
+    fingerprints: dict[str, Any],
+) -> list[str]:
+    released = set(release_ids)
+    return [
+        f"{release_path}: {card_id} serving fingerprint does not match its file"
+        for card_id, (_, raw, _) in on_disk.items()
+        if card_id in released and fingerprints.get(card_id) != cohort_card_serving_fingerprint(raw)
+    ]
+
+
 def load_cloze_card_corpus(root: str | Path | None = None) -> ClozeCardCorpus:
     content_root = open_content_root(root)
     repo_root = content_root.parent
@@ -647,64 +884,28 @@ def load_cloze_card_corpus(root: str | Path | None = None) -> ClozeCardCorpus:
     errors: list[str] = []
     cards: list[tuple[ClozeCardRecord, dict[str, Any], str]] = []
 
-    for path in sorted((module_root / "cards").rglob("*.json")):
-        source = _repo_relative(path, repo_root)
-        try:
-            raw_shard = _read_json(path)
-            shard = ClozeCardShard.model_validate(raw_shard)
-        except (OSError, json.JSONDecodeError) as error:
-            errors.append(f"{source}: invalid JSON ({error})")
-            continue
-        except ValidationError as error:
-            errors.extend(_validation_error_messages(source, error))
-            continue
-        for raw_card, card in zip(raw_shard.get("cards", []), shard.cards, strict=True):
-            try:
-                expected_suffix = _card_shard_suffix(card)
-            except ValueError as error:
-                errors.append(f"{source}: {card.id}: {error}")
-                expected_suffix = None
-            if card.discipline != shard.discipline:
-                errors.append(f"{source}: {card.id}: discipline does not match shard")
-            if expected_suffix is not None and source != expected_suffix:
-                errors.append(f"{source}: {card.id}: belongs in {expected_suffix}")
-            cards.append((card, raw_card, source))
+    for path in sorted((module_root / "cards").rglob(JSON_GLOB)):
+        shard_cards, shard_errors = _load_card_shard(path, repo_root)
+        cards.extend(shard_cards)
+        errors.extend(shard_errors)
 
-    try:
-        release = _read_json(release_path)
-        errors.extend(_expect_manifest_object(release, release_path, 1))
-        release_ids, id_errors = _id_list(release, "cardIds", release_path)
-        errors.extend(id_errors)
-    except (OSError, json.JSONDecodeError) as error:
-        errors.append(f"{release_path}: invalid card release ({error})")
-        release = {}
-        release_ids = []
+    release, release_ids, release_errors = _read_card_release(release_path)
+    errors.extend(release_errors)
     fingerprints = release.get("cardFingerprints") if isinstance(release, dict) else None
     if not isinstance(fingerprints, dict):
         errors.append(f"{release_path}: cardFingerprints must be an object")
         fingerprints = {}
 
-    seen: set[str] = set()
-    on_disk: dict[str, tuple[ClozeCardRecord, dict[str, Any], str]] = {}
-    for card, raw, source in cards:
-        if card.id in seen:
-            errors.append(f"{source}: duplicate card id {card.id}")
-        seen.add(card.id)
-        on_disk[card.id] = (card, raw, source)
-    released = set(release_ids)
-    for card_id in sorted(on_disk):
-        if card_id not in released:
-            errors.append(f"{release_path}: {card_id} is on disk but not in the release")
-    for card_id in release_ids:
-        if card_id not in on_disk:
-            errors.append(f"{release_path}: {card_id} is released but its file is missing")
-    for card_id, (card, raw, source) in on_disk.items():
-        if card_id in released and fingerprints.get(card_id) != cohort_card_serving_fingerprint(raw):
-            errors.append(f"{release_path}: {card_id} serving fingerprint does not match its file")
+    on_disk, index_errors = _index_cards(cards)
+    errors.extend(index_errors)
+    errors.extend(_card_membership_errors(release_path, on_disk, release_ids))
+    errors.extend(_card_fingerprint_errors(release_path, on_disk, release_ids, fingerprints))
 
     if errors:
         raise CorpusAdmissionError(errors)
-    return ClozeCardCorpus(cards=tuple(card for card, _, _ in cards), release_card_ids=tuple(release_ids))
+    return ClozeCardCorpus(
+        cards=tuple(card for card, _, _ in cards), release_card_ids=tuple(release_ids)
+    )
 
 
 def load_cloze_cards(root: str | Path | None = None) -> list[ClozeCardRecord]:
@@ -719,7 +920,7 @@ def load_corpus(root: str | Path | None = None) -> CorpusSnapshot:
     all pass before a snapshot is returned.
     """
     content_root = open_content_root(root)
-    json_files = sorted(content_root.rglob("*.json"))
+    json_files = sorted(content_root.rglob(JSON_GLOB))
     parse_errors: list[str] = []
     for path in json_files:
         try:
