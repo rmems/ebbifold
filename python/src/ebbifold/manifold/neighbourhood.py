@@ -103,7 +103,8 @@ class ConceptManifold:
         sims = self.similarities(query)
         skip = set(exclude)
         result: list[Neighbour] = []
-        for i in np.lexsort((self._id_rank, -sims)):
+        ordering_scores = np.round(sims, 12)
+        for i in np.lexsort((self._id_rank, -ordering_scores)):
             if len(result) == k:
                 break
             concept_id = self._ids[i]

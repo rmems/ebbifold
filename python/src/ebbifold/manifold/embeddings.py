@@ -49,9 +49,13 @@ def validate_embeddings(
         )
     if not np.all(np.isfinite(array)):
         raise EmbeddingError("embeddings contain NaN or infinite values")
-    if count and np.any(np.linalg.norm(array, axis=1) <= 0.0):
+    with np.errstate(over="ignore", under="ignore"):
+        narrowed = array.astype(np.float32)
+    if not np.all(np.isfinite(narrowed)):
+        raise EmbeddingError("embeddings exceed the finite float32 range")
+    if count and np.any(np.linalg.norm(narrowed.astype(np.float64), axis=1) <= 0.0):
         raise EmbeddingError("embeddings contain a zero vector; cosine is undefined")
-    return array.astype(np.float32)
+    return narrowed
 
 
 class PrecomputedEmbeddingProvider:

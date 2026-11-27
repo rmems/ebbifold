@@ -103,7 +103,10 @@ class EmbeddingCache:
         vector = np.load(path, allow_pickle=False)
         if vector.dtype != _DTYPE or vector.shape != (self.dimensions,):
             raise EmbeddingError(f"corrupt cache entry {path}")
-        return vector.astype(np.float32, copy=False)
+        try:
+            return validate_embeddings(vector.reshape(1, -1), count=1, dimensions=self.dimensions)[0]
+        except EmbeddingError as exc:
+            raise EmbeddingError(f"corrupt cache entry {path}") from exc
 
     def put(self, text: str, vector: NDArray[np.floating]) -> Path:
         row = validate_embeddings(

@@ -152,6 +152,10 @@ def test_ties_break_by_concept_id_deterministically() -> None:
     got = manifold.neighbours(base, 4)
     assert [n.concept_id for n in got] == ["alpha", "beta", "zeta", "mu"]
     assert manifold.neighbours(base, 2, exclude={"alpha"})[0].concept_id == "beta"
+    reversed_manifold = ConceptManifold(list(reversed(ids)), vectors[::-1].copy(), dimensions=dim)
+    assert [n.concept_id for n in reversed_manifold.neighbours(base, 4)] == [
+        n.concept_id for n in got
+    ]
 
 
 def test_manifold_accessors(manifold_data) -> None:
@@ -173,6 +177,8 @@ def test_manifold_accessors(manifold_data) -> None:
         (["a", "a"], np.ones((2, 4)), "unique"),
         (["a"], np.ones((1, 3)), "shape"),
         (["a"], np.array([[1.0, np.nan, 0.0, 0.0]]), "NaN"),
+        (["a"], np.array([[1e39, 0.0, 0.0, 0.0]]), "float32 range"),
+        (["a"], np.array([[1e-50, 0.0, 0.0, 0.0]]), "zero vector"),
         (["a"], np.zeros((1, 4)), "zero vector"),
     ],
 )
@@ -288,6 +294,12 @@ def test_cache_rejects_tampered_manifest_and_entries(tmp_path: Path) -> None:
         cache.get("t"), np.array([1, 2, 3, 4], dtype=np.float32)
     )
     np.save(path, np.ones(3, dtype="<f4"))
+    with pytest.raises(EmbeddingError, match="corrupt"):
+        cache.get("t")
+    np.save(path, np.array([np.nan, 0, 0, 0], dtype="<f4"))
+    with pytest.raises(EmbeddingError, match="corrupt"):
+        cache.get("t")
+    np.save(path, np.zeros(4, dtype="<f4"))
     with pytest.raises(EmbeddingError, match="corrupt"):
         cache.get("t")
     (cache.directory / "manifest.json").write_text(
