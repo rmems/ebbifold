@@ -28,6 +28,21 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
+def _attempt_payload(**overrides):
+    payload = {
+        "schemaVersion": 1,
+        "attemptId": "attempt-1",
+        "sessionId": "session-1",
+        "questionId": "bank:usmle-step1:biochem-acetyl-coa-gate:v1",
+        "selectedLabel": "A",
+        "isCorrect": True,
+        "attemptNumber": 1,
+        "answeredAt": "2026-11-27T06:00:00Z",
+    }
+    payload.update(overrides)
+    return payload
+
+
 @pytest.fixture(scope="module")
 def snapshot():
     return load_corpus(REPO_ROOT)
@@ -94,17 +109,7 @@ def test_corrupted_fixture_record_is_rejected_by_admission_gate() -> None:
 
 
 def test_attempt_record_schema_and_model_admit_a_valid_attempt() -> None:
-    payload = {
-        "schemaVersion": 1,
-        "attemptId": "attempt-1",
-        "sessionId": "session-1",
-        "questionId": "bank:usmle-step1:biochem-acetyl-coa-gate:v1",
-        "selectedLabel": "A",
-        "isCorrect": True,
-        "attemptNumber": 1,
-        "answeredAt": "2026-11-27T06:00:00Z",
-        "timeToAnswerMs": 4500,
-    }
+    payload = _attempt_payload(timeToAnswerMs=4500)
     attempt = admit_attempt_payload(payload, repo_root=REPO_ROOT)
     assert attempt.question_id == payload["questionId"]
     assert attempt.attempt_number == 1
@@ -130,30 +135,14 @@ def test_image_media_requires_public_foss_licence() -> None:
 
 
 def test_attempt_record_schema_rejects_timezone_free_timestamp() -> None:
-    payload = {
-        "schemaVersion": 1,
-        "attemptId": "attempt-1",
-        "sessionId": "session-1",
-        "questionId": "bank:usmle-step1:biochem-acetyl-coa-gate:v1",
-        "selectedLabel": "A",
-        "isCorrect": True,
-        "attemptNumber": 1,
-        "answeredAt": "2026-11-27T06:00:00",
-    }
+    payload = _attempt_payload(answeredAt="2026-11-27T06:00:00")
     with pytest.raises(CorpusAdmissionError) as raised:
         admit_attempt_payload(payload, repo_root=REPO_ROOT)
     assert "date-time" in str(raised.value)
 
 
 def test_attempt_record_schema_rejects_missing_answer_result() -> None:
-    payload = {
-        "schemaVersion": 1,
-        "attemptId": "attempt-1",
-        "sessionId": "session-1",
-        "questionId": "bank:usmle-step1:biochem-acetyl-coa-gate:v1",
-        "selectedLabel": "A",
-        "attemptNumber": 1,
-        "answeredAt": "2026-11-27T06:00:00Z",
-    }
+    payload = _attempt_payload()
+    del payload["isCorrect"]
     with pytest.raises(CorpusAdmissionError):
         admit_attempt_payload(payload, repo_root=REPO_ROOT)
