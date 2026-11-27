@@ -19,70 +19,94 @@ CONCEPT_CADENCE_WINDOW = 6
 LEGACY_CONCEPT_PAIR_WINDOW = 3
 
 
-def order_by_manifold_walk(items: list[dict[str, Any]], embeddings: dict[str, list[float]],
-                           flow_axis: list[float] | None = None) -> list[dict[str, Any]]:
-    o = WALK_DEFAULTS
-    embedded = [i for i in items if i["id"] in embeddings]
-    unembedded = [i for i in items if i["id"] not in embeddings]
-    if len(embedded) < o["minItemsForWalk"]:
-        return list(items)
+def _walk_seed(embedded: list[dict[str, Any]]) -> dict[str, Any]:
     seed = embedded[0]
     for item in embedded[1:]:
         if item["priority"] > seed["priority"]:
             seed = item
+    return seed
+
+
+def _walk_similarity_score(similarity: float) -> float:
+    lo, hi = WALK_DEFAULTS["sweetSpotMin"], WALK_DEFAULTS["sweetSpotMax"]
+    if lo <= similarity <= hi:
+        return 1.0 - (abs(similarity - (lo + hi) / 2) / ((hi - lo) / 2)) * 0.3
+    if similarity > hi:
+        return 0.7 - (similarity - hi) * 2.0
+    return 0.7 - (lo - similarity) * 0.5
+
+
+def _walk_flow_score(current: list[float], candidate: list[float], flow_axis: list[float] | None) -> float:
+    if not flow_axis:
+        return 0.0
+    cur_dot = cand_dot = 0.0
+    for d in range(min(len(current), len(flow_axis))):
+        cur_dot += current[d] * flow_axis[d]
+        cand_dot += candidate[d] * flow_axis[d]
+    return math.tanh((cand_dot - cur_dot) * 3) * WALK_DEFAULTS["flowWeight"]
+
+
+def _walk_concept_proximity(walk: list[dict[str, Any]], candidate: dict[str, Any]) -> float:
+    weight = WALK_DEFAULTS["conceptPairWeight"]
+    if weight == 0 or not candidate.get("conceptId"):
+        return 0.0
+    cadence = weight < 0
+    window = CONCEPT_CADENCE_WINDOW if cadence else LEGACY_CONCEPT_PAIR_WINDOW
+    for k in range(1, min(window, len(walk)) + 1):
+        if walk[-k].get("conceptId") == candidate["conceptId"]:
+            return weight * ((window - k + 1) / window) if cadence else weight / k
+    return 0.0
+
+
+def _walk_candidate_score(
+    walk: list[dict[str, Any]], candidate: dict[str, Any], current: list[float], centroid: list[float],
+    embeddings: dict[str, list[float]], flow_axis: list[float] | None, consecutive: int,
+) -> float:
+    emb = embeddings[candidate["id"]]
+    sim_score = _walk_similarity_score(cosine_similarity(current, emb))
+    coverage = (1.0 - cosine_similarity(emb, centroid)) * 0.3
+    same_type_capped = candidate["type"] == walk[-1]["type"] and consecutive >= WALK_DEFAULTS["maxConsecutiveSameType"]
+    type_penalty = -0.5 if same_type_capped else 0
+    flow = _walk_flow_score(current, emb, flow_axis)
+    proximity = _walk_concept_proximity(walk, candidate)
+    return sim_score + coverage + type_penalty + flow + proximity
+
+
+def _update_centroid(centroid: list[float], new: list[float], count: int) -> None:
+    for d in range(len(centroid)):
+        centroid[d] = centroid[d] * ((count - 1) / count) + new[d] / count
+
+
+def order_by_manifold_walk(items: list[dict[str, Any]], embeddings: dict[str, list[float]],
+                           flow_axis: list[float] | None = None) -> list[dict[str, Any]]:
+    embedded = [i for i in items if i["id"] in embeddings]
+    unembedded = [i for i in items if i["id"] not in embeddings]
+    if len(embedded) < WALK_DEFAULTS["minItemsForWalk"]:
+        return list(items)
+    seed = _walk_seed(embedded)
     visited = {seed["id"]}
     walk = [seed]
-    dim = len(embeddings[seed["id"]])
     centroid = list(embeddings[seed["id"]])
     consecutive = 1
     while len(walk) < len(embedded):
-        current = embeddings[walk[-1]["id"]]
         current_type = walk[-1]["type"]
-        hard_cap = consecutive >= o["hardMaxConsecutiveSameType"]
+        hard_cap = consecutive >= WALK_DEFAULTS["hardMaxConsecutiveSameType"]
         require_switch = hard_cap and any(c["id"] not in visited and c["type"] != current_type for c in embedded)
         best_score, best = -math.inf, None
         for cand in embedded:
             if cand["id"] in visited or (require_switch and cand["type"] == current_type):
                 continue
-            emb = embeddings[cand["id"]]
-            sim = cosine_similarity(current, emb)
-            lo, hi = o["sweetSpotMin"], o["sweetSpotMax"]
-            if lo <= sim <= hi:
-                sim_score = 1.0 - (abs(sim - (lo + hi) / 2) / ((hi - lo) / 2)) * 0.3
-            elif sim > hi:
-                sim_score = 0.7 - (sim - hi) * 2.0
-            else:
-                sim_score = 0.7 - (lo - sim) * 0.5
-            coverage = (1.0 - cosine_similarity(emb, centroid)) * 0.3
-            type_penalty = -0.5 if cand["type"] == current_type and consecutive >= o["maxConsecutiveSameType"] else 0
-            flow = 0.0
-            if flow_axis:
-                cur_dot = cand_dot = 0.0
-                for d in range(min(len(current), len(flow_axis))):
-                    cur_dot += current[d] * flow_axis[d]
-                    cand_dot += emb[d] * flow_axis[d]
-                flow = math.tanh((cand_dot - cur_dot) * 3) * o["flowWeight"]
-            proximity = 0.0
-            weight = o["conceptPairWeight"]
-            if weight != 0 and cand.get("conceptId"):
-                cadence = weight < 0
-                window = CONCEPT_CADENCE_WINDOW if cadence else LEGACY_CONCEPT_PAIR_WINDOW
-                for k in range(1, min(window, len(walk)) + 1):
-                    if walk[-k].get("conceptId") == cand["conceptId"]:
-                        proximity = weight * ((window - k + 1) / window) if cadence else weight / k
-                        break
-            total = sim_score + coverage + type_penalty + flow + proximity
-            if total > best_score:
-                best_score, best = total, cand
+            score = _walk_candidate_score(
+                walk, cand, embeddings[walk[-1]["id"]], centroid, embeddings, flow_axis, consecutive
+            )
+            if score > best_score:
+                best_score, best = score, cand
         if best is None:
             break
         visited.add(best["id"])
         walk.append(best)
         consecutive = consecutive + 1 if best["type"] == current_type else 1
-        n = len(walk)
-        new = embeddings[best["id"]]
-        for d in range(dim):
-            centroid[d] = centroid[d] * ((n - 1) / n) + new[d] / n
+        _update_centroid(centroid, embeddings[best["id"]], len(walk))
     return distribute_evenly(walk, unembedded) if unembedded else walk
 
 
@@ -324,6 +348,35 @@ def _is_anchor(item: dict[str, Any]) -> bool:
     return False
 
 
+def _default_pairing_limit(items: list[dict[str, Any]]) -> int:
+    anchors = sum(1 for it in items if _is_anchor(it))
+    return max(2, min(max(2, anchors), max(2, len(items) // 3)))
+
+
+def _find_preemptive_scaffold(
+    candidates: list[dict[str, Any]], used: set[str], present: set[str], groups: set[str], left: set[str]
+) -> dict[str, Any] | None:
+    return next(
+        (
+            c for c in candidates
+            if c["id"] not in used and c["id"] not in present
+            and (not c.get("variantGroupId") or c["variantGroupId"] not in groups)
+            and bool(left) and any(t in left for t in _specific(c["topics"]))
+        ),
+        None,
+    )
+
+
+def _preemptive_scaffold_item(item: dict[str, Any], card: dict[str, Any], rotation: str) -> dict[str, Any]:
+    return {
+        "type": "card", "id": card["id"], "rotation": item["rotation"] if item.get("rotation") is not None else rotation,
+        "priority": 0.5, "conceptId": item.get("conceptId") or "", "conceptName": item.get("conceptName") or "",
+        "topics": card["topics"], "complexity": card.get("complexity"), "clusterId": card.get("clusterId"),
+        "variantGroupId": card.get("variantGroupId"), "interventionReason": "preemptive_scaffold",
+        "struggleIntervention": {"strategy": "preemptive", "isScaffold": True, "targetCardId": item["id"]},
+    }
+
+
 def inject_preemptive_scaffolds(items: list[dict[str, Any]], bulk: dict[str, Any], *, rotation_seed: str,
                                 step_down_concept_ids: set[str], max_pairings: int | None) -> list[dict[str, Any]]:
     if not step_down_concept_ids:
@@ -350,22 +403,13 @@ def inject_preemptive_scaffolds(items: list[dict[str, Any]], bulk: dict[str, Any
         nxt = items[i + 1] if i + 1 < len(items) else None
         if nxt and nxt["type"] == "card" and nxt.get("complexity") == 1:
             continue
-        left = _specific(item.get("topics"))
-        card = next((c for c in candidates if c["id"] not in used and c["id"] not in present
-                     and (not c.get("variantGroupId") or c["variantGroupId"] not in groups)
-                     and bool(left) and any(t in left for t in _specific(c["topics"]))), None)
+        card = _find_preemptive_scaffold(candidates, used, present, groups, _specific(item.get("topics")))
         if card is None:
             continue
         used.add(card["id"])
         if card.get("variantGroupId"):
             groups.add(card["variantGroupId"])
-        insertions[i] = {
-            "type": "card", "id": card["id"], "rotation": item["rotation"] if item.get("rotation") is not None else bulk["rotation"], "priority": 0.5,
-            "conceptId": item.get("conceptId") or "", "conceptName": item.get("conceptName") or "",
-            "topics": card["topics"], "complexity": card.get("complexity"), "clusterId": card.get("clusterId"),
-            "variantGroupId": card.get("variantGroupId"), "interventionReason": "preemptive_scaffold",
-            "struggleIntervention": {"strategy": "preemptive", "isScaffold": True, "targetCardId": item["id"]},
-        }
+        insertions[i] = _preemptive_scaffold_item(item, card, bulk["rotation"])
     if not insertions:
         return items
     out: list[dict[str, Any]] = []

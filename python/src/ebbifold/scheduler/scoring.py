@@ -96,6 +96,39 @@ def build_cluster_round_robin(
     return result
 
 
+def _teaching_cap_removals(
+    items: Sequence[Mapping[str, Any]], indexes: list[int], cap_value: float
+) -> set[int]:
+    cap = max(0, math.floor(cap_value))
+    excess = len(indexes) - cap
+    if excess <= 0:
+        return set()
+
+    def struggle(i: int) -> Mapping[str, Any]:
+        return items[i].get("struggleIntervention") or {}
+
+    scaffold = {i for i in indexes if struggle(i).get("isScaffold") is True}
+    mastery_core = {i for i in indexes if items[i].get("examTargetMasteryStage") == "scheduled-atomic-core"}
+    protected_ids = {struggle(i).get("targetCardId") for i in scaffold} - {None, ""}
+    removed: set[int] = set()
+
+    def remove_where(predicate: Callable[[int], bool]) -> None:
+        nonlocal excess
+        for index in reversed(indexes):
+            if excess <= 0:
+                break
+            if index in removed or not predicate(index):
+                continue
+            removed.add(index)
+            excess -= 1
+
+    remove_where(lambda i: i not in scaffold and i not in mastery_core and items[i]["id"] not in protected_ids)
+    remove_where(lambda i: i in scaffold)
+    remove_where(lambda i: i not in mastery_core)
+    remove_where(lambda i: True)
+    return removed
+
+
 def enforce_concept_teaching_caps(
     items: Sequence[Mapping[str, Any]], cap_for: Callable[[str], float]
 ) -> list[Mapping[str, Any]]:
@@ -108,36 +141,7 @@ def enforce_concept_teaching_caps(
 
     removed: set[int] = set()
     for concept_id, indexes in groups.items():
-        cap = max(0, math.floor(cap_for(concept_id)))
-        excess = len(indexes) - cap
-        if excess <= 0:
-            continue
-
-        def struggle(i: int) -> Mapping[str, Any]:
-            return items[i].get("struggleIntervention") or {}
-
-        scaffold = {i for i in indexes if struggle(i).get("isScaffold") is True}
-        mastery_core = {
-            i for i in indexes if items[i].get("examTargetMasteryStage") == "scheduled-atomic-core"
-        }
-        protected_ids = {struggle(i).get("targetCardId") for i in scaffold} - {None, ""}
-
-        def remove_where(predicate: Callable[[int], bool]) -> None:
-            nonlocal excess
-            for index in reversed(indexes):
-                if excess <= 0:
-                    break
-                if index in removed or not predicate(index):
-                    continue
-                removed.add(index)
-                excess -= 1
-
-        remove_where(
-            lambda i: i not in scaffold and i not in mastery_core and items[i]["id"] not in protected_ids
-        )
-        remove_where(lambda i: i in scaffold)
-        remove_where(lambda i: i not in mastery_core)
-        remove_where(lambda i: True)
+        removed.update(_teaching_cap_removals(items, indexes, cap_for(concept_id)))
     return [item for index, item in enumerate(items) if index not in removed]
 
 

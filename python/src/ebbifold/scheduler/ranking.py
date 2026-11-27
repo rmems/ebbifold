@@ -93,6 +93,179 @@ def _card_candidate(card: Mapping[str, Any]) -> dict[str, Any]:
     return {k: card.get(k) for k in CARD_FIELDS}
 
 
+class _CardRanker:
+    def __init__(
+        self, concept_id: str, bulk: Mapping[str, Any], penalty_context: Mapping[str, Any] | None,
+        current_teaching_week: int | None, exam_target_scores: Mapping[str, float] | None,
+        exam_target_max_rank_move: float, topic_teaching_weeks: Mapping[str, int] | None,
+        recent_figure_exposures: Mapping[str, Any] | None, figure_now_ms: float,
+        topic_recency_days: Mapping[str, float] | None, matching_seen: list[dict[str, Any]],
+    ) -> None:
+        self.concept_id = concept_id
+        self.bulk = bulk
+        self.current_teaching_week = current_teaching_week
+        self.exam_target_max_rank_move = exam_target_max_rank_move
+        self.topic_teaching_weeks = topic_teaching_weeks
+        self.recent_figure_exposures = recent_figure_exposures
+        self.figure_now_ms = figure_now_ms
+        self.topic_recency_days = topic_recency_days
+        self.vector_rank = build_rank_from_scores(bulk["cardScores"].get(concept_id), 200)
+        self.exam_scores = exam_target_scores if exam_target_scores is not None else bulk["cardExamRelevance"]
+        self.history = bulk["cardVariantGroupHistory"]
+        failed = bulk["failedStretchCardIds"]
+        self.step_down = bool(failed) and any(c["id"] in failed for c in matching_seen)
+        self.recent_ids = (penalty_context or {}).get("recentCardIds") or set()
+        self.recent_failures = (penalty_context or {}).get("recentFailureConceptIds") or set()
+
+    @staticmethod
+    def importance_boost(importance: Any) -> float:
+        return -10 if importance == 3 else -3 if importance == 2 else 0
+
+    def variant_boost(self, card: Mapping[str, Any]) -> float:
+        group = card.get("variantGroupId")
+        if group is None:
+            return 0
+        seen = self.history.get(group)
+        if not seen:
+            return 0
+        return 4 if card["id"] in seen else -4
+
+    def ladder(self, card: Mapping[str, Any]) -> float:
+        return complexity_ladder_boost(card.get("complexity"), "step-down" if self.step_down else "frontier")
+
+    def pacing(self, card: Mapping[str, Any]) -> float:
+        week = item_teaching_week(self.bulk["rotation"], card.get("sourceFile"), card["topics"], self.topic_teaching_weeks)
+        return curriculum_pacing_boost(week, self.current_teaching_week) + min(
+            curriculum_recency_boost(week, self.current_teaching_week),
+            dated_topic_recency_boost(card["topics"], self.topic_recency_days),
+        )
+
+    def figure(self, card: Mapping[str, Any]) -> float:
+        return figure_cooldown_boost(card.get("imageUrl"), self.recent_figure_exposures, self.figure_now_ms)
+
+    @staticmethod
+    def media(card: Mapping[str, Any]) -> float:
+        return media_presence_boost(card.get("imageUrl"), card.get("clipId"))
+
+    def soft(self, card: Mapping[str, Any]) -> float:
+        return self.pacing(card) + self.figure(card) + self.media(card)
+
+    def fallback_key(self, card: Mapping[str, Any]) -> tuple[float, float, float, float]:
+        importance = card.get("importance")
+        return (self.variant_boost(card), self.ladder(card), self.soft(card), -(1 if importance is None else importance))
+
+    def recent_neighbor(self, ordered: list[dict[str, Any]], enabled: bool) -> list[dict[str, Any]]:
+        if not enabled or not self.recent_ids or self.concept_id in self.recent_failures:
+            return ordered
+        rows = []
+        for i, card in enumerate(ordered):
+            penalty = recent_neighbor_signal(card.get("similarCards"), self.recent_ids)["penalty"]
+            rows.append((i + (penalty / MAX_RECENT_NEIGHBOR_PENALTY) * RECENT_NEIGHBOR_MAX_RANK_SINK, penalty, i, card))
+        rows.sort(key=lambda r: (r[0], r[1], r[2]))
+        return [r[3] for r in rows]
+
+    def nudge(self, ordered: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return apply_bounded_exam_target_nudge(
+            ordered, lambda c: self.exam_scores.get(c["id"]), self.exam_target_max_rank_move
+        )
+
+    def vector_key(self, card: Mapping[str, Any], base: float) -> float:
+        importance = card.get("importance")
+        return (
+            base + self.importance_boost(1 if importance is None else importance) + self.variant_boost(card)
+            + self.ladder(card) + self.pacing(card) + self.figure(card) + self.media(card)
+        )
+
+    def rank_candidates(self, candidates: list[dict[str, Any]], novelty: bool) -> list[dict[str, Any]]:
+        if self.vector_rank is None:
+            return self.recent_neighbor(self.nudge(sorted(candidates, key=self.fallback_key)), novelty)
+        ranked, unranked = [], []
+        for card in candidates:
+            base = self.vector_rank.get(card["id"])
+            if base is None:
+                unranked.append(card)
+            else:
+                ranked.append((self.vector_key(card, base), card))
+        ranked.sort(key=lambda r: r[0])
+        unranked.sort(key=self.fallback_key)
+        return self.recent_neighbor(self.nudge([c for _, c in ranked]), novelty) + self.recent_neighbor(
+            self.nudge(unranked), novelty
+        )
+
+
+def _matching_cards(
+    bulk: Mapping[str, Any], topic_set: set[str], selected_card_ids: set[str], review_challenge: int
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    matching_unseen: list[dict[str, Any]] = []
+    matching_seen: list[dict[str, Any]] = []
+    for card in bulk["unseenCards"]:
+        if card["id"] in selected_card_ids or card["id"] in bulk["passSetDeferredCardIds"]:
+            continue
+        if card_eligible_for_review_learning(card.get("complexity"), review_challenge) and any(t in topic_set for t in card["topics"]):
+            matching_unseen.append(_card_candidate(card))
+    for card in bulk["seenCards"]:
+        if card["id"] in selected_card_ids:
+            continue
+        if card_eligible_for_review_learning(card.get("complexity"), review_challenge) and any(t in topic_set for t in card["topics"]):
+            matching_seen.append(_card_candidate(card))
+    return matching_unseen, matching_seen
+
+
+def _apply_card_penalties(
+    combined: list[dict[str, Any]], penalty_context: Mapping[str, Any], bulk: Mapping[str, Any]
+) -> list[dict[str, Any]]:
+    rows = []
+    for i, card in enumerate(combined):
+        topic_penalty = compute_topic_cooldown_penalty(
+            card["topics"], penalty_context.get("recentTopicExposures") or {}, penalty_context["nowMs"]
+        )
+        bank_penalty = compute_bank_card_penalty(card.get("sourceFile"), bulk["seenCardReviewCounts"].get(card["id"], 0))
+        penalty = max(topic_penalty, bank_penalty)
+        if card["id"] in bulk["fragileSeenCards"]:
+            penalty -= 1.0
+        rows.append((penalty, i, card))
+    rows.sort(key=lambda r: (r[0], r[1]))
+    return [r[2] for r in rows]
+
+
+def _apply_review_challenge_card_order(
+    combined: list[dict[str, Any]], matching_seen: list[dict[str, Any]], bulk: Mapping[str, Any], review_challenge: int
+) -> list[dict[str, Any]]:
+    seen_groups = {c.get("variantGroupId") for c in matching_seen if c.get("variantGroupId")}
+    unseen_by_id = {
+        c["id"]: c for c in bulk["unseenCards"] if not c.get("variantGroupId") or c["variantGroupId"] not in seen_groups
+    }
+    target = {-2: 1, -1: 2, 1: 4}.get(review_challenge, 5)
+
+    def cx(card: Mapping[str, Any]) -> float:
+        return 2 if card.get("complexity") is None else card["complexity"]
+
+    unseen = [c for c in combined if c["id"] in unseen_by_id]
+    authored = sorted(enumerate(unseen), key=lambda p: (abs(cx(p[1]) - target), p[0]))
+    preferred = []
+    for index, (_, card) in enumerate(authored):
+        meta = unseen_by_id.get(card["id"]) or {}
+        quality = shrunk_facility(meta.get("facilityIndex"), meta.get("sampleSize"))
+        rank = index + (0 if quality is None else 2 * review_challenge * (quality - 0.5))
+        preferred.append((abs(cx(card) - target), rank, index, card))
+    preferred.sort(key=lambda r: (r[0], r[1], r[2]))
+    it = iter(preferred)
+    return [next(it)[3] if c["id"] in unseen_by_id else c for c in combined]
+
+
+def _unique_limited(cards: list[dict[str, Any]], max_candidates: int) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    for card in cards:
+        if len(out) >= max_candidates:
+            break
+        if card["id"] in seen_ids:
+            continue
+        seen_ids.add(card["id"])
+        out.append(card)
+    return out
+
+
 def get_cards_from_bulk(
     concept_id: str,
     concept: Mapping[str, Any],
@@ -113,160 +286,37 @@ def get_cards_from_bulk(
     topic_set = set(expand_topic_set(concept["topics"]))
     if not topic_set:
         return []
-    matching_unseen: list[dict[str, Any]] = []
-    matching_seen: list[dict[str, Any]] = []
-    for card in bulk["unseenCards"]:
-        if card["id"] in selected_card_ids or card["id"] in bulk["passSetDeferredCardIds"]:
-            continue
-        if card_eligible_for_review_learning(card.get("complexity"), review_challenge) and any(t in topic_set for t in card["topics"]):
-            matching_unseen.append(_card_candidate(card))
-    for card in bulk["seenCards"]:
-        if card["id"] in selected_card_ids:
-            continue
-        if card_eligible_for_review_learning(card.get("complexity"), review_challenge) and any(t in topic_set for t in card["topics"]):
-            matching_seen.append(_card_candidate(card))
-
-    vector_rank = build_rank_from_scores(bulk["cardScores"].get(concept_id), 200)
-    exam_scores = exam_target_scores if exam_target_scores is not None else bulk["cardExamRelevance"]
-    history = bulk["cardVariantGroupHistory"]
-    failed = bulk["failedStretchCardIds"]
-    step_down = bool(failed) and any(c["id"] in failed for c in matching_seen)
-    recent_ids = (penalty_context or {}).get("recentCardIds") or set()
-    recent_failures = (penalty_context or {}).get("recentFailureConceptIds") or set()
-
-    def importance_boost(importance: Any) -> float:
-        return -10 if importance == 3 else -3 if importance == 2 else 0
-
-    def variant_boost(card: Mapping[str, Any]) -> float:
-        group = card.get("variantGroupId")
-        if group is None:
-            return 0
-        seen = history.get(group)
-        if not seen:
-            return 0
-        return 4 if card["id"] in seen else -4
-
-    def ladder(card: Mapping[str, Any]) -> float:
-        return complexity_ladder_boost(card.get("complexity"), "step-down" if step_down else "frontier")
-
-    def pacing(card: Mapping[str, Any]) -> float:
-        week = item_teaching_week(bulk["rotation"], card.get("sourceFile"), card["topics"], topic_teaching_weeks)
-        return curriculum_pacing_boost(week, current_teaching_week) + min(
-            curriculum_recency_boost(week, current_teaching_week),
-            dated_topic_recency_boost(card["topics"], topic_recency_days),
-        )
-
-    def figure(card: Mapping[str, Any]) -> float:
-        return figure_cooldown_boost(card.get("imageUrl"), recent_figure_exposures, figure_now_ms)
-
-    def media(card: Mapping[str, Any]) -> float:
-        return media_presence_boost(card.get("imageUrl"), card.get("clipId"))
-
-    def soft(card: Mapping[str, Any]) -> float:
-        return pacing(card) + figure(card) + media(card)
-
-    def fallback_key(card: Mapping[str, Any]) -> tuple[float, float, float, float]:
-        importance = card.get("importance")
-        return (variant_boost(card), ladder(card), soft(card), -(1 if importance is None else importance))
-
-    def recent_neighbor(ordered: list[dict[str, Any]], enabled: bool) -> list[dict[str, Any]]:
-        if not enabled or not recent_ids or concept_id in recent_failures:
-            return ordered
-        rows = []
-        for i, card in enumerate(ordered):
-            penalty = recent_neighbor_signal(card.get("similarCards"), recent_ids)["penalty"]
-            rows.append((i + (penalty / MAX_RECENT_NEIGHBOR_PENALTY) * RECENT_NEIGHBOR_MAX_RANK_SINK, penalty, i, card))
-        rows.sort(key=lambda r: (r[0], r[1], r[2]))
-        return [r[3] for r in rows]
-
-    def nudge(ordered: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        return apply_bounded_exam_target_nudge(ordered, lambda c: exam_scores.get(c["id"]), exam_target_max_rank_move)
-
-    def rank_candidates(candidates: list[dict[str, Any]], novelty: bool) -> list[dict[str, Any]]:
-        if vector_rank is None:
-            return recent_neighbor(nudge(sorted(candidates, key=fallback_key)), novelty)
-        ranked, unranked = [], []
-        for card in candidates:
-            base = vector_rank.get(card["id"])
-            if base is None:
-                unranked.append(card)
-            else:
-                importance = card.get("importance")
-                rank = (base + importance_boost(1 if importance is None else importance) + variant_boost(card)
-                        + ladder(card) + pacing(card) + figure(card) + media(card))
-                ranked.append((rank, card))
-        ranked.sort(key=lambda r: r[0])
-        unranked.sort(key=fallback_key)
-        return recent_neighbor(nudge([c for _, c in ranked]), novelty) + recent_neighbor(nudge(unranked), novelty)
-
+    matching_unseen, matching_seen = _matching_cards(bulk, topic_set, selected_card_ids, review_challenge)
+    ranker = _CardRanker(
+        concept_id, bulk, penalty_context, current_teaching_week, exam_target_scores,
+        exam_target_max_rank_move, topic_teaching_weeks, recent_figure_exposures, figure_now_ms,
+        topic_recency_days, matching_seen,
+    )
     passed_ids = bulk["passedScaffoldCardIds"]
     passed = [c for c in matching_seen if c["id"] in passed_ids] if passed_ids else []
 
     def is_block(card: Mapping[str, Any]) -> bool:
         return (2 if card.get("complexity") is None else card["complexity"]) <= 2
 
-    if step_down:
+    if ranker.step_down:
         both = matching_unseen + matching_seen
-        combined = rank_candidates([c for c in both if is_block(c)], False) + rank_candidates(
+        combined = ranker.rank_candidates([c for c in both if is_block(c)], False) + ranker.rank_candidates(
             [c for c in both if not is_block(c)], False
         )
     else:
         passed_ref = {id(c) for c in passed}
         frontier = [c for c in matching_unseen if not is_block(c)] + [c for c in matching_seen if not is_block(c)]
         combined = (
-            rank_candidates(frontier, True)
-            + rank_candidates([c for c in matching_unseen if is_block(c)], True)
-            + rank_candidates([c for c in matching_seen if is_block(c) and id(c) not in passed_ref], False)
-            + rank_candidates(passed, False)
+            ranker.rank_candidates(frontier, True)
+            + ranker.rank_candidates([c for c in matching_unseen if is_block(c)], True)
+            + ranker.rank_candidates([c for c in matching_seen if is_block(c) and id(c) not in passed_ref], False)
+            + ranker.rank_candidates(passed, False)
         )
-
     if penalty_context is not None:
-        rows = []
-        for i, card in enumerate(combined):
-            topic_penalty = compute_topic_cooldown_penalty(
-                card["topics"], penalty_context.get("recentTopicExposures") or {}, penalty_context["nowMs"]
-            )
-            bank_penalty = compute_bank_card_penalty(card.get("sourceFile"), bulk["seenCardReviewCounts"].get(card["id"], 0))
-            penalty = max(topic_penalty, bank_penalty)
-            if card["id"] in bulk["fragileSeenCards"]:
-                penalty -= 1.0
-            rows.append((penalty, i, card))
-        rows.sort(key=lambda r: (r[0], r[1]))
-        combined = [r[2] for r in rows]
-
-    if review_challenge != 0 and not step_down:
-        seen_groups = {c.get("variantGroupId") for c in matching_seen if c.get("variantGroupId")}
-        unseen_by_id = {
-            c["id"]: c for c in bulk["unseenCards"] if not c.get("variantGroupId") or c["variantGroupId"] not in seen_groups
-        }
-        target = {-2: 1, -1: 2, 1: 4}.get(review_challenge, 5)
-
-        def cx(card: Mapping[str, Any]) -> float:
-            return 2 if card.get("complexity") is None else card["complexity"]
-
-        unseen = [c for c in combined if c["id"] in unseen_by_id]
-        authored = sorted(enumerate(unseen), key=lambda p: (abs(cx(p[1]) - target), p[0]))
-        preferred = []
-        for index, (_, card) in enumerate(authored):
-            meta = unseen_by_id.get(card["id"]) or {}
-            quality = shrunk_facility(meta.get("facilityIndex"), meta.get("sampleSize"))
-            rank = index + (0 if quality is None else 2 * review_challenge * (quality - 0.5))
-            preferred.append((abs(cx(card) - target), rank, index, card))
-        preferred.sort(key=lambda r: (r[0], r[1], r[2]))
-        it = iter(preferred)
-        combined = [next(it)[3] if c["id"] in unseen_by_id else c for c in combined]
-
-    out: list[dict[str, Any]] = []
-    seen_ids: set[str] = set()
-    for card in combined:
-        if len(out) >= max_candidates:
-            break
-        if card["id"] in seen_ids:
-            continue
-        seen_ids.add(card["id"])
-        out.append(card)
-    return out
-
+        combined = _apply_card_penalties(combined, penalty_context, bulk)
+    if review_challenge != 0 and not ranker.step_down:
+        combined = _apply_review_challenge_card_order(combined, matching_seen, bulk, review_challenge)
+    return _unique_limited(combined, max_candidates)
 
 def get_videos_from_bulk(
     concept_id: str, concept: Mapping[str, Any], limit: int, bulk: Mapping[str, Any], exclude_video_ids: set[str]

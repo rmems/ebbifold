@@ -60,6 +60,72 @@ def estimate_item_recall(*, concept_recall: float, concept_exposure_count: float
     return {"predictedRecall": predicted, "source": "empirical" if valid and samples > 0 else "fallback"}
 
 
+def _delivery_tier(item: dict[str, Any], q_meta: dict[str, Any] | None, c_meta: dict[str, Any] | None) -> str | None:
+    if item["type"] == "card":
+        return tier_from_complexity(
+            c_meta["complexity"] if c_meta and c_meta.get("complexity") is not None else item.get("complexity")
+        )
+    if item["type"] == "question" and q_meta:
+        return tier_from_question_difficulty(get_effective_question_difficulty(
+            q_meta.get("difficulty"), q_meta.get("facilityIndex"), q_meta.get("totalAttempts")
+        ))
+    return None
+
+
+def _apply_challenge_telemetry(
+    item: dict[str, Any], tier: str | None, challenge_recall: float, applied: bool, synthetic: bool
+) -> None:
+    bypass = item.get("interventionReason") in _CHALLENGE_BYPASS
+    if item["type"] not in ("card", "question") or synthetic or bypass:
+        return
+    target = "stretch" if _finite(challenge_recall) else None
+    if target and tier:
+        item["challengePolicyVersion"] = CHALLENGE_POLICY_VERSION
+        item["challengeTargetTier"] = target
+        item["challengeDistance"] = abs(_TIER_RANK[tier] - _TIER_RANK[target])
+        item["challengePolicyApplied"] = item["type"] == "card" and applied
+
+
+def _apply_novelty_telemetry(
+    inputs: dict[str, Any], item: dict[str, Any], c_meta: dict[str, Any] | None,
+    applied: bool, synthetic: bool, unseen: set[str], recent_ids: set[str] | None
+) -> None:
+    bypass = item.get("interventionReason") in _CHALLENGE_BYPASS
+    eligible = (
+        item["type"] == "card" and applied and not synthetic and item["id"] in unseen
+        and item["conceptId"] not in inputs["recentFailureConceptIds"] and not bypass
+    )
+    if not eligible:
+        return
+    novelty = recent_neighbor_signal((c_meta or {}).get("similarCards"), recent_ids)
+    item["noveltyPolicyVersion"] = RECENT_NEIGHBOR_POLICY_VERSION
+    item["recentNeighborSimilarity"] = novelty["maxSimilarity"]
+    item["noveltyPenalty"] = novelty["penalty"]
+
+
+def _apply_recall_telemetry(
+    item: dict[str, Any], q_meta: dict[str, Any] | None, c_meta: dict[str, Any] | None,
+    serve_recall: float, serve_exposures: float
+) -> None:
+    if not is_calibrated_review_item(item["type"], item.get("complexity")):
+        return
+    facility = (c_meta or {}).get("facilityIndex")
+    if facility is None:
+        facility = (q_meta or {}).get("facilityIndex")
+    samples = (c_meta or {}).get("sampleSize")
+    if samples is None:
+        samples = (q_meta or {}).get("totalAttempts")
+    est = estimate_item_recall(
+        concept_recall=serve_recall, concept_exposure_count=serve_exposures,
+        item_type=item["type"], facility_index=facility, sample_size=samples,
+        difficulty=(q_meta or {}).get("difficulty") or item.get("difficulty"),
+    )
+    item["predictedRecall"] = est["predictedRecall"]
+    item["predictedRecallModel"] = ITEM_RECALL_MODEL_VERSION
+    item["predictedRecallSource"] = est["source"]
+    item["predictedRecallStatus"] = ITEM_RECALL_MODEL_STATUS
+
+
 def attach_delivery_telemetry(inputs: dict[str, Any], plan: dict[str, Any], build: Any,
                               final: list[dict[str, Any]], card_meta: dict[str, dict[str, Any]]) -> None:
     if inputs.get("ratingReliability"):
@@ -78,46 +144,12 @@ def attach_delivery_telemetry(inputs: dict[str, Any], plan: dict[str, Any], buil
         item.pop("challengePolicyApplied", None)
         descriptive = state.currentRecall if state else raw.get("recallProbability")
         challenge_recall = build.challenge_recall_at_selection.get(item["id"]) if applied else descriptive
-        if item["type"] == "card":
-            tier = tier_from_complexity(c_meta["complexity"] if c_meta and c_meta.get("complexity") is not None
-                                        else item.get("complexity"))
-        elif item["type"] == "question" and q_meta:
-            tier = tier_from_question_difficulty(get_effective_question_difficulty(
-                q_meta.get("difficulty"), q_meta.get("facilityIndex"), q_meta.get("totalAttempts")))
-        else:
-            tier = None
+        tier = _delivery_tier(item, q_meta, c_meta)
         item["difficultyTier"] = tier
         synthetic = is_synthetic_concept_attribution(item["conceptId"])
-        bypass = item.get("interventionReason") in _CHALLENGE_BYPASS
-        if item["type"] in ("card", "question") and not synthetic and not bypass:
-            target = "stretch" if _finite(challenge_recall) else None
-            if target and tier:
-                item["challengePolicyVersion"] = CHALLENGE_POLICY_VERSION
-                item["challengeTargetTier"] = target
-                item["challengeDistance"] = abs(_TIER_RANK[tier] - _TIER_RANK[target])
-                item["challengePolicyApplied"] = item["type"] == "card" and applied
-        if (item["type"] == "card" and applied and not synthetic and item["id"] in unseen
-                and item["conceptId"] not in inputs["recentFailureConceptIds"] and not bypass):
-            novelty = recent_neighbor_signal((c_meta or {}).get("similarCards"), recent_ids)
-            item["noveltyPolicyVersion"] = RECENT_NEIGHBOR_POLICY_VERSION
-            item["recentNeighborSimilarity"] = novelty["maxSimilarity"]
-            item["noveltyPenalty"] = novelty["penalty"]
-        complexity = (c_meta or {}).get("complexity", item.get("complexity"))
-        if is_calibrated_review_item(item["type"], item.get("complexity")):
-            facility = (c_meta or {}).get("facilityIndex")
-            if facility is None:
-                facility = (q_meta or {}).get("facilityIndex")
-            samples = (c_meta or {}).get("sampleSize")
-            if samples is None:
-                samples = (q_meta or {}).get("totalAttempts")
-            est = estimate_item_recall(concept_recall=serve_recall, concept_exposure_count=serve_exposures,
-                                       item_type=item["type"], facility_index=facility, sample_size=samples,
-                                       difficulty=(q_meta or {}).get("difficulty") or item.get("difficulty"))
-            del complexity
-            item["predictedRecall"] = est["predictedRecall"]
-            item["predictedRecallModel"] = ITEM_RECALL_MODEL_VERSION
-            item["predictedRecallSource"] = est["source"]
-            item["predictedRecallStatus"] = ITEM_RECALL_MODEL_STATUS
+        _apply_challenge_telemetry(item, tier, challenge_recall, applied, synthetic)
+        _apply_novelty_telemetry(inputs, item, c_meta, applied, synthetic, unseen, recent_ids)
+        _apply_recall_telemetry(item, q_meta, c_meta, serve_recall, serve_exposures)
 
 
 def assemble_session_result(inputs: dict[str, Any], plan: dict[str, Any], build: Any,

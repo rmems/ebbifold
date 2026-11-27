@@ -80,119 +80,136 @@ def _days_since(now_ms: float, at_ms: float | None) -> float:
     return math.inf if at_ms is None else (now_ms - at_ms) / MS_PER_DAY
 
 
+def _concept_intervention(
+    confidence: float, exposure_count: int, recall_on_exam_day: float, days_since_probe: float
+) -> str:
+    if confidence < DEFAULTS["confidence_threshold"] or exposure_count < 3:
+        return "probe"
+    if recall_on_exam_day < DEFAULTS["recall_threshold"]:
+        return "remediate"
+    if days_since_probe > DEFAULTS["days_since_probe_threshold"]:
+        return "probe"
+    return "reinforce"
+
+
+def _concept_gap_alignment(inputs: dict[str, Any], concept_id: str, exam_pressure: float) -> float:
+    embeddings = inputs.get("conceptEmbeddings", {})
+    gap_direction = inputs.get("gapDirection")
+    raw_emb = embeddings.get(concept_id)
+    concept_emb = smath.truncate_to_manifold_dim(raw_emb) if raw_emb else None
+    if inputs.get("applyExamTarget") or not concept_emb or not gap_direction:
+        return 0
+    return max(0, smath.cosine_similarity(concept_emb, gap_direction)) * (0.15 + exam_pressure * 0.15)
+
+
+def _initial_concept_state(inputs: dict[str, Any], concept: dict[str, Any]) -> ConceptState:
+    options = inputs.get("options", {})
+    now_ms = inputs["nowMs"]
+    state = inputs.get("stateMap", {}).get(concept["id"])
+    days_since_probe = _days_since(now_ms, state.get("lastProbeAt") if state else None)
+    days_since_exposure = _days_since(now_ms, state.get("lastExposureAt") if state else None)
+    stored_recall = state.get("recallProbability", 0) if state else 0
+    confidence = state.get("confidence", 0) if state else 0
+    exposure_count = state.get("exposureCount", 0) if state else 0
+    current_recall = (
+        smath.apply_decay(stored_recall, days_since_exposure, confidence)
+        if days_since_exposure < math.inf
+        else 0
+    )
+    days_to_exam = inputs["daysToExam"]
+    recall_on_exam_day = smath.project_recall_to_exam_day(current_recall, days_to_exam, confidence)
+    ranking_recall = smath.project_recall_to_exam_day(
+        current_recall, days_to_exam, confidence, RECALL_RANKING_HORIZON_DAYS
+    )
+    intervention = _concept_intervention(confidence, exposure_count, recall_on_exam_day, days_since_probe)
+
+    gap_score = max(0, DEFAULTS["target_recall"] - ranking_recall)
+    confidence_boost = 0.2 if confidence < DEFAULTS["confidence_threshold"] else 0
+    stale_boost = 0.1 if days_since_probe > DEFAULTS["days_since_probe_threshold"] else 0
+    gap_alignment = _concept_gap_alignment(inputs, concept["id"], inputs["examPressure"])
+    liked_boost = 0.15 if concept["id"] in set(inputs.get("likedConceptIds", [])) else 0
+    failure_boost = 0.25 if concept["id"] in set(inputs.get("recentFailureConceptIds", [])) else 0
+    practice_boost = PRACTICE_MISS_BOOST if concept["id"] in set(inputs.get("practiceMissConceptIds", [])) else 0
+    cadence = teaching_cadence_concept_boost(
+        teaching_week_for_topics(concept["topics"], options.get("topicTeachingWeeks")),
+        options.get("currentTeachingWeek"),
+    )
+    dated = dated_topic_recency_concept_boost(concept["topics"], options.get("topicRecencyDays"))
+    exam_weight_multiplier = 1 if inputs.get("applyExamTarget") else (concept.get("examWeight") or 1) / 3
+    soft_penalty = compute_recall_soft_penalty(
+        current_recall, confidence, is_chronic_failure=concept["id"] in set(inputs.get("chronicFailureConceptIds", []))
+    )
+    priority = (
+        (gap_score + confidence_boost + stale_boost + gap_alignment + liked_boost + failure_boost
+         + practice_boost + max(cadence, dated))
+        * exam_weight_multiplier
+        * soft_penalty
+    )
+    return ConceptState(
+        conceptId=concept["id"], conceptName=concept["name"], currentRecall=current_recall,
+        recallOnExamDay=recall_on_exam_day, confidence=confidence, exposureCount=exposure_count,
+        daysSinceProbe=days_since_probe, daysSinceExposure=days_since_exposure,
+        priority=priority, intervention=intervention,
+    )
+
+
+def _boost_one_prerequisite_chain(
+    concept: dict[str, Any], state: ConceptState, states_by_id: dict[str, ConceptState],
+    concept_by_id: dict[str, dict[str, Any]],
+) -> None:
+    base_boost = state.priority * 0.85
+    if base_boost <= 0:
+        return
+    visited = {concept["id"]}
+    queue = [(pid, 1) for pid in concept.get("prerequisiteIds", [])]
+    while queue:
+        next_id, depth = queue.pop(0)
+        if next_id in visited:
+            continue
+        visited.add(next_id)
+        prereq = states_by_id.get(next_id)
+        if prereq is None:
+            continue
+        boosted = base_boost * math.pow(0.7, depth - 1)
+        solid = (
+            prereq.recallOnExamDay >= DEFAULTS["target_recall"]
+            and prereq.confidence >= DEFAULTS["confidence_threshold"]
+        )
+        if not solid:
+            prereq.priority = max(prereq.priority, boosted)
+        if depth < 3:
+            prereq_concept = concept_by_id.get(next_id)
+            if prereq_concept is None:
+                continue
+            for pid in prereq_concept.get("prerequisiteIds", []):
+                if pid not in visited:
+                    queue.append((pid, depth + 1))
+
+
+def _apply_prerequisite_boosts(
+    concepts: list[dict[str, Any]], states_by_id: dict[str, ConceptState],
+    concept_by_id: dict[str, dict[str, Any]],
+) -> None:
+    for concept in concepts:
+        state = states_by_id.get(concept["id"])
+        if state is None or state.recallOnExamDay >= DEFAULTS["target_recall"]:
+            continue
+        _boost_one_prerequisite_chain(concept, state, states_by_id, concept_by_id)
+
+
 def rank_concepts(inputs: dict[str, Any]) -> ConceptRanking:
     assert_supported(inputs)
     options = inputs.get("options", {})
     bulk = inputs["bulk"]
     concepts = inputs["concepts"]
-    state_map = inputs.get("stateMap", {})
-    embeddings = inputs.get("conceptEmbeddings", {})
-    gap_direction = inputs.get("gapDirection")
-    liked = set(inputs.get("likedConceptIds", []))
-    recent_failures = set(inputs.get("recentFailureConceptIds", []))
-    practice_miss = set(inputs.get("practiceMissConceptIds", []))
-    chronic = set(inputs.get("chronicFailureConceptIds", []))
-    days_to_exam = inputs["daysToExam"]
-    exam_pressure = inputs["examPressure"]
-    now_ms = inputs["nowMs"]
-
-    states: list[ConceptState] = []
-    for concept in concepts:
-        state = state_map.get(concept["id"])
-        days_since_probe = _days_since(now_ms, state.get("lastProbeAt") if state else None)
-        days_since_exposure = _days_since(now_ms, state.get("lastExposureAt") if state else None)
-        stored_recall = state.get("recallProbability", 0) if state else 0
-        confidence = state.get("confidence", 0) if state else 0
-        exposure_count = state.get("exposureCount", 0) if state else 0
-        current_recall = (
-            smath.apply_decay(stored_recall, days_since_exposure, confidence)
-            if days_since_exposure < math.inf
-            else 0
-        )
-        recall_on_exam_day = smath.project_recall_to_exam_day(current_recall, days_to_exam, confidence)
-        ranking_recall = smath.project_recall_to_exam_day(
-            current_recall, days_to_exam, confidence, RECALL_RANKING_HORIZON_DAYS
-        )
-        if confidence < DEFAULTS["confidence_threshold"] or exposure_count < 3:
-            intervention = "probe"
-        elif recall_on_exam_day < DEFAULTS["recall_threshold"]:
-            intervention = "remediate"
-        elif days_since_probe > DEFAULTS["days_since_probe_threshold"]:
-            intervention = "probe"
-        else:
-            intervention = "reinforce"
-
-        gap_score = max(0, DEFAULTS["target_recall"] - ranking_recall)
-        confidence_boost = 0.2 if confidence < DEFAULTS["confidence_threshold"] else 0
-        stale_boost = 0.1 if days_since_probe > DEFAULTS["days_since_probe_threshold"] else 0
-        raw_emb = embeddings.get(concept["id"])
-        concept_emb = smath.truncate_to_manifold_dim(raw_emb) if raw_emb else None
-        gap_alignment = (
-            max(0, smath.cosine_similarity(concept_emb, gap_direction)) * (0.15 + exam_pressure * 0.15)
-            if not inputs.get("applyExamTarget") and concept_emb and gap_direction
-            else 0
-        )
-        liked_boost = 0.15 if concept["id"] in liked else 0
-        failure_boost = 0.25 if concept["id"] in recent_failures else 0
-        practice_boost = PRACTICE_MISS_BOOST if concept["id"] in practice_miss else 0
-        cadence = teaching_cadence_concept_boost(
-            teaching_week_for_topics(concept["topics"], options.get("topicTeachingWeeks")),
-            options.get("currentTeachingWeek"),
-        )
-        dated = dated_topic_recency_concept_boost(concept["topics"], options.get("topicRecencyDays"))
-        exam_weight_multiplier = 1 if inputs.get("applyExamTarget") else (concept.get("examWeight") or 1) / 3
-        soft_penalty = compute_recall_soft_penalty(
-            current_recall, confidence, is_chronic_failure=concept["id"] in chronic
-        )
-        priority = (
-            (gap_score + confidence_boost + stale_boost + gap_alignment + liked_boost + failure_boost
-             + practice_boost + max(cadence, dated))
-            * exam_weight_multiplier
-            * soft_penalty
-        )
-        states.append(ConceptState(
-            conceptId=concept["id"], conceptName=concept["name"], currentRecall=current_recall,
-            recallOnExamDay=recall_on_exam_day, confidence=confidence, exposureCount=exposure_count,
-            daysSinceProbe=days_since_probe, daysSinceExposure=days_since_exposure,
-            priority=priority, intervention=intervention,
-        ))
+    states = [_initial_concept_state(inputs, concept) for concept in concepts]
 
     resolve_learner_policy(inputs, states)
     states_by_id = {s.conceptId: s for s in states}
     concept_by_id = {c["id"]: c for c in concepts}
 
     # Prerequisite boost: weak concepts lift their unsolid prerequisites (BFS, depth <= 3).
-    for concept in concepts:
-        state = states_by_id.get(concept["id"])
-        if state is None or state.recallOnExamDay >= DEFAULTS["target_recall"]:
-            continue
-        base_boost = state.priority * 0.85
-        if base_boost <= 0:
-            continue
-        visited = {concept["id"]}
-        queue = [(pid, 1) for pid in concept.get("prerequisiteIds", [])]
-        while queue:
-            next_id, depth = queue.pop(0)
-            if next_id in visited:
-                continue
-            visited.add(next_id)
-            prereq = states_by_id.get(next_id)
-            if prereq is None:
-                continue
-            boosted = base_boost * math.pow(0.7, depth - 1)
-            solid = (
-                prereq.recallOnExamDay >= DEFAULTS["target_recall"]
-                and prereq.confidence >= DEFAULTS["confidence_threshold"]
-            )
-            if not solid:
-                prereq.priority = max(prereq.priority, boosted)
-            if depth < 3:
-                prereq_concept = concept_by_id.get(next_id)
-                if prereq_concept is None:
-                    continue
-                for pid in prereq_concept.get("prerequisiteIds", []):
-                    if pid not in visited:
-                        queue.append((pid, depth + 1))
+    _apply_prerequisite_boosts(concepts, states_by_id, concept_by_id)
 
     prereq_recalls = {s.conceptId: s.recallOnExamDay for s in states}
     for concept in concepts:
