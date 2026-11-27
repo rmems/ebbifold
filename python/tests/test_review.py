@@ -1,6 +1,7 @@
 ﻿from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
+from unittest.mock import Mock
 import argparse
 import sqlite3
 
@@ -42,14 +43,8 @@ def test_review_engine_uses_persisted_attempts_for_next_item(tmp_path, monkeypat
     engine = ReviewEngine(snapshot, now_ms=1_700_000_000_000)
     store = SQLiteReviewStore(tmp_path / "review.sqlite3")
     session_id = store.create_session("validation-corpus")
-    rank_inputs = []
-    real_rank_adaptive = engine_module.rank_adaptive
-
-    def spy_rank_adaptive(questions, history, size):
-        rank_inputs.append({question.id: question.preference_rank for question in questions})
-        return real_rank_adaptive(questions, history, size)
-
-    monkeypatch.setattr(engine_module, "rank_adaptive", spy_rank_adaptive)
+    rank_mock = Mock(wraps=engine_module.rank_adaptive)
+    monkeypatch.setattr(engine_module, "rank_adaptive", rank_mock)
 
     first = engine.next_question([], [])
     assert first is not None
@@ -62,7 +57,9 @@ def test_review_engine_uses_persisted_attempts_for_next_item(tmp_path, monkeypat
     second = engine.next_question(session_attempts, persisted_attempts)
 
     assert persisted_priority != baseline_priority
-    assert rank_inputs[1][first.id] != rank_inputs[0][first.id]
+    first_rank_input = {question.id: question.preference_rank for question in rank_mock.call_args_list[0].args[0]}
+    second_rank_input = {question.id: question.preference_rank for question in rank_mock.call_args_list[1].args[0]}
+    assert second_rank_input[first.id] != first_rank_input[first.id]
     assert second is not None
     assert second.id != first.id
 
