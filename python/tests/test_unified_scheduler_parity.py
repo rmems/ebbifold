@@ -246,3 +246,77 @@ def test_fixture_covers_required_behaviors() -> None:
         assert required in names
     assert DATA["generator"] == "python/tools/generate_unified_scheduler_fixtures.ts"
     assert (Path(__file__).parents[1] / "tools" / "generate_unified_scheduler_fixtures.ts").is_file()
+
+
+# --- end-to-end session construction --------------------------------------
+
+from ebbifold.scheduler.pipeline import run_session  # noqa: E402
+
+SESSION_FIXTURE = Path(__file__).parent / "fixtures" / "unified-scheduler-session.cases.json"
+if not SESSION_FIXTURE.is_file():
+    pytest.fail(f"session golden fixture missing: {SESSION_FIXTURE}; regenerate, do not skip", pytrace=False)
+SESSIONS = json.loads(SESSION_FIXTURE.read_text(encoding="utf-8"))["sessions"]
+if not SESSIONS:
+    pytest.fail("session golden fixture has no cases", pytrace=False)
+
+
+def _session(case: dict[str, Any]) -> dict[str, Any]:
+    out = run_session(copy.deepcopy(case["snapshot"]))
+    out.pop("trace")
+    return out
+
+
+@pytest.mark.parametrize("case", SESSIONS, ids=lambda c: c["name"])
+def test_session_parity(case: dict[str, Any]) -> None:
+    assert_parity(_session(case), case["expected"])
+
+
+@pytest.mark.parametrize("case", SESSIONS, ids=lambda c: c["name"])
+def test_session_construction_is_deterministic(case: dict[str, Any]) -> None:
+    runs = [json.dumps(_session(case), sort_keys=True) for _ in range(3)]
+    assert runs[0] == runs[1] == runs[2]
+
+
+def test_session_fixture_covers_required_behaviors() -> None:
+    names = {c["name"] for c in SESSIONS}
+    for required in (
+        "full_session_weak_new_pristine", "empty_pools", "backfill_and_orphan_rescue", "exhausted_backfill",
+        "rotation_bank_top_up", "first_sight_reservation_release", "interference_tight_threshold",
+        "cluster_dampening", "struggle_step_down_scaffolds", "review_challenge_harder",
+        "empty_concepts_cluster_fallback",
+    ):
+        assert required in names
+    reasons = {i["interventionReason"] for c in SESSIONS for i in c["expected"]["result"]["items"]}
+    assert {"preemptive_scaffold", "pre_teach", "pre_teach_naive", "needs_retest", "reinforcement"} <= reasons
+
+
+def _base_session() -> dict[str, Any]:
+    return copy.deepcopy(SESSIONS[0]["snapshot"])
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda s: s.update(struggleHistory=[{"cardId": "u-renal-1"}]),
+        lambda s: s.update(ratingReliability={"verdict": "ok"}),
+        lambda s: s.update(composedDeck=True),
+        lambda s: s["bulk"].update(cardGradeById={"s-glyco-1": {"lastQuality": 4, "correctCount": 2}}),
+        lambda s: s["bulk"].update(passSet={"factKeys": []}, passSetIntakeDecision="pass-set-first"),
+        lambda s: s.update(conceptThreadAnchors=[{"anchorEventId": "e"}]),
+        lambda s: s.update(concepts=[], deckStrandMix={"strands": []}),
+    ],
+    ids=["struggle", "serve_conditioning", "composed_deck", "repetition_slot", "pass_set", "concept_thread",
+         "cluster_strands"],
+)
+def test_session_unported_adapters_fail_closed(mutate: Any) -> None:
+    snapshot = _base_session()
+    mutate(snapshot)
+    with pytest.raises(UnsupportedSchedulerInput):
+        run_session(snapshot)
+
+
+def test_session_missing_seed_fails_closed() -> None:
+    snapshot = _base_session()
+    snapshot["options"].pop("examTargetTieBreakSeed")
+    with pytest.raises(SchedulerDeterminismError):
+        run_session(snapshot)
