@@ -10,8 +10,8 @@ upstream's code into a new stack).
 
 ebbifold is a Python port of [todd866/cohort](https://github.com/todd866/cohort),
 the open-source spaced-repetition engine. The TypeScript app remains in this
-repository as the reference implementation; new development happens under
-`python/` and `julia/`:
+repository as the reference implementation; the port adds new code under
+`python/` and `julia/` (in progress — see the phase gates in the plan):
 
 - **Python** (`python/`, `src/ebbifold/`) — the engine: adaptive scheduling,
   the concept-space scheduler over 3,072-dimensional embeddings, corpus
