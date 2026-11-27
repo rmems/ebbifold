@@ -14,6 +14,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from ebbifold.corpus import load_corpus
+from ebbifold.corpus.validation import open_content_root
 
 from .engine import ReviewEngine, ReviewQuestion
 from .store import AttemptInput, SQLiteReviewStore, default_store_path
@@ -30,6 +31,9 @@ class CliContext:
 
 def _print_question(question: ReviewQuestion) -> None:
     print(f"\n{question.stem}")
+    if question.record.image_url:
+        caption = question.record.image_caption or "image attachment"
+        print(f"[media: {caption}] {question.record.image_url}")
     for option in question.options:
         print(f"{option.label}. {option.text}")
 
@@ -58,9 +62,9 @@ def _answer(ctx: CliContext, question: ReviewQuestion, answer: str, started: dat
     return correct
 
 
-def _open_session(args: argparse.Namespace, store: SQLiteReviewStore) -> str | None:
+def _open_session(args: argparse.Namespace, store: SQLiteReviewStore, content_root: Path) -> str | None:
     if not args.session:
-        return store.create_session(str(Path(args.content).resolve() if args.content else Path.cwd()))
+        return store.create_session(str(content_root))
     if store.session_exists(args.session):
         return args.session
     print(f"unknown review session: {args.session}", file=sys.stderr)
@@ -74,7 +78,10 @@ def _read_answer(ctx: CliContext, scripted_index: int) -> tuple[str | None, int]
         return answer, scripted_index + 1
     if ctx.script_mode:
         return None, scripted_index
-    return input("answer: "), scripted_index
+    try:
+        return input("answer: "), scripted_index
+    except EOFError:
+        return None, scripted_index
 
 
 def _submit_answer(ctx: CliContext, question: ReviewQuestion, answer: str, started: datetime) -> str:
@@ -112,10 +119,10 @@ def _review_loop(ctx: CliContext, size: int) -> int:
 
 
 def run(args: argparse.Namespace) -> int:
-    content_root = Path(args.content).resolve() if args.content else None
+    content_root = open_content_root(Path(args.content).resolve() if args.content else Path.cwd())
     snapshot = load_corpus(content_root)
     store = SQLiteReviewStore(args.db)
-    session_id = _open_session(args, store)
+    session_id = _open_session(args, store, content_root)
     if session_id is None:
         return 2
     print(f"session {session_id}")
@@ -124,7 +131,7 @@ def run(args: argparse.Namespace) -> int:
         store=store,
         session_id=session_id,
         scripted=[part.strip() for part in args.script.split(",")] if args.script else [],
-        script_mode=bool(args.script),
+        script_mode=args.script is not None,
     )
     return _review_loop(ctx, args.size)
 

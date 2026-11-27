@@ -1,10 +1,11 @@
 ﻿from datetime import UTC, datetime
 from pathlib import Path
+from typing import cast
 import argparse
 import sqlite3
 
 from ebbifold.corpus import load_corpus
-from ebbifold.review.cli import run
+from ebbifold.review.cli import CliContext, _read_answer, run
 from ebbifold.review.engine import ReviewEngine
 from ebbifold.review.store import AttemptInput, SQLiteReviewStore
 
@@ -43,14 +44,17 @@ def test_review_engine_uses_persisted_attempts_for_next_item(tmp_path):
 
     first = engine.next_question([], [])
     assert first is not None
+    baseline_priority = engine.concept_priorities([])[first.concept_id]
     _attempt(store, session_id, first.id, False)
 
     session_attempts = store.attempts(session_id)
-    second = engine.next_question(session_attempts, store.attempts())
+    persisted_attempts = store.attempts()
+    persisted_priority = engine.concept_priorities(persisted_attempts)[first.concept_id]
+    second = engine.next_question(session_attempts, persisted_attempts)
 
+    assert persisted_priority != baseline_priority
     assert second is not None
     assert second.id != first.id
-    assert second.concept_priority != 0 or first.concept_priority != 0
 
 
 def test_review_store_schema_is_domain_neutral(tmp_path):
@@ -91,3 +95,15 @@ def test_scripted_cli_session_persists_attempt_and_resumes(tmp_path, capsys):
     store = SQLiteReviewStore(db)
     assert store.session_exists(session_id)
     assert len(store.attempts(session_id)) == 2
+    with sqlite3.connect(db) as conn:
+        stored_root = conn.execute("SELECT content_root FROM review_sessions WHERE session_id = ?", (session_id,)).fetchone()[0]
+    assert stored_root.replace("\\", "/").endswith("/open-content")
+
+
+def test_empty_script_and_eof_end_without_input(monkeypatch):
+    ctx = CliContext(engine=cast(ReviewEngine, None), store=cast(SQLiteReviewStore, None), session_id="s", scripted=[], script_mode=True)
+    assert _read_answer(ctx, 0) == (None, 0)
+
+    interactive = CliContext(engine=cast(ReviewEngine, None), store=cast(SQLiteReviewStore, None), session_id="s", scripted=[], script_mode=False)
+    monkeypatch.setattr("builtins.input", lambda _: (_ for _ in ()).throw(EOFError()))
+    assert _read_answer(interactive, 0) == (None, 0)
