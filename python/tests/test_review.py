@@ -38,6 +38,29 @@ def test_review_store_persists_attempts_across_restarts(tmp_path):
     assert attempts[0]["is_correct"] == 1
 
 
+def test_review_store_repairs_duplicate_attempts_on_open(tmp_path):
+    path = tmp_path / "review.sqlite3"
+    store = SQLiteReviewStore(path)
+    session_id = store.create_session("validation-corpus")
+    _attempt(store, session_id, "item-1", True)
+
+    with sqlite3.connect(path) as conn:
+        conn.execute("DROP INDEX attempts_session_item_unique")
+        conn.execute(
+            """
+            INSERT INTO attempts(
+                attempt_id, session_id, item_id, selected_label, is_correct, attempt_number, answered_at
+            ) VALUES ('duplicate-attempt', ?, 'item-1', 'B', 0, 2, ?)
+            """,
+            (session_id, datetime.now(UTC).isoformat()),
+        )
+
+    reopened = SQLiteReviewStore(path)
+    attempts = reopened.attempts(session_id)
+    assert len(attempts) == 1
+    assert attempts[0]["item_id"] == "item-1"
+
+
 def test_review_engine_uses_persisted_attempts_for_next_item(tmp_path, monkeypatch):
     snapshot = load_corpus()
     engine = ReviewEngine(snapshot, now_ms=1_700_000_000_000)

@@ -87,8 +87,18 @@ class SQLiteReviewStore:
                 );
                 CREATE INDEX IF NOT EXISTS attempts_session_idx ON attempts(session_id, answered_at);
                 CREATE INDEX IF NOT EXISTS attempts_item_idx ON attempts(item_id, answered_at);
-                CREATE UNIQUE INDEX IF NOT EXISTS attempts_session_item_unique ON attempts(session_id, item_id);
                 """
+            )
+            conn.execute(
+                """
+                DELETE FROM attempts
+                WHERE rowid NOT IN (
+                    SELECT MIN(rowid) FROM attempts GROUP BY session_id, item_id
+                )
+                """
+            )
+            conn.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS attempts_session_item_unique ON attempts(session_id, item_id)"
             )
             conn.execute(
                 "INSERT OR REPLACE INTO metadata(key, value) VALUES ('schema_version', ?)",

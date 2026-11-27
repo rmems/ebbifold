@@ -104,11 +104,17 @@ class ReviewApi:
         self.store = store
         self.content_root = content_root
 
+    def repair_completed_session(self, row: Any) -> Any:
+        if row["status"] != "active" or self.current_question(row["session_id"]) is not None:
+            return row
+        self.store.complete_session(row["session_id"])
+        return self.store.session(row["session_id"])
+
     def session_row(self, session_id: str) -> Any:
         row = self.store.session(session_id)
         if row is None:
             raise HTTPException(status_code=404, detail="unknown review session")
-        return row
+        return self.repair_completed_session(row)
 
     def fresh_engine(self) -> ReviewEngine:
         return ReviewEngine(self.engine.snapshot, days_to_exam=self.engine.days_to_exam)
