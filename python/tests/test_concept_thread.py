@@ -81,6 +81,37 @@ def test_concept_thread_reserves_inside_existing_freshness_tier() -> None:
     assert all("_conceptThreadMatch" not in row for row in bulk["rotationQuestions"])
 
 
+def test_concept_thread_match_blocks_review_challenge_difficulty_shift() -> None:
+    now = 1_800_000_000_000
+    rows = [
+        {"id": "followup", "stem": "Most likely diagnosis of renal tubular acidosis in a child?", "questionType": "diagnosis",
+         "difficulty": "medium", "variantGroupId": None, "variantType": None, "format": None,
+         "facilityIndex": None, "totalAttempts": None, "source": "bank", "topics": ["Renal Tubular Acidosis"]},
+        {"id": "shifted-hard", "stem": "Hard renal tubular acidosis question", "questionType": "diagnosis",
+         "difficulty": "hard", "variantGroupId": None, "variantType": None, "format": None,
+         "facilityIndex": None, "totalAttempts": None, "source": "bank", "topics": ["Renal Tubular Acidosis"]},
+    ]
+    bulk = {
+        "rotation": "rot-main",
+        "questionConceptLinks": [{"questionId": row["id"], "conceptId": "c-renal", "isPrimary": True} for row in rows],
+        "questionMap": {row["id"]: row for row in rows}, "rotationQuestions": rows,
+        "questionScores": {}, "questionExamRelevance": {}, "questionFamiliarity": {},
+    }
+    concept = {"topics": ["Renal Tubular Acidosis"]}
+    matched_bulk = {**bulk, "conceptThreadMatcher": prepare_concept_thread_matcher([_anchor(now)], now)}
+    matched = get_questions_from_bulk(
+        "c-renal", concept, 1, matched_bulk, selected_question_ids=set(), selected_question_variant_groups=set(),
+        review_challenge=1, challenge_slot_index=2,
+    )
+    assert [row["id"] for row in matched] == ["followup"]
+
+    unmatched = get_questions_from_bulk(
+        "c-renal", concept, 1, bulk, selected_question_ids=set(), selected_question_variant_groups=set(),
+        review_challenge=1, challenge_slot_index=2,
+    )
+    assert [row["id"] for row in unmatched] == ["shifted-hard"]
+
+
 def test_session_marks_one_concept_followup_and_reserves_only_one() -> None:
     base = copy.deepcopy(next(c for c in SESSIONS if c["name"] == "full_session_weak_new_pristine")["snapshot"])
     anchor = _anchor(base["nowMs"])
