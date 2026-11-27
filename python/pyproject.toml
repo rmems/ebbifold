@@ -5,16 +5,20 @@ description = "Spaced repetition over an embedding of concepts — Python port o
 requires-python = ">=3.12"
 license = { text = "MIT" }
 dependencies = [
+    "fastapi>=0.115",
     "jsonschema[format]>=4.23",
     "numpy>=2.1",
     "pydantic>=2.10",
+    "uvicorn>=0.30",
 ]
 
 [project.scripts]
 ebbifold-review = "ebbifold.review.cli:main"
+ebbifold-review-api = "ebbifold.review.api:main"
 
 [dependency-groups]
 dev = [
+    "httpx>=0.27",
     "pytest>=8.0",
     "pytest-cov>=6.0",
 ]

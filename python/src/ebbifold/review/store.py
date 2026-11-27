@@ -103,12 +103,14 @@ class SQLiteReviewStore:
             )
         return session_id
 
-    def session_exists(self, session_id: str) -> bool:
+    def session(self, session_id: str) -> sqlite3.Row | None:
         with self._connect() as conn:
-            row = conn.execute(
-                "SELECT 1 FROM review_sessions WHERE session_id = ?", (session_id,)
+            return conn.execute(
+                "SELECT * FROM review_sessions WHERE session_id = ?", (session_id,)
             ).fetchone()
-        return row is not None
+
+    def session_exists(self, session_id: str) -> bool:
+        return self.session(session_id) is not None
 
     def record_attempt(self, attempt: AttemptInput) -> str:
         attempt_id = str(uuid.uuid4())

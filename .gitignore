@@ -171,3 +171,12 @@ content/gamsat/_harvest/index.json
 # Embedding cache / learner memory (runtime artifacts, never committed)
 .ebbifold-cache/
 /python/.cache/
+
+# Local review runtime databases (personal learner memory)
+*.sqlite
+*.sqlite3
+*.db
+
+*-wal
+*-shm
+
