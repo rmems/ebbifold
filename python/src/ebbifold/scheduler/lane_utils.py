@@ -43,6 +43,7 @@ class QuestionPoolRequest:
     concept: dict[str, Any]
     difficulty: str
     slot: int | None = None
+    allow_concept_thread: bool = True
 
 
 @dataclass(frozen=True)
@@ -109,6 +110,7 @@ def question_pool(request: QuestionPoolRequest) -> list[dict[str, Any]]:
         topic_recency_days=options.get("topicRecencyDays"),
         mastered_reentry_counter=request.build.mastered_reentry_counter,
         recent_formats_by_concept=inputs.get("recentFormatsByConcept"),
+        concept_thread_matcher=(request.build.available_concept_thread_matcher() if request.allow_concept_thread else None),
         **exam,
     )
 
@@ -158,6 +160,7 @@ def _initial_build_state(inputs: dict[str, Any], plan: dict[str, Any], size: int
         question_familiarity=bulk["questionFamiliarity"].keys(), excluded_card_ids=inputs["excludedCardIds"],
         excluded_question_ids=inputs["excludedQuestionIds"], excluded_video_ids=inputs["excludedVideoIds"],
         weak_concepts=plan["weakConcepts"], concept_thread_anchors=inputs.get("conceptThreadAnchors") or [],
+        now_ms=inputs["nowMs"],
     )
 
 
@@ -245,5 +248,27 @@ def _simulation_registry(inputs: dict[str, Any]):
 CONCEPT_THREAD_POLICY_VERSION = "clinical-thread-facets-v1"
 
 
-def thread_trace() -> dict[str, Any]:
-    return {"conceptThreadPolicyVersion": CONCEPT_THREAD_POLICY_VERSION, "conceptThreadPolicyApplied": False}
+def question_thread_fields(question: dict[str, Any], fallback_reason: str) -> dict[str, Any]:
+    match = question.get("conceptThreadMatch")
+    return {"interventionReason": "concept_followup" if match else fallback_reason, **thread_trace(match)}
+
+
+def record_question_thread_selection(build: SessionBuildState, question: dict[str, Any], added: bool) -> None:
+    if added and question.get("conceptThreadMatch"):
+        build.concept_thread_followup_selected = True
+
+
+def thread_trace(match: dict[str, Any] | None = None) -> dict[str, Any]:
+    trace = {"conceptThreadPolicyVersion": CONCEPT_THREAD_POLICY_VERSION, "conceptThreadPolicyApplied": False}
+    if match:
+        trace.update({
+            "conceptThreadPolicyApplied": True,
+            "conceptThreadAnchorEventId": match["anchorEventId"],
+            "conceptThreadAnchorItemId": match["anchorItemId"],
+            "conceptThreadAnchorFacet": match["anchorFacet"],
+            "conceptThreadTargetFacet": match["targetFacet"],
+            "conceptThreadSharedTopic": match["sharedTopic"],
+            "conceptThreadAgeMs": match["ageMs"],
+            "conceptThreadInterveningExposures": match["interveningExposures"],
+        })
+    return trace

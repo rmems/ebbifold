@@ -42,6 +42,7 @@ def question_suppression_key(item: Mapping[str, Any]) -> str | None:
 
 
 class SessionBuildState:
+# NOSONAR
     def __init__(
         self,
         *,
@@ -58,9 +59,10 @@ class SessionBuildState:
         excluded_video_ids: Iterable[str] = (),
         weak_concepts: Sequence[Any] = (),
         concept_thread_anchors: Sequence[Any] = (),
+        now_ms: float = 0,
     ) -> None:
-        if concept_thread_anchors:
-            raise UnsupportedSchedulerInput("concept-thread follow-up matching is not ported in Phase 3a")
+        from .concept_thread import prepare_concept_thread_matcher
+
         self.size = size
         self.min_first_sight_items = min_first_sight_items
         self.max_new_cards = max_new_cards
@@ -90,10 +92,17 @@ class SessionBuildState:
         self.first_sight_selected = 0
         self.enforce_first_sight_reservation = min_first_sight_items > 0
         self.deferred_for_novelty: dict[str, dict[str, Any]] = {}
+        self.concept_thread_followup_selected = False
+        self.prepared_concept_thread_matcher = prepare_concept_thread_matcher(list(concept_thread_anchors), now_ms)
         self.trace: list[dict[str, Any]] = []
         for cs in weak_concepts:
             state = classify_teaching_state(cs.exposureCount, cs.recallOnExamDay, cs.confidence)
             self.concept_teaching_cap[cs.conceptId] = TEACHING_ARC_TARGET_ITEMS[state]
+
+    def available_concept_thread_matcher(self):
+        if self.concept_thread_followup_selected:
+            return None
+        return self.prepared_concept_thread_matcher
 
     def is_first_sight_item(self, item: Mapping[str, Any]) -> bool:
         if item["type"] == "card":

@@ -17,6 +17,8 @@ from .lane_utils import (
     card_pool,
     commit_card,
     question_pool,
+    question_thread_fields,
+    record_question_thread_selection,
     resolve_reason,
     thread_trace,
 )
@@ -152,10 +154,11 @@ def _try_backfill_question(inputs: dict[str, Any], build: SessionBuildState, con
     if not questions:
         return
     question = questions[0]
-    build.add_item({"type": "question", "id": question["id"], "conceptId": concept.conceptId,
-                    "conceptName": concept.conceptName, "priority": concept.priority,
-                    "interventionReason": "reinforcement", **thread_trace(),
-                    "variantGroupId": question.get("variantGroupId"), "variantType": question.get("variantType")})
+    added = build.add_item({"type": "question", "id": question["id"], "conceptId": concept.conceptId,
+                            "conceptName": concept.conceptName, "priority": concept.priority,
+                            **question_thread_fields(question, "reinforcement"),
+                            "variantGroupId": question.get("variantGroupId"), "variantType": question.get("variantType")})
+    record_question_thread_selection(build, question, added)
 
 
 def _backfill_any_concept_questions(inputs: dict[str, Any], plan: dict[str, Any], build: SessionBuildState) -> None:
@@ -184,7 +187,7 @@ def _stale_strong_concepts(plan: dict[str, Any], build: SessionBuildState) -> li
 def _question_item(question: dict[str, Any], concept: Any, reason: str) -> dict[str, Any]:
     return {"type": "question", "id": question["id"], "conceptId": concept.conceptId,
             "conceptName": concept.conceptName, "priority": concept.priority,
-            "interventionReason": reason, **thread_trace(),
+            **question_thread_fields(question, reason),
             "variantGroupId": question.get("variantGroupId"), "variantType": question.get("variantType")}
 
 
@@ -192,11 +195,14 @@ def _probe_stale_concept(inputs: dict[str, Any], plan: dict[str, Any], build: Se
     data = inputs["conceptMap"].get(concept.conceptId)
     if not data:
         return
-    questions = question_pool(QuestionPoolRequest(inputs, build, concept.conceptId, data, "hard"))
+    reason = resolve_reason(ReasonRequest(inputs, plan, concept.conceptId, concept.recallOnExamDay, "needs_retest"))
+    questions = question_pool(QuestionPoolRequest(
+        inputs, build, concept.conceptId, data, "hard", None, reason != "failure_escalation",
+    ))
     if not questions:
         return
-    reason = resolve_reason(ReasonRequest(inputs, plan, concept.conceptId, concept.recallOnExamDay, "needs_retest"))
-    build.add_item(_question_item(questions[0], concept, reason))
+    added = build.add_item(_question_item(questions[0], concept, reason))
+    record_question_thread_selection(build, questions[0], added)
 
 
 def probe_stale_strong_concepts(inputs: dict[str, Any], plan: dict[str, Any], build: SessionBuildState) -> None:

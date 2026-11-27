@@ -27,8 +27,9 @@ from .lane_utils import (
     commit_card,
     create_session_build,
     question_pool,
+    question_thread_fields,
+    record_question_thread_selection,
     resolve_reason,
-    thread_trace,
 )
 from .mastery_lanes import hold_back_unearned_stages, reserve_applied_surplus, reserve_scheduled_core
 from .prep_lanes import reserve_session_prep_blend
@@ -174,14 +175,17 @@ def fill_questions(inputs: dict[str, Any], plan: dict[str, Any], build: SessionB
                 continue
             questions = question_pool(QuestionPoolRequest(
                 inputs, build, concept.conceptId, data, difficulty, build.selected_question_count,
+                reason != "failure_escalation",
             ))
             if not questions:
                 continue
             q = questions[0]
-            if build.add_item({"type": "question", "id": q["id"], "conceptId": concept.conceptId,
-                               "conceptName": concept.conceptName, "priority": concept.priority,
-                               "interventionReason": reason, **thread_trace(),
-                               "variantGroupId": q.get("variantGroupId"), "variantType": q.get("variantType")}):
+            added = build.add_item({"type": "question", "id": q["id"], "conceptId": concept.conceptId,
+                                    "conceptName": concept.conceptName, "priority": concept.priority,
+                                    **question_thread_fields(q, reason),
+                                    "variantGroupId": q.get("variantGroupId"), "variantType": q.get("variantType")})
+            record_question_thread_selection(build, q, added)
+            if added:
                 added_this_pass += 1
         if added_this_pass == 0:
             break

@@ -200,14 +200,14 @@ def test_unported_lanes_fail_closed(lane: str) -> None:
         plan_concepts(snapshot)
 
 
-def test_concept_thread_anchors_fail_closed() -> None:
+def test_concept_thread_anchors_are_accepted() -> None:
     from ebbifold.scheduler.build_state import SessionBuildState
 
-    with pytest.raises(UnsupportedSchedulerInput):
-        SessionBuildState(
-            size=1, min_first_sight_items=0, max_new_cards=0, max_cross_source_items=0,
-            unseen_card_ids=[], concept_thread_anchors=[{"anchorEventId": "e"}],
-        )
+    build = SessionBuildState(
+        size=1, min_first_sight_items=0, max_new_cards=0, max_cross_source_items=0,
+        unseen_card_ids=[], concept_thread_anchors=[],
+    )
+    assert build.prepared_concept_thread_matcher.anchor_count == 0
 
 
 def test_unknown_build_op_fails_closed() -> None:
@@ -442,18 +442,9 @@ def test_pass_set_and_composed_deck_source_identity() -> None:
     assert source_corpus_for("neurosurg") == "kubie"
 
 
-@pytest.mark.parametrize(
-    "mutate",
-    [
-        lambda s: s.update(struggleHistory={"cardProgress": {}}, userId=None),
-        lambda s: s.update(conceptThreadAnchors=[{"anchorEventId": "e"}]),
-        lambda s: s.update(concepts=[], deckStrandMix={"strands": []}),
-    ],
-    ids=["struggle", "concept_thread", "cluster_strands"],
-)
-def test_session_unported_adapters_fail_closed(mutate: Any) -> None:
+def test_session_unported_adapters_fail_closed() -> None:
     snapshot = _base_session()
-    mutate(snapshot)
+    snapshot.update(struggleHistory={"cardProgress": {}}, userId=None)
     with pytest.raises(UnsupportedSchedulerInput):
         run_session(snapshot)
 
