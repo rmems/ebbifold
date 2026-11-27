@@ -27,7 +27,6 @@ from .policies import (
     figure_cooldown_boost,
     item_teaching_week,
     media_presence_boost,
-    freshness_tier,
     partition_by_freshness,
     prioritize_least_recently_served_contrast_siblings,
     question_eligible_for_review_learning,

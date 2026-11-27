@@ -17,7 +17,7 @@ from .cluster_card_selection import select_cluster_cards
 from .cluster_eligibility import eligible_rows, restricted
 from .deck_strand_mix import order_by_deck_strands
 from .lane_utils import thread_trace
-from .prep_allocation import order_session_prep_candidates, prep_modality_budgets
+from .prep_allocation import order_session_prep_candidates
 from .queue import break_modality_runs, compute_concept_pairing_rate, order_by_manifold_walk
 from .scoring import classify_teaching_state, enforce_concept_teaching_caps
 
