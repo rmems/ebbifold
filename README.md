@@ -40,10 +40,10 @@ SQLite databases default to the user data directory and are gitignored.
 
 ## Datasets
 
-| | |
-|---|---|
-| **Dataset #1 — USMLE Step 1** | 556 original, citation-backed questions plus a 25-item baseline set, under `open-content/usmle/step1/` |
-| **Dataset #2 — AI Engineering blueprint** | Planned. A second exam blueprint exercising the same engine, unmodified |
+|                                           |                                                                                                        |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| **Dataset #1 — USMLE Step 1**             | 556 original, citation-backed questions plus a 25-item baseline set, under `open-content/usmle/step1/` |
+| **Dataset #2 — AI Engineering blueprint** | Planned. A second exam blueprint exercising the same engine, unmodified                                |
 
 The corpus is frozen: the JSON files under `open-content/` are the data
 contract. Python reads them as-is — no format conversion, no re-authoring.

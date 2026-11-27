@@ -82,7 +82,7 @@ Tooling: `uv` + `pytest`. Python ≥3.12, type hints throughout, pydantic models
 
 ### Phase 6 — Dataset #2: AI Engineering blueprint
 
-- Author an AI-engineering blueprint in the exam-target *shape* (registry + policy concepts only — not the retired server stack): courses/competencies as concepts, questions authored or generated against them.
+- Author an AI-engineering blueprint in the exam-target _shape_ (registry + policy concepts only — not the retired server stack): courses/competencies as concepts, questions authored or generated against them.
 - Same engine, second dataset — the degree tie-in made concrete.
 - **Gate:** a blueprint session runs end-to-end through the Phase 4 app, unmodified engine code.
 
