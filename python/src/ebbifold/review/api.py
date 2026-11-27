@@ -152,9 +152,18 @@ def create_app(content: str | Path | None = None, db: str | Path | None = None) 
     app = FastAPI(title="ebbifold local review API")
     app.get("/health")(api.health)
     app.post("/sessions", status_code=201)(api.create_session)
-    app.get("/sessions/{session_id}")(api.inspect_session)
-    app.get("/sessions/{session_id}/current")(api.inspect_current)
-    app.post("/sessions/{session_id}/answers", status_code=201)(api.submit_answer)
+    missing_session = {404: {"description": "Unknown review session"}}
+    app.get("/sessions/{session_id}", responses=missing_session)(api.inspect_session)
+    app.get("/sessions/{session_id}/current", responses=missing_session)(api.inspect_current)
+    app.post(
+        "/sessions/{session_id}/answers",
+        status_code=201,
+        responses={
+            **missing_session,
+            409: {"description": "No current item remains or the answer item is stale"},
+            422: {"description": "Answer label is not one of the displayed labels"},
+        },
+    )(api.submit_answer)
     return app
 
 
