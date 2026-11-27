@@ -339,7 +339,7 @@ def test_mastery_seat_allocator_and_prep_ordering() -> None:
         allocate_exam_target_concept_order,
         allocate_mastery_seats,
     )
-    from ebbifold.scheduler.lanes import order_prep_keys
+    from ebbifold.scheduler.prep_lanes import order_prep_keys
 
     candidates = [
         {"itemKey": "card:one", "unitId": "u1", "stage": "scheduled-atomic-core"},
@@ -427,7 +427,7 @@ def test_session_prep_blend_and_positive_mastery_seats_are_constructed() -> None
 
 
 def test_pass_set_and_composed_deck_source_identity() -> None:
-    from ebbifold.scheduler.lanes import _pass_set_rank
+    from ebbifold.scheduler.rescue_lanes import _pass_set_rank
     from ebbifold.scheduler.queue import source_corpus_for
 
     bulk = {
