@@ -197,6 +197,46 @@ def _apply_prerequisite_boosts(
         _boost_one_prerequisite_chain(concept, state, states_by_id, concept_by_id)
 
 
+def _apply_hub_readiness_dampening(
+    concepts: list[dict[str, Any]], states: list[ConceptState], states_by_id: dict[str, ConceptState]
+) -> None:
+    prereq_recalls = {s.conceptId: s.recallOnExamDay for s in states}
+    for concept in concepts:
+        prereqs = concept.get("prerequisiteIds", [])
+        if not prereqs:
+            continue
+        state = states_by_id.get(concept["id"])
+        if state is None:
+            continue
+        ready, dampening = smath.compute_hub_readiness(prereqs, prereq_recalls)
+        if not ready:
+            state.priority *= dampening
+
+
+def _topic_to_cluster(cards: list[dict[str, Any]]) -> dict[str, str]:
+    topic_to_cluster: dict[str, str] = {}
+    for card in cards:
+        if not card.get("clusterId"):
+            continue
+        for topic in card["topics"]:
+            topic_to_cluster.setdefault(topic, card["clusterId"])
+    return topic_to_cluster
+
+
+def _cluster_lookup(concept_by_id: dict[str, dict[str, Any]], topic_to_cluster: dict[str, str]) -> Any:
+    def get_concept_cluster(cs: ConceptState) -> str:
+        data = concept_by_id.get(cs.conceptId)
+        if data is None:
+            return cs.conceptId
+        for topic in data["topics"]:
+            cluster = topic_to_cluster.get(topic)
+            if cluster:
+                return cluster
+        return cs.conceptId
+
+    return get_concept_cluster
+
+
 def rank_concepts(inputs: dict[str, Any]) -> ConceptRanking:
     assert_supported(inputs)
     options = inputs.get("options", {})
@@ -211,36 +251,10 @@ def rank_concepts(inputs: dict[str, Any]) -> ConceptRanking:
     # Prerequisite boost: weak concepts lift their unsolid prerequisites (BFS, depth <= 3).
     _apply_prerequisite_boosts(concepts, states_by_id, concept_by_id)
 
-    prereq_recalls = {s.conceptId: s.recallOnExamDay for s in states}
-    for concept in concepts:
-        prereqs = concept.get("prerequisiteIds", [])
-        if not prereqs:
-            continue
-        state = states_by_id.get(concept["id"])
-        if state is None:
-            continue
-        ready, dampening = smath.compute_hub_readiness(prereqs, prereq_recalls)
-        if not ready:
-            state.priority *= dampening
+    _apply_hub_readiness_dampening(concepts, states, states_by_id)
 
     all_cards = [*bulk.get("unseenCards", []), *bulk.get("seenCards", [])]
-    topic_to_cluster: dict[str, str] = {}
-    for card in all_cards:
-        if not card.get("clusterId"):
-            continue
-        for topic in card["topics"]:
-            topic_to_cluster.setdefault(topic, card["clusterId"])
-
-    def get_concept_cluster(cs: ConceptState) -> str:
-        data = concept_by_id.get(cs.conceptId)
-        if data is None:
-            return cs.conceptId
-        for topic in data["topics"]:
-            cluster = topic_to_cluster.get(topic)
-            if cluster:
-                return cluster
-        return cs.conceptId
-
+    get_concept_cluster = _cluster_lookup(concept_by_id, _topic_to_cluster(all_cards))
     recent_cluster = inputs.get("recentClusterExposures") or {}
     if recent_cluster and sum(recent_cluster.values()) > 0:
         for state in states:
