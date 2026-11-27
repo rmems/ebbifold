@@ -93,6 +93,8 @@ class ConceptManifold:
         if norm <= 0.0:
             raise EmbeddingError("query is a zero vector; cosine is undefined")
         unit_query = q / norm
+        if len(self._row_groups) == len(self._ids):
+            return self._unit @ unit_query
         result = np.empty(len(self._ids), dtype=np.float64)
         for indices in self._row_groups:
             score = self._unit[indices[0]] @ unit_query
