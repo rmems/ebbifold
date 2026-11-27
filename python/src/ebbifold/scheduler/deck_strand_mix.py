@@ -34,6 +34,18 @@ def deck_strand_of(mix: dict[str, Any], identity: dict[str, Any]) -> str:
     return strands[-1]["id"] if strands else "default"
 
 
+def strand_seat_targets(mix: dict[str, Any] | None, seats: int) -> dict[str, int]:
+    strands = (mix or {}).get("strands") or []
+    if seats <= 0 or not strands:
+        return {}
+    exact = [(strand["id"], seats * float(strand.get("share") or 0)) for strand in strands]
+    targets = {sid: int(value) for sid, value in exact}
+    remaining = seats - sum(targets.values())
+    for sid, _value in sorted(exact, key=lambda pair: pair[1] - int(pair[1]), reverse=True)[:remaining]:
+        targets[sid] += 1
+    return targets
+
+
 def _strand_units(items, mix, identify, keep_with_previous):
     units = []
     for item in items:
