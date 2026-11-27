@@ -20,3 +20,6 @@ packages = ["src/ebbifold"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Tests import the package straight from src/ so CI can skip building it
+# (uv sync --no-install-project --no-build — no setup-script execution).
+pythonpath = ["src"]
