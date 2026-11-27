@@ -111,7 +111,10 @@ def create_session_build(inputs: dict[str, Any], plan: dict[str, Any]) -> Sessio
     build.selected_core_target_seats = 0
     build.selected_surplus_target_seats = 0
     workload_core = (inputs.get("targetWorkload") or {}).get("coreTargetSeats")
-    requirement = (size if workload_core is None else workload_core) if inputs.get("applyExamTarget") else 0
+    if inputs.get("applyExamTarget"):
+        requirement = size if workload_core is None else workload_core
+    else:
+        requirement = 0
     build.core_target_quota_satisfied = requirement == 0
     if inputs.get("applyExamTarget") and requirement > 0 and inputs.get("masteryEvidence") is None:
         for card in bulk["unseenCards"] + bulk["seenCards"]:
@@ -123,25 +126,31 @@ def create_session_build(inputs: dict[str, Any], plan: dict[str, Any]) -> Sessio
     return build
 
 
+def _expanded_topics(inputs: dict[str, Any], concept_id: str) -> set[str]:
+    concept = inputs["conceptMap"].get(concept_id)
+    return set(expand_topic_set((concept or {}).get("topics") or []))
+
+
+def _topic_fallback_state(inputs: dict[str, Any], plan: dict[str, Any], topics: list[str]):
+    matches = [state for state in plan["conceptStates"] if any(topic in _expanded_topics(inputs, state.conceptId) for topic in topics)]
+    matches.sort(key=lambda state: (-state.priority, state.conceptId))
+    return matches[0] if matches else None
+
+
+def _scored_card_state(inputs: dict[str, Any], plan: dict[str, Any], card: dict[str, Any]):
+    best = None
+    for state in plan["conceptStates"]:
+        score = (inputs["bulk"]["cardScores"].get(state.conceptId) or {}).get(card["id"])
+        if score is None:
+            continue
+        if best is None or score > best[1] or (score == best[1] and state.conceptId < best[0].conceptId):
+            best = (state, score)
+    return best[0] if best else None
+
+
 def _core_card_resolver(inputs: dict[str, Any], plan: dict[str, Any]):
     def resolve(card: dict[str, Any]):
-        best = None
-        for state in plan["conceptStates"]:
-            score = (inputs["bulk"]["cardScores"].get(state.conceptId) or {}).get(card["id"])
-            if score is None:
-                continue
-            if best is None or score > best[1] or (score == best[1] and state.conceptId < best[0].conceptId):
-                best = (state, score)
-        if best:
-            return best[0]
-        matches = []
-        for state in plan["conceptStates"]:
-            concept = inputs["conceptMap"].get(state.conceptId)
-            expanded = set(expand_topic_set((concept or {}).get("topics") or []))
-            if any(topic in expanded for topic in card.get("topics") or []):
-                matches.append(state)
-        matches.sort(key=lambda s: (-s.priority, s.conceptId))
-        return matches[0] if matches else None
+        return _scored_card_state(inputs, plan, card) or _topic_fallback_state(inputs, plan, card.get("topics") or [])
     return resolve
 
 
@@ -153,6 +162,37 @@ def _mastery_candidates(evidence: dict[str, Any], stages: set[str]) -> list[dict
         for key in (unit.get("safeMetadata") or {}).get("candidateItemKeys") or []:
             rows.append({"itemKey": key, "unitId": unit.get("unitId"), "stage": unit.get("stage")})
     return rows
+
+
+def _reserve_core_unit(inputs: dict[str, Any], build: SessionBuildState, unit: dict[str, Any],
+                       cards: dict[str, dict[str, Any]], active: dict[str, float], resolve: Any) -> bool:
+    candidates = [
+        cards[key[5:]] for key in (unit.get("safeMetadata") or {}).get("candidateItemKeys") or []
+        if key.startswith("card:") and key[5:] in cards
+    ]
+    candidates.sort(key=lambda card: (-(active.get(card["id"]) or 0), -(card.get("importance") or 1), card["id"]))
+    picked = build.pick_card_candidate(candidates, similarity_threshold=inputs["interferenceThreshold"], max_per_cluster=3)
+    if not picked:
+        return False
+    concept = resolve(picked)
+    weak = concept and concept.recallOnExamDay < DEFAULTS["recall_threshold"]
+    item = card_item(
+        picked, conceptId=concept.conceptId if concept else "_unattached",
+        conceptName=concept.conceptName if concept else "Scheduled atomic core",
+        priority=max(1, concept.priority if concept else 0),
+        interventionReason="weak_recall" if weak else "reinforcement",
+        examTargetMasteryStage="scheduled-atomic-core", examTargetMasteryUnitId=unit.get("unitId"),
+    )
+    return commit_card(build, picked, item, record_recall=False)
+
+
+def _reserve_core_units(inputs: dict[str, Any], build: SessionBuildState, ordered_units: list[dict[str, Any]],
+                        cards: dict[str, dict[str, Any]], active: dict[str, Any], resolve: Any, quota: int) -> None:
+    for unit in ordered_units:
+        if build.selected_core_target_seats >= quota:
+            break
+        if _reserve_core_unit(inputs, build, unit, cards, active, resolve):
+            build.selected_core_target_seats += 1
 
 
 def reserve_scheduled_core(inputs: dict[str, Any], plan: dict[str, Any], build: SessionBuildState) -> None:
@@ -173,37 +213,66 @@ def reserve_scheduled_core(inputs: dict[str, Any], plan: dict[str, Any], build: 
     ordered_units = [u for u in evidence.get("units") or [] if u.get("stage") == "scheduled-atomic-core" and u.get("unitId") in planned]
     active = active_targets(inputs)["card"]
     resolve = _core_card_resolver(inputs, plan)
-    for unit in ordered_units:
-        if build.selected_core_target_seats >= (workload.get("coreTargetSeats") or 0):
-            break
-        candidates = []
-        for key in (unit.get("safeMetadata") or {}).get("candidateItemKeys") or []:
-            if not key.startswith("card:") or key[5:] not in cards:
-                continue
-            candidates.append(cards[key[5:]])
-        candidates.sort(key=lambda c: (-(active.get(c["id"]) or 0), -(c.get("importance") or 1), c["id"]))
-        picked = build.pick_card_candidate(candidates, similarity_threshold=inputs["interferenceThreshold"], max_per_cluster=3)
-        if not picked:
-            continue
-        concept = resolve(picked)
-        reason = "weak_recall" if concept and concept.recallOnExamDay < DEFAULTS["recall_threshold"] else "reinforcement"
-        item = card_item(
-            picked, conceptId=concept.conceptId if concept else "_unattached",
-            conceptName=concept.conceptName if concept else "Scheduled atomic core",
-            priority=max(1, concept.priority if concept else 0), interventionReason=reason,
-            examTargetMasteryStage="scheduled-atomic-core", examTargetMasteryUnitId=unit.get("unitId"),
-        )
-        if commit_card(build, picked, item, record_recall=False):
-            build.selected_core_target_seats += 1
+    quota = workload.get("coreTargetSeats") or 0
+    _reserve_core_units(inputs, build, ordered_units, cards, active, resolve, quota)
     workload_core = workload.get("coreTargetSeats")
-    requirement = (inputs["size"] if workload_core is None else workload_core) if inputs.get("applyExamTarget") else 0
+    requirement = inputs["size"] if workload_core is None else workload_core
     build.core_target_quota_satisfied = build.selected_core_target_seats >= requirement
 
 
-def reserve_applied_surplus(inputs: dict[str, Any], plan: dict[str, Any], build: SessionBuildState) -> None:
+def _reserve_surplus_card(inputs: dict[str, Any], build: SessionBuildState, card: dict[str, Any],
+                          planned: dict[str, Any], resolve: Any) -> bool:
+    picked = build.pick_card_candidate([card], similarity_threshold=inputs["interferenceThreshold"], max_per_cluster=3)
+    if not picked:
+        return False
+    concept = resolve(picked)
+    weak = concept and concept.recallOnExamDay < DEFAULTS["recall_threshold"]
+    item = card_item(picked, conceptId=concept.conceptId if concept else "_unattached",
+                     conceptName=concept.conceptName if concept else "Exam-target surplus",
+                     priority=concept.priority if concept else 0.5,
+                     interventionReason="weak_recall" if weak else "reinforcement",
+                     examTargetMasteryStage=planned["stage"], examTargetMasteryUnitId=planned["unitId"])
+    return commit_card(build, picked, item, record_recall=False)
+
+
+def _reserve_surplus_question(inputs: dict[str, Any], build: SessionBuildState, question: dict[str, Any],
+                              planned: dict[str, Any], resolve: Any) -> bool:
     from .build_state import question_suppression_key
-    from .exam_target import allocate_mastery_seats
     from .policies import take_with_reentry_cap
+
+    suppression = question_suppression_key(question)
+    if question["id"] in build.selected_question_ids:
+        return False
+    if suppression and suppression in build.selected_question_variant_groups:
+        return False
+    if not take_with_reentry_cap(question["id"], inputs["bulk"]["questionFamiliarity"], build.mastered_reentry_counter):
+        return False
+    concept = resolve(question)
+    weak = concept and concept.recallOnExamDay < DEFAULTS["recall_threshold"]
+    return build.add_item({
+        "type": "question", "id": question["id"],
+        "conceptId": concept.conceptId if concept else f"rotation:{question['id']}",
+        "conceptName": concept.conceptName if concept else "Exam-target application",
+        "priority": concept.priority if concept else 0.5,
+        "interventionReason": "needs_retest" if weak else "reinforcement",
+        **thread_trace(), "variantGroupId": question.get("variantGroupId"), "variantType": question.get("variantType"),
+        "examTargetMasteryStage": planned["stage"], "examTargetMasteryUnitId": planned["unitId"],
+    })
+
+
+def _reserve_planned_surplus(inputs: dict[str, Any], build: SessionBuildState, bulk: dict[str, Any],
+                             cards: dict[str, dict[str, Any]], planned: dict[str, Any], resolve_card: Any,
+                             resolve_question: Any) -> bool:
+    key = planned["itemKey"]
+    if key.startswith("card:") and key[5:] in cards:
+        return _reserve_surplus_card(inputs, build, cards[key[5:]], planned, resolve_card)
+    if key.startswith("question:") and key[9:] in bulk["questionMap"]:
+        return _reserve_surplus_question(inputs, build, bulk["questionMap"][key[9:]], planned, resolve_question)
+    return False
+
+
+def reserve_applied_surplus(inputs: dict[str, Any], plan: dict[str, Any], build: SessionBuildState) -> None:
+    from .exam_target import allocate_mastery_seats
 
     evidence, workload = inputs.get("masteryEvidence"), inputs.get("targetWorkload")
     if not (inputs.get("applyExamTarget") and evidence and workload and (workload.get("surplusSeats") or 0) > 0
@@ -218,57 +287,26 @@ def reserve_applied_surplus(inputs: dict[str, Any], plan: dict[str, Any], build:
     )
     cards = {c["id"]: c for c in bulk["unseenCards"] + bulk["seenCards"]}
     resolve_card = _core_card_resolver(inputs, plan)
-    states = plan["statesById"]
+    resolve_question = _core_question_resolver(inputs, plan)
 
-    def resolve_question(question: dict[str, Any]):
-        links = [link for link in bulk["questionConceptLinks"] if link["questionId"] == question["id"] and link["conceptId"] in states]
-        links.sort(key=lambda link: (-(1 if link.get("isPrimary") else 0), -states[link["conceptId"]].priority, link["conceptId"]))
-        if links:
-            return states[links[0]["conceptId"]]
-        expanded_matches = []
-        for state in plan["conceptStates"]:
-            concept = inputs["conceptMap"].get(state.conceptId)
-            expanded = set(expand_topic_set((concept or {}).get("topics") or []))
-            if any(topic in expanded for topic in question.get("topics") or []):
-                expanded_matches.append(state)
-        expanded_matches.sort(key=lambda s: (-s.priority, s.conceptId))
-        return expanded_matches[0] if expanded_matches else None
-
+    quota = workload.get("surplusSeats") or 0
     for planned in allocation["selectedCandidates"]:
-        if planned["stage"] != "applied-distinction" or build.selected_surplus_target_seats >= (workload.get("surplusSeats") or 0):
+        if planned["stage"] != "applied-distinction" or build.selected_surplus_target_seats >= quota:
             continue
-        key = planned["itemKey"]
-        if key.startswith("card:") and key[5:] in cards:
-            card = cards[key[5:]]
-            picked = build.pick_card_candidate([card], similarity_threshold=inputs["interferenceThreshold"], max_per_cluster=3)
-            if not picked:
-                continue
-            concept = resolve_card(picked)
-            reason = "weak_recall" if concept and concept.recallOnExamDay < DEFAULTS["recall_threshold"] else "reinforcement"
-            item = card_item(picked, conceptId=concept.conceptId if concept else "_unattached",
-                             conceptName=concept.conceptName if concept else "Exam-target surplus",
-                             priority=concept.priority if concept else 0.5, interventionReason=reason,
-                             examTargetMasteryStage=planned["stage"], examTargetMasteryUnitId=planned["unitId"])
-            if commit_card(build, picked, item, record_recall=False):
-                build.selected_surplus_target_seats += 1
-        elif key.startswith("question:") and key[9:] in bulk["questionMap"]:
-            question = bulk["questionMap"][key[9:]]
-            suppression = question_suppression_key(question)
-            if question["id"] in build.selected_question_ids or (suppression and suppression in build.selected_question_variant_groups):
-                continue
-            if not take_with_reentry_cap(question["id"], bulk["questionFamiliarity"], build.mastered_reentry_counter):
-                continue
-            concept = resolve_question(question)
-            reason = "needs_retest" if concept and concept.recallOnExamDay < DEFAULTS["recall_threshold"] else "reinforcement"
-            added = build.add_item({"type": "question", "id": question["id"],
-                                    "conceptId": concept.conceptId if concept else f"rotation:{question['id']}",
-                                    "conceptName": concept.conceptName if concept else "Exam-target application",
-                                    "priority": concept.priority if concept else 0.5, "interventionReason": reason,
-                                    **thread_trace(), "variantGroupId": question.get("variantGroupId"),
-                                    "variantType": question.get("variantType"),
-                                    "examTargetMasteryStage": planned["stage"], "examTargetMasteryUnitId": planned["unitId"]})
-            if added:
-                build.selected_surplus_target_seats += 1
+        if _reserve_planned_surplus(inputs, build, bulk, cards, planned, resolve_card, resolve_question):
+            build.selected_surplus_target_seats += 1
+
+
+def _unearned_stage_denied(assignment: dict[str, Any] | None, source_rotation: str | None,
+                           *, session_rotation: str, eligible: set[str], quota_satisfied: bool) -> bool:
+    if not quota_satisfied and source_rotation != session_rotation:
+        return True
+    if not assignment:
+        return False
+    stage = assignment.get("stage")
+    if stage == "applied-distinction":
+        return assignment.get("unitId") not in eligible or not quota_satisfied
+    return stage == "breadth-exploration" and not quota_satisfied
 
 
 def hold_back_unearned_stages(inputs: dict[str, Any], build: SessionBuildState) -> None:
@@ -277,16 +315,12 @@ def hold_back_unearned_stages(inputs: dict[str, Any], build: SessionBuildState) 
         return
     eligible = set(inputs.get("eligibleAppliedUnitIds") or [])
     assignments = evidence.get("itemStageMap") or {}
+    quota = build.core_target_quota_satisfied
+    rotation = inputs["rotation"]
 
     def denied(key: str, source_rotation: str | None) -> bool:
-        assignment = assignments.get(key)
-        if assignment and assignment.get("stage") == "applied-distinction" and (
-            assignment.get("unitId") not in eligible or not build.core_target_quota_satisfied
-        ):
-            return True
-        if assignment and assignment.get("stage") == "breadth-exploration" and not build.core_target_quota_satisfied:
-            return True
-        return source_rotation != inputs["rotation"] and not build.core_target_quota_satisfied
+        return _unearned_stage_denied(assignments.get(key), source_rotation,
+                                      session_rotation=rotation, eligible=eligible, quota_satisfied=quota)
 
     for card in inputs["bulk"]["unseenCards"] + inputs["bulk"]["seenCards"]:
         if denied(f"card:{card['id']}", card.get("rotation")):
@@ -302,25 +336,29 @@ _PROTECTED_PREP_REASONS = frozenset({
 })
 
 
-def _order_prep_candidates(items: list[dict[str, Any]], plan: dict[str, Any], size: int) -> list[dict[str, Any]]:
+def _partition_prep_candidates(items: list[dict[str, Any]], plan: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
     prep_keys = set(plan.get("itemIds") or [])
     weak_keys = set(plan.get("weakItemIds") or [])
     unseen_keys = set(plan.get("unseenItemIds") or [])
-    protected, ordinary, weak, unseen, other_prep = [], [], [], [], []
+    buckets = {"protected": [], "ordinary": [], "weak": [], "unseen": [], "other_prep": []}
     for item in items:
         key = f"{item['type']}:{item['id']}"
         if item.get("interventionReason") in _PROTECTED_PREP_REASONS:
-            protected.append(item)
+            bucket = "protected"
         elif key not in prep_keys:
-            ordinary.append(item)
+            bucket = "ordinary"
         elif key in weak_keys:
-            weak.append(item)
+            bucket = "weak"
         elif key in unseen_keys:
-            unseen.append(item)
+            bucket = "unseen"
         else:
-            other_prep.append(item)
+            bucket = "other_prep"
+        buckets[bucket].append(item)
+    return buckets
+
+
+def _interleave_prep_items(weak: list[dict[str, Any]], unseen: list[dict[str, Any]], share: float) -> list[dict[str, Any]]:
     prep = []
-    share = plan.get("share") or 0
     for index in range(max(len(weak), len(unseen))):
         if share < 0.25 and index < len(unseen):
             prep.append(unseen[index])
@@ -328,102 +366,198 @@ def _order_prep_candidates(items: list[dict[str, Any]], plan: dict[str, Any], si
             prep.append(weak[index])
         if share >= 0.25 and index < len(unseen):
             prep.append(unseen[index])
-    prep.extend(other_prep)
+    return prep
+
+
+def _seat_prep_candidates(protected: list[dict[str, Any]], ordinary: list[dict[str, Any]],
+                          prep: list[dict[str, Any]], size: int, share: float) -> list[dict[str, Any]]:
     seats = max(0, size - len(protected))
     wanted = min(len(prep), seats, max(0, int(seats * min(0.5, share))))
     prefix = list(protected)
     prep_index = ordinary_index = 0
     for slot in range(seats):
         prep_due = int((slot + 1) * wanted / seats) > prep_index if seats else False
-        if (prep_due or ordinary_index >= len(ordinary)) and prep_index < len(prep):
-            prefix.append(prep[prep_index]); prep_index += 1
+        prep_available = prep_index < len(prep)
+        if (prep_due or ordinary_index >= len(ordinary)) and prep_available:
+            prefix.append(prep[prep_index])
+            prep_index += 1
         elif ordinary_index < len(ordinary):
-            prefix.append(ordinary[ordinary_index]); ordinary_index += 1
+            prefix.append(ordinary[ordinary_index])
+            ordinary_index += 1
         else:
             break
     return prefix + ordinary[ordinary_index:] + prep[prep_index:]
 
 
-def _core_question_resolver(inputs: dict[str, Any], plan: dict[str, Any]):
-    states = plan["statesById"]
+def _order_prep_candidates(items: list[dict[str, Any]], plan: dict[str, Any], size: int) -> list[dict[str, Any]]:
+    share = plan.get("share") or 0
+    buckets = _partition_prep_candidates(items, plan)
+    prep = _interleave_prep_items(buckets["weak"], buckets["unseen"], share)
+    prep.extend(buckets["other_prep"])
+    return _seat_prep_candidates(buckets["protected"], buckets["ordinary"], prep, size, share)
 
+
+def _interleave_prep_keys(keys: list[str], weak: set[str], unseen: set[str], share: float) -> list[str]:
+    weak_keys = [key for key in keys if key in weak]
+    unseen_keys = [key for key in keys if key in unseen]
+    out = []
+    for index in range(max(len(weak_keys), len(unseen_keys))):
+        if share < 0.25 and index < len(unseen_keys):
+            out.append(unseen_keys[index])
+        if index < len(weak_keys):
+            out.append(weak_keys[index])
+        if share >= 0.25 and index < len(unseen_keys):
+            out.append(unseen_keys[index])
+    return out + [key for key in keys if key not in weak and key not in unseen]
+
+
+def _prep_session_queues(keys: list[str], sessions: list[dict[str, Any]], weak: set[str],
+                         unseen: set[str], share: float) -> list[dict[str, Any]]:
+    queues = []
+    for session in sessions:
+        ids = set(session.get("itemIds") or [])
+        session_keys = [key for key in keys if key in ids]
+        queues.append({"share": session["share"], "taken": 0,
+                       "keys": _interleave_prep_keys(session_keys, weak, unseen, share)})
+    return queues
+
+
+def _drop_used_prep_keys(queues: list[dict[str, Any]], used: set[str]) -> None:
+    for queue in queues:
+        while queue["keys"] and queue["keys"][0] in used:
+            queue["keys"].pop(0)
+
+
+def order_prep_keys(keys: list[str], plan: dict[str, Any]) -> list[str]:
+    weak = set(plan.get("weakItemIds") or [])
+    unseen = set(plan.get("unseenItemIds") or [])
+    share = plan.get("share") or 0
+    sessions = [session for session in plan.get("sessions") or [] if (session.get("share") or 0) > 0]
+    if len(sessions) < 2:
+        return _interleave_prep_keys(keys, weak, unseen, share)
+    queues = _prep_session_queues(keys, sessions, weak, unseen, share)
+    used, out = set(), []
+    while True:
+        _drop_used_prep_keys(queues, used)
+        available = [queue for queue in queues if queue["keys"]]
+        if not available:
+            break
+        queue = min(available, key=lambda item: (item["taken"] + 1) / item["share"])
+        key = queue["keys"].pop(0)
+        queue["taken"] += 1
+        used.add(key)
+        out.append(key)
+    return out + [key for key in keys if key not in used]
+
+
+def _linked_question_state(inputs: dict[str, Any], plan: dict[str, Any], question: dict[str, Any]):
+    states = plan["statesById"]
+    links = [link for link in inputs["bulk"]["questionConceptLinks"] if link["questionId"] == question["id"] and link["conceptId"] in states]
+    links.sort(key=lambda link: (-(1 if link.get("isPrimary") else 0), -states[link["conceptId"]].priority, link["conceptId"]))
+    return states[links[0]["conceptId"]] if links else None
+
+
+def _core_question_resolver(inputs: dict[str, Any], plan: dict[str, Any]):
     def resolve(question: dict[str, Any]):
-        links = [link for link in inputs["bulk"]["questionConceptLinks"] if link["questionId"] == question["id"] and link["conceptId"] in states]
-        links.sort(key=lambda link: (-(1 if link.get("isPrimary") else 0), -states[link["conceptId"]].priority, link["conceptId"]))
-        if links:
-            return states[links[0]["conceptId"]]
-        matches = []
-        for state in plan["conceptStates"]:
-            concept = inputs["conceptMap"].get(state.conceptId)
-            expanded = set(expand_topic_set((concept or {}).get("topics") or []))
-            if any(topic in expanded for topic in question.get("topics") or []):
-                matches.append(state)
-        matches.sort(key=lambda s: (-s.priority, s.conceptId))
-        return matches[0] if matches else None
+        return _linked_question_state(inputs, plan, question) or _topic_fallback_state(inputs, plan, question.get("topics") or [])
     return resolve
 
 
-def reserve_session_prep_blend(inputs: dict[str, Any], plan: dict[str, Any], build: SessionBuildState) -> None:
+def _prep_card_concept_id(topics: list[str], inputs: dict[str, Any]) -> str:
+    topic_set = set(topics)
+    match = next((concept for concept in inputs["concepts"] if any(topic in topic_set for topic in concept.get("topics") or [])), None)
+    return match["id"] if match else "_unattached"
+
+
+def _prep_question_concept_id(question_id: str, inputs: dict[str, Any]) -> str:
+    links = [link for link in inputs["bulk"]["questionConceptLinks"] if link["questionId"] == question_id]
+    primary = next((link for link in links if link.get("isPrimary")), None)
+    link = primary or (links[0] if links else None)
+    return link["conceptId"] if link else "_unattached"
+
+
+def _prep_maps(inputs: dict[str, Any], item_ids: list[str]) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
+    bulk, wanted = inputs["bulk"], set(item_ids)
+    cards = [card for card in bulk["unseenCards"] + bulk["seenCards"] if f"card:{card['id']}" in wanted]
+    questions = [question for question in bulk["rotationQuestions"] if f"question:{question['id']}" in wanted]
+    return ({f"card:{card['id']}": card for card in cards},
+            {f"question:{question['id']}": question for question in questions})
+
+
+def _prep_question_allowed(build: SessionBuildState, question: dict[str, Any], familiarity: dict[str, Any], reentry: dict[str, int]) -> bool:
+    from .build_state import question_suppression_key
     from .policies import take_with_reentry_cap
+
+    suppression = question_suppression_key(question)
+    if question["id"] in build.selected_question_ids:
+        return False
+    if suppression and suppression in build.selected_question_variant_groups:
+        return False
+    return take_with_reentry_cap(question["id"], familiarity, reentry)
+
+
+def _prep_item(inputs: dict[str, Any], card: dict[str, Any] | None, question: dict[str, Any] | None) -> dict[str, Any]:
+    source = card or question
+    concept_id = (_prep_card_concept_id(card.get("topics") or [], inputs) if card
+                  else _prep_question_concept_id(question["id"], inputs))
+    concept = inputs["conceptMap"].get(concept_id)
+    item = {
+        "type": "card" if card else "question", "id": source["id"], "conceptId": concept_id,
+        "conceptName": (concept or {}).get("name") or "Class preparation", "priority": 1,
+        "interventionReason": "pre_teach", "topics": source.get("topics") or [],
+        "variantGroupId": source.get("variantGroupId"), "variantType": source.get("variantType"),
+        "rotation": source.get("rotation"), "challengePolicyApplied": False,
+    }
+    if card:
+        item.update({"variantIndex": card.get("variantIndex"), "complexity": card.get("complexity"), "clusterId": card.get("clusterId")})
+    return item
+
+
+def _add_prep_candidate(inputs: dict[str, Any], build: SessionBuildState,
+                        card: dict[str, Any] | None, question: dict[str, Any] | None) -> bool:
+    picked = None
+    if card:
+        picked = build.pick_card_candidate([card], similarity_threshold=inputs["interferenceThreshold"], max_per_cluster=3)
+        if not picked:
+            return False
+    reentry = dict(build.mastered_reentry_counter)
+    if question and not _prep_question_allowed(build, question, inputs["bulk"]["questionFamiliarity"], reentry):
+        return False
+    added = build.add_item(_prep_item(inputs, card, question))
+    if added and card:
+        build.record_cluster(card.get("clusterId"))
+        build.record_card_neighborhood(card)
+    if added and question:
+        build.mastered_reentry_counter["masteredServed"] = reentry["masteredServed"]
+    return added
+
+
+def reserve_session_prep_blend(inputs: dict[str, Any], _plan: dict[str, Any], build: SessionBuildState) -> None:
     from .queue import shuffle_with_seed
 
     prep = inputs["options"].get("sessionPrepBlend")
-    if not prep or not isinstance(prep.get("share"), (int, float)) or prep["share"] <= 0:
+    item_ids = list((prep or {}).get("itemIds") or [])
+    share_value = (prep or {}).get("share")
+    if not prep or not isinstance(share_value, (int, float)) or share_value <= 0 or not item_ids:
         return
-    bulk, seed = inputs["bulk"], inputs["servingRotationSeed"]
-    unseen = shuffle_with_seed(list(bulk["unseenCards"]), seed + "-prep-unseen")
-    seen = shuffle_with_seed(list(bulk["seenCards"]), seed + "-prep-seen")
-    questions = shuffle_with_seed(list(bulk["rotationQuestions"]), seed + "-prep-questions")
-    videos = shuffle_with_seed(list(bulk["rotationVideos"]), seed + "-prep-videos")
-    candidates = [{"type": "card", "row": row, "id": row["id"]} for row in unseen + seen]
-    candidates += [{"type": "question", "row": row, "id": row["id"]} for row in questions]
-    candidates += [{"type": "video", "row": row, "id": row["id"]} for row in videos]
-    eligible = []
-    for candidate in candidates:
-        row, ctype = candidate["row"], candidate["type"]
-        if row.get("visibility") == "hidden":
-            continue
-        if ctype == "card" and row["id"] in build.selected_card_ids:
-            continue
-        if ctype == "question" and row["id"] in build.selected_question_ids:
-            continue
-        if ctype == "video" and row["id"] in build.selected_video_ids:
-            continue
-        if ctype != "video":
-            eligible.append(candidate)
-    ordered = _order_prep_candidates(eligible, prep, inputs["size"])
-    resolve_card = _core_card_resolver(inputs, plan)
-    resolve_question = _core_question_resolver(inputs, plan)
-    prep_key_set = set(prep.get("itemIds") or [])
-    for candidate in ordered:
-        if len(build.selected_items) >= inputs["size"]:
+    share = min(0.5, max(0.15, share_value))
+    discretionary = max(0, inputs["size"] - len(build.selected_items))
+    seats = min(discretionary, int(discretionary * share))
+    if seats == 0:
+        return
+
+    card_by_key, question_by_key = _prep_maps(inputs, item_ids)
+    available = [key for key in item_ids if key in card_by_key or key in question_by_key]
+    shuffled = shuffle_with_seed(available, f"{inputs['servingRotationSeed']}:class-prep")
+    ordered_ids = order_prep_keys(shuffled, prep)
+    stop_at = min(inputs["size"], len(build.selected_items) + seats)
+
+    for key in ordered_ids:
+        if len(build.selected_items) >= stop_at:
             break
-        row, ctype, key = candidate["row"], candidate["type"], f"{candidate['type']}:{candidate['id']}"
-        if key not in prep_key_set or candidate.get("interventionReason") in _PROTECTED_PREP_REASONS:
-            continue
-        if ctype == "card":
-            concept = resolve_card(row)
-            reason = "weak_recall" if concept and concept.recallOnExamDay < DEFAULTS["recall_threshold"] else "reinforcement"
-            item = card_item(row, conceptId=concept.conceptId if concept else "_unattached",
-                             conceptName=concept.conceptName if concept else "Session preparation",
-                             priority=concept.priority if concept else 0.5, interventionReason=reason,
-                             sessionPrepKey=key)
-            picked = build.pick_card_candidate([row], similarity_threshold=inputs["interferenceThreshold"], max_per_cluster=3)
-            if picked and commit_card(build, picked, item, record_recall=False):
-                continue
-        elif ctype == "question":
-            if not take_with_reentry_cap(row["id"], bulk["questionFamiliarity"], build.mastered_reentry_counter):
-                continue
-            concept = resolve_question(row)
-            added = build.add_item({"type": "question", "id": row["id"],
-                                    "conceptId": concept.conceptId if concept else f"rotation:{row['id']}",
-                                    "conceptName": concept.conceptName if concept else "Session preparation",
-                                    "priority": concept.priority if concept else 0.5,
-                                    "interventionReason": "needs_retest" if concept and concept.recallOnExamDay < DEFAULTS["recall_threshold"] else "reinforcement",
-                                    **thread_trace(), "variantGroupId": row.get("variantGroupId"),
-                                    "variantType": row.get("variantType"), "sessionPrepKey": key})
-            if added:
-                continue
+        card, question = card_by_key.get(key), question_by_key.get(key)
+        if card or question:
+            _add_prep_candidate(inputs, build, card, question)
 
 
 def pre_teach_videos(inputs: dict[str, Any], plan: dict[str, Any], build: SessionBuildState) -> None:
@@ -845,7 +979,7 @@ def _rescue_seen_cards(inputs: dict[str, Any], build: SessionBuildState, active:
         _add_orphan_card(inputs, build, card, "needs_retest")
 
 
-def _pass_set_rank(bulk: dict[str, Any], card: dict[str, Any]) -> int:
+def _pass_set_rank(bulk: dict[str, Any], card: dict[str, Any], fact_key_set: set[str] | None = None) -> int:
     import sys
 
     wrapper = bulk.get("passSet") or {}
@@ -853,8 +987,8 @@ def _pass_set_rank(bulk: dict[str, Any], card: dict[str, Any]) -> int:
     if not pass_set or bulk.get("passSetIntakeDecision") not in ("pass-set-first", "supply-exhausted", "unlocked"):
         return 0
     key = (pass_set.get("factKeyByCardId") or {}).get(card["id"]) or card.get("variantGroupId") or card["id"]
-    fact_keys = pass_set.get("factKeys") or []
-    if key not in set(fact_keys):
+    fact_keys = fact_key_set if fact_key_set is not None else set(pass_set.get("factKeys") or [])
+    if key not in fact_keys:
         return sys.maxsize
     return (pass_set.get("rankByFactKey") or {}).get(key) or 0
 
@@ -863,7 +997,9 @@ def _rescue_unseen_cards(inputs: dict[str, Any], build: SessionBuildState, activ
     size, bulk = inputs["size"], inputs["bulk"]
     unseen = [c for c in bulk["unseenCards"] if c["id"] not in build.selected_card_ids
               and c["id"] not in bulk["passSetDeferredCardIds"]]
-    unseen.sort(key=lambda c: (_pass_set_rank(bulk, c), -(1 if c.get("importance") is None else c["importance"])))
+    pass_set = ((bulk.get("passSet") or {}).get("passSet") or {})
+    fact_key_set = set(pass_set.get("factKeys") or [])
+    unseen.sort(key=lambda c: (_pass_set_rank(bulk, c, fact_key_set), -(1 if c.get("importance") is None else c["importance"])))
     for card in _orphan_nudge(inputs, active, unseen, "card"):
         if len(build.selected_items) >= size:
             break
@@ -896,7 +1032,7 @@ def _rescue_rotation_questions(inputs: dict[str, Any], build: SessionBuildState,
 
 
 def rescue_orphans(inputs: dict[str, Any], plan: dict[str, Any], build: SessionBuildState) -> None:
-    size, bulk = inputs["size"], inputs["bulk"]
+    size = inputs["size"]
     active = active_targets(inputs)
     _rescue_seen_cards(inputs, build, active)
     if len(build.selected_items) >= size or inputs.get("effectiveMaxNewCards") == 0:

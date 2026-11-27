@@ -127,7 +127,7 @@ def _apply_recall_telemetry(
 
 
 def attach_delivery_telemetry(inputs: dict[str, Any], plan: dict[str, Any], build: Any,
-                              final: list[dict[str, Any]], card_meta: dict[str, dict[str, Any]]) -> None:
+                              final: list[dict[str, Any]], card_meta: dict[str, dict[str, Any]]) -> dict[str, Any] | None:
     bulk = inputs["bulk"]
     cards = bulk["unseenCards"] + bulk["seenCards"]
     overlay = inputs.get("proximityOverlay")
