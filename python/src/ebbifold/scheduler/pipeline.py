@@ -183,6 +183,8 @@ def run_session(snapshot: dict[str, Any]) -> dict[str, Any]:
         "unknownItemRotation": ranking.unknownItemRotation, "weakConcepts": selection.weakConcepts,
         "cardRatio": selection.cardRatio, **quota,
         "allocatedConceptRanks": selection.allocatedConceptRanks, "conceptHasPristine": pristine,
+        "allocationChangedConceptMembershipCount": selection.allocationChangedConceptMembershipCount,
+        "allocationCoverageDebtDomainCodes": selection.allocationCoverageDebtDomainCodes or [],
     }
     build = run_selection(inputs, plan)
     lane_counts = [{"id": t["id"], "result": t["result"]} for t in build.trace if t["op"] == "lane"]

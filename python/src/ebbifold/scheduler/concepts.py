@@ -15,7 +15,11 @@ from typing import Any, Callable
 from . import math as smath
 from .config import DEFAULTS, RECALL_RANKING_HORIZON_DAYS, stable_target_random
 from .errors import UnsupportedSchedulerInput
-from .exam_target import assert_exam_target_supported, resolve_learner_policy
+from .exam_target import (
+    allocate_exam_target_concept_order,
+    assert_exam_target_supported,
+    resolve_learner_policy,
+)
 from .scoring import (
     PRACTICE_MISS_BOOST,
     cluster_exposure_dampening,
@@ -305,6 +309,8 @@ class ConceptSelection:
     cardRatio: float
     maintenanceShift: float
     allocatedConceptRanks: dict[str, int] | None = None
+    allocationChangedConceptMembershipCount: int = 0
+    allocationCoverageDebtDomainCodes: list[str] | None = None
 
 
 def select_weak_concepts(
@@ -325,6 +331,30 @@ def select_weak_concepts(
     if budget_filtered:
         weak = budget_filtered
     allocated_ranks = None
+    allocation_changed = 0
+    coverage_debt: list[str] = []
+    policy = inputs.get("learnerTargetPolicyResolved")
+    workload = inputs.get("targetWorkload") or {}
+    if (inputs.get("applyExamTarget") and policy and inputs.get("runtimeTargetSnapshot")
+            and (workload.get("surplusSeats") or 0) > 0 and weak):
+        desired = {
+            code: (domain or {}).get("desiredShare", 0)
+            for code, domain in (policy.get("desiredDomains") or {}).items()
+        }
+        snapshot_influence = ((inputs.get("runtimeTargetSnapshot") or {}).get("definition") or {}).get("influence") or {}
+        allocated = allocate_exam_target_concept_order(
+            concepts=weak, protected_concept_ids=set(inputs.get("recentFailureConceptIds") or []),
+            requested_discretionary_size=workload.get("surplusSeats") or 0,
+            concept_mappings=(inputs.get("conceptTargetScores") or {}).get("scores") or {},
+            desired_shares=desired,
+            observed_domain_counts=inputs.get("observedExamTargetDomainCounts") or {},
+            influence=inputs.get("effectiveTargetInfluence") or snapshot_influence,
+        )
+        weak = allocated["concepts"]
+        allocated_ranks = {state.conceptId: rank for rank, state in enumerate(weak)}
+        allocation_changed = allocated["changedMembershipCount"]
+        coverage_debt = allocated["coverageDebtDomainCodes"]
+
     focus = options.get("simulationFocus")
     if focus:
         from .simulation import prefer_simulation_topics
@@ -343,7 +373,9 @@ def select_weak_concepts(
         if shift > 0:
             card_ratio = min(0.9, card_ratio + shift)
     return ConceptSelection(weakConcepts=weak, cardRatio=card_ratio, maintenanceShift=shift,
-                            allocatedConceptRanks=allocated_ranks)
+                            allocatedConceptRanks=allocated_ranks,
+                            allocationChangedConceptMembershipCount=allocation_changed,
+                            allocationCoverageDebtDomainCodes=coverage_debt)
 
 
 def plan_card_quota(inputs: dict[str, Any], card_ratio: float) -> dict[str, int]:
