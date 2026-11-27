@@ -47,6 +47,7 @@ def test_review_store_preserves_legacy_duplicate_attempts_on_open(tmp_path):
     _attempt(store, session_id, "item-1", True)
 
     with sqlite3.connect(path) as conn:
+        conn.execute("DROP INDEX attempts_session_item_unique")
         conn.execute(
             """
             INSERT INTO attempts(
@@ -58,18 +59,21 @@ def test_review_store_preserves_legacy_duplicate_attempts_on_open(tmp_path):
 
     reopened = SQLiteReviewStore(path)
     attempts = reopened.attempts(session_id)
-    assert len(attempts) == 2
-    assert {row["attempt_number"] for row in attempts} == {1, 2}
+    assert len(attempts) == 1
+    assert attempts[0]["attempt_number"] == 1
+    with sqlite3.connect(path) as conn:
+        archived = conn.execute("SELECT attempt_id, archive_reason FROM archived_attempts").fetchall()
+    assert archived == [("duplicate-attempt", "duplicate-session-item")]
 
-    with sqlite3.connect(path) as conn, pytest.raises(sqlite3.IntegrityError):
-        conn.execute(
-            """
-            INSERT INTO attempts(
-                attempt_id, session_id, item_id, selected_label, is_correct, attempt_number, answered_at
-            ) VALUES ('overlapping-attempt', ?, 'item-1', 'B', 0, 1, ?)
-            """,
-            (session_id, datetime.now(UTC).isoformat()),
-        )
+    duplicate_input = AttemptInput(
+        session_id=session_id,
+        item_id="item-1",
+        selected_label="B",
+        is_correct=False,
+        answered_at=datetime.now(UTC),
+    )
+    with pytest.raises(sqlite3.IntegrityError):
+        reopened.record_attempt(duplicate_input)
 
 
 def test_review_engine_uses_persisted_attempts_for_next_item(tmp_path, monkeypatch):

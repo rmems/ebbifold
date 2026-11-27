@@ -108,8 +108,10 @@ class ReviewApi:
         row = self.store.session(session_id)
         if row is None:
             raise HTTPException(status_code=404, detail="unknown review session")
+        if row["status"] != "active":
+            return row, None
         question = self.current_question(session_id)
-        if row["status"] == "active" and question is None:
+        if question is None:
             self.store.complete_session(session_id)
             row = self.store.session(session_id)
         return row, question
