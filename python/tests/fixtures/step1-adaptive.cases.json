@@ -606,6 +606,46 @@
       }
     },
     {
+      "name": "scaffold-domain-beats-preference-rank",
+      "notes": "After a miss, domain scaffolding is a stronger signal than preferenceRank: the in-domain question must lead even with the worse rank. If domain and preference favored the same question, this case could pass without domain ordering implemented at all.",
+      "input": {
+        "questions": [
+          {
+            "id": "q-med-x",
+            "difficulty": "medium",
+            "domain": "cardio",
+            "ladderId": "LX"
+          },
+          {
+            "id": "q-easy-in-domain",
+            "difficulty": "easy",
+            "domain": "cardio",
+            "preferenceRank": 99
+          },
+          {
+            "id": "q-easy-off-domain",
+            "difficulty": "easy",
+            "domain": "neuro",
+            "preferenceRank": 1
+          }
+        ],
+        "history": [
+          {
+            "questionId": "q-med-x",
+            "isCorrect": false,
+            "createdAt": "2026-01-01T12:00:00.000Z"
+          }
+        ],
+        "size": 2
+      },
+      "expected": {
+        "order": [
+          "q-easy-in-domain",
+          "q-easy-off-domain"
+        ]
+      }
+    },
+    {
       "name": "ladder-exhaustion-still-serves",
       "notes": "Missed question on ladder L3 with no other L3 members in the pool: the exhausted ladder must not end the session — off-ladder questions still rank, just later.",
       "input": {

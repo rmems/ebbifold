@@ -144,6 +144,21 @@ const SCENARIOS: Scenario[] = [
     size: 2,
   },
   {
+    name: 'scaffold-domain-beats-preference-rank',
+    notes:
+      'After a miss, domain scaffolding is a stronger signal than preferenceRank: ' +
+      'the in-domain question must lead even with the worse rank. If domain and ' +
+      'preference favored the same question, this case could pass without domain ' +
+      'ordering implemented at all.',
+    questions: [
+      { id: 'q-med-x', difficulty: 'medium', domain: 'cardio', ladderId: 'LX' },
+      { id: 'q-easy-in-domain', difficulty: 'easy', domain: 'cardio', preferenceRank: 99 },
+      { id: 'q-easy-off-domain', difficulty: 'easy', domain: 'neuro', preferenceRank: 1 },
+    ],
+    history: [row('q-med-x', false, 0)],
+    size: 2,
+  },
+  {
     name: 'ladder-exhaustion-still-serves',
     notes:
       'Missed question on ladder L3 with no other L3 members in the pool: the exhausted ' +
