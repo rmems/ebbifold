@@ -55,10 +55,11 @@ def test_loaders_expose_step1_baseline_modules_and_cards() -> None:
     assert len(load_cloze_cards(REPO_ROOT)) == 2136
 
 
-def test_baseline_records_keep_manifest_order_and_module_tag() -> None:
+def test_baseline_records_keep_manifest_order_and_module_tag(snapshot) -> None:
     corpus = load_step1_corpus(REPO_ROOT)
     baseline = load_step1_baseline(REPO_ROOT)
     assert [question.id for question in baseline] == list(corpus.baseline_question_ids)
+    assert [question.id for question in snapshot.baseline_questions] == list(corpus.baseline_question_ids)
     assert all(BASELINE_MODULE in question.module_nodes for question in baseline)
 
 
