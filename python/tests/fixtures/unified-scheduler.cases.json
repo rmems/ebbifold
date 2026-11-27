@@ -1,0 +1,6099 @@
+{
+  "generator": "python/tools/generate_unified_scheduler_fixtures.ts",
+  "nowMs": 1768478400000,
+  "seed": "a3f1c9e2b7d4058e6a1f3c5d7e9b2a4c6e8f0a1b3c5d7e9f1a2b3c4d5e6f7a8b",
+  "conceptPlan": [
+    {
+      "name": "weak_new_pristine_mix",
+      "snapshot": {
+        "nowMs": 1768478400000,
+        "daysToExam": 30,
+        "examPressure": 0.20587037180094736,
+        "size": 20,
+        "cardRatio": 0.7,
+        "rotation": "rot-main",
+        "effectiveMaxNewCards": null,
+        "options": {
+          "examTargetTieBreakSeed": "a3f1c9e2b7d4058e6a1f3c5d7e9b2a4c6e8f0a1b3c5d7e9f1a2b3c4d5e6f7a8b"
+        },
+        "concepts": [
+          {
+            "id": "c-weak",
+            "name": "C-WEAK",
+            "topics": ["Renal Physiology"],
+            "prerequisiteIds": ["c-prereq"],
+            "examWeight": 4
+          },
+          {
+            "id": "c-new",
+            "name": "C-NEW",
+            "topics": ["cardiac_output"],
+            "prerequisiteIds": [],
+            "examWeight": 3
+          },
+          {
+            "id": "c-pristine",
+            "name": "C-PRISTINE",
+            "topics": ["Acid-Base"],
+            "prerequisiteIds": [],
+            "examWeight": 5
+          },
+          {
+            "id": "c-strong",
+            "name": "C-STRONG",
+            "topics": ["Glycolysis"],
+            "prerequisiteIds": [],
+            "examWeight": 1
+          },
+          {
+            "id": "c-prereq",
+            "name": "C-PREREQ",
+            "topics": ["Nephron Anatomy"],
+            "prerequisiteIds": ["c-root"],
+            "examWeight": 3
+          },
+          {
+            "id": "c-root",
+            "name": "C-ROOT",
+            "topics": ["Cell Membranes"],
+            "prerequisiteIds": [],
+            "examWeight": 3
+          },
+          {
+            "id": "c-hub",
+            "name": "C-HUB",
+            "topics": ["Integrated Renal"],
+            "prerequisiteIds": ["c-weak", "c-new"],
+            "examWeight": 3
+          },
+          {
+            "id": "c-zero",
+            "name": "C-ZERO",
+            "topics": ["Zeta Topic"],
+            "prerequisiteIds": [],
+            "examWeight": 0
+          }
+        ],
+        "stateMap": {
+          "c-weak": {
+            "recallProbability": 0.35,
+            "confidence": 0.5,
+            "exposureCount": 5,
+            "lastExposureAt": 1768305600000,
+            "lastProbeAt": 1768132800000
+          },
+          "c-pristine": {
+            "recallProbability": 0.97,
+            "confidence": 0.9,
+            "exposureCount": 12,
+            "lastExposureAt": 1768392000000,
+            "lastProbeAt": 1768392000000
+          },
+          "c-strong": {
+            "recallProbability": 0.98,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "lastExposureAt": 1768435200000,
+            "lastProbeAt": 1768435200000
+          },
+          "c-prereq": {
+            "recallProbability": 0.55,
+            "confidence": 0.2,
+            "exposureCount": 2,
+            "lastExposureAt": 1767960000000,
+            "lastProbeAt": 1767960000000
+          },
+          "c-root": {
+            "recallProbability": 0.9,
+            "confidence": 0.8,
+            "exposureCount": 9,
+            "lastExposureAt": 1768392000000,
+            "lastProbeAt": 1768305600000
+          },
+          "c-hub": {
+            "recallProbability": 0.4,
+            "confidence": 0.45,
+            "exposureCount": 4,
+            "lastExposureAt": 1768219200000,
+            "lastProbeAt": 1767614400000
+          },
+          "c-zero": {
+            "recallProbability": 0.2,
+            "confidence": 0.1,
+            "exposureCount": 1,
+            "lastExposureAt": 1765886400000,
+            "lastProbeAt": null
+          }
+        },
+        "conceptEmbeddings": {
+          "c-weak": [0.9, 0.1, 0, 0.4],
+          "c-new": [0.1, 0.8, 0.2, 0],
+          "c-hub": [0.5, 0.5, 0.5, 0.5],
+          "c-zero": [0, 0, 0, 0]
+        },
+        "gapDirection": [0.8, 0.2, 0.1, 0.55],
+        "likedConceptIds": ["c-new"],
+        "recentFailureConceptIds": ["c-hub"],
+        "practiceMissConceptIds": ["c-weak"],
+        "chronicFailureConceptIds": ["c-strong"],
+        "bulk": {
+          "unseenCards": [
+            {
+              "id": "u-acid-1",
+              "topics": ["Acid-Base"],
+              "clusterId": "cl-renal",
+              "rotation": "rot-main",
+              "sourceFile": "u-acid-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-acid-1"
+            },
+            {
+              "id": "u-acid-2",
+              "topics": ["acid base"],
+              "clusterId": null,
+              "rotation": "rot-main",
+              "sourceFile": "u-acid-2.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-acid-2"
+            },
+            {
+              "id": "u-renal-1",
+              "topics": ["Renal Physiology"],
+              "clusterId": "cl-renal",
+              "rotation": "rot-cross",
+              "sourceFile": "u-renal-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-renal-1"
+            },
+            {
+              "id": "u-cardiac-1",
+              "topics": ["Cardiac Output"],
+              "clusterId": "cl-cardio",
+              "rotation": "rot-main",
+              "sourceFile": "u-cardiac-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-cardiac-1"
+            },
+            {
+              "id": "u-deferred",
+              "topics": ["Glycolysis"],
+              "clusterId": "cl-metab",
+              "rotation": "rot-main",
+              "sourceFile": "u-deferred.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-deferred"
+            }
+          ],
+          "seenCards": [
+            {
+              "id": "s-glyco-1",
+              "topics": ["Glycolysis"],
+              "clusterId": "cl-metab",
+              "rotation": "rot-main",
+              "sourceFile": "s-glyco-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "s-glyco-1"
+            },
+            {
+              "id": "s-nephron-1",
+              "topics": ["Nephron Anatomy"],
+              "clusterId": "cl-renal",
+              "rotation": "rot-main",
+              "sourceFile": "s-nephron-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "s-nephron-1"
+            }
+          ],
+          "rotationQuestions": [
+            {
+              "id": "q-1",
+              "rotation": "rot-cross"
+            },
+            {
+              "id": "q-2",
+              "rotation": "rot-main"
+            }
+          ],
+          "passSetDeferredCardIds": ["u-deferred"]
+        }
+      },
+      "expected": {
+        "rankedStates": [
+          {
+            "conceptId": "c-weak",
+            "conceptName": "C-WEAK",
+            "currentRecall": 0.3170032824923673,
+            "recallOnExamDay": 0.07177934365066832,
+            "confidence": 0.5,
+            "exposureCount": 5,
+            "daysSinceProbe": 4,
+            "daysSinceExposure": 2,
+            "priority": 0.13380027804721387,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-new",
+            "conceptName": "C-NEW",
+            "currentRecall": 0,
+            "recallOnExamDay": 0,
+            "confidence": 0,
+            "exposureCount": 0,
+            "daysSinceProbe": "Infinity",
+            "daysSinceExposure": "Infinity",
+            "priority": 1.3068297085302203,
+            "intervention": "probe"
+          },
+          {
+            "conceptId": "c-pristine",
+            "conceptName": "C-PRISTINE",
+            "currentRecall": 0.9362957693222784,
+            "recallOnExamDay": 0.32408047265548806,
+            "confidence": 0.9,
+            "exposureCount": 12,
+            "daysSinceProbe": 1,
+            "daysSinceExposure": 1,
+            "priority": 0.23631061818387958,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-strong",
+            "conceptName": "C-STRONG",
+            "currentRecall": 0.9634108737782726,
+            "recallOnExamDay": 0.3458912923594134,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "daysSinceProbe": 0.5,
+            "daysSinceExposure": 0.5,
+            "priority": 0.10989053342429247,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-prereq",
+            "conceptName": "C-PREREQ",
+            "currentRecall": 0.3597978886557065,
+            "recallOnExamDay": 0.04310604873882552,
+            "confidence": 0.2,
+            "exposureCount": 2,
+            "daysSinceProbe": 6,
+            "daysSinceExposure": 6,
+            "priority": 0.7291835056948449,
+            "intervention": "probe"
+          },
+          {
+            "conceptId": "c-root",
+            "conceptName": "C-ROOT",
+            "currentRecall": 0.8663679937969035,
+            "recallOnExamDay": 0.2763752256877902,
+            "confidence": 0.8,
+            "exposureCount": 9,
+            "daysSinceProbe": 2,
+            "daysSinceExposure": 1,
+            "priority": 1.121312480701124,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-hub",
+            "conceptName": "C-HUB",
+            "currentRecall": 0.3421042649969313,
+            "recallOnExamDay": 0.07163800133327329,
+            "confidence": 0.45,
+            "exposureCount": 4,
+            "daysSinceProbe": 10,
+            "daysSinceExposure": 3,
+            "priority": 0,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-zero",
+            "conceptName": "C-ZERO",
+            "currentRecall": 0.016823752407904454,
+            "recallOnExamDay": 0.0014151932254123547,
+            "confidence": 0.1,
+            "exposureCount": 1,
+            "daysSinceProbe": "Infinity",
+            "daysSinceExposure": 30,
+            "priority": 0.36567531754894733,
+            "intervention": "probe"
+          }
+        ],
+        "conceptClusters": {
+          "c-weak": "cl-renal",
+          "c-new": "c-new",
+          "c-pristine": "cl-renal",
+          "c-strong": "cl-metab",
+          "c-prereq": "cl-renal",
+          "c-root": "c-root",
+          "c-hub": "c-hub",
+          "c-zero": "c-zero"
+        },
+        "sortedConceptIds": ["c-new", "c-root", "c-prereq", "c-zero", "c-pristine", "c-weak", "c-strong", "c-hub"],
+        "sortedPriorities": [
+          1.4536533978397754, 1.0215692893082988, 0.5561204263569306, 0.44928583228383956, 0.26287801498924057,
+          0.15501687442547515, 0.13754662513940452, -0.013493944178335368
+        ],
+        "pristineConceptIds": ["c-new", "c-pristine", "c-weak"],
+        "weakConceptIds": ["c-new", "c-root", "c-prereq", "c-zero", "c-pristine", "c-weak", "c-strong", "c-hub"],
+        "cardRatio": 0.7,
+        "quota": {
+          "targetCardCount": 14,
+          "targetQuestionCount": 6,
+          "coverageReservation": 2,
+          "targetWeakCardCount": 12
+        },
+        "clusterRoundRobin": ["c-new", "c-root", "c-prereq", "c-zero", "c-strong", "c-hub", "c-pristine", "c-weak"],
+        "unseenCardIds": ["u-acid-1", "u-acid-2", "u-cardiac-1", "u-deferred", "u-renal-1"],
+        "crossSourceCardIds": [],
+        "crossSourceQuestionIds": [],
+        "maxCrossSourceItems": 0,
+        "maxNewCards": "Infinity",
+        "unknownItemRotation": "rot-main"
+      }
+    },
+    {
+      "name": "cluster_dampening",
+      "snapshot": {
+        "nowMs": 1768478400000,
+        "daysToExam": 30,
+        "examPressure": 0.20587037180094736,
+        "size": 20,
+        "cardRatio": 0.7,
+        "rotation": "rot-main",
+        "effectiveMaxNewCards": null,
+        "options": {
+          "examTargetTieBreakSeed": "a3f1c9e2b7d4058e6a1f3c5d7e9b2a4c6e8f0a1b3c5d7e9f1a2b3c4d5e6f7a8b"
+        },
+        "concepts": [
+          {
+            "id": "c-weak",
+            "name": "C-WEAK",
+            "topics": ["Renal Physiology"],
+            "prerequisiteIds": ["c-prereq"],
+            "examWeight": 4
+          },
+          {
+            "id": "c-new",
+            "name": "C-NEW",
+            "topics": ["cardiac_output"],
+            "prerequisiteIds": [],
+            "examWeight": 3
+          },
+          {
+            "id": "c-pristine",
+            "name": "C-PRISTINE",
+            "topics": ["Acid-Base"],
+            "prerequisiteIds": [],
+            "examWeight": 5
+          },
+          {
+            "id": "c-strong",
+            "name": "C-STRONG",
+            "topics": ["Glycolysis"],
+            "prerequisiteIds": [],
+            "examWeight": 1
+          },
+          {
+            "id": "c-prereq",
+            "name": "C-PREREQ",
+            "topics": ["Nephron Anatomy"],
+            "prerequisiteIds": ["c-root"],
+            "examWeight": 3
+          },
+          {
+            "id": "c-root",
+            "name": "C-ROOT",
+            "topics": ["Cell Membranes"],
+            "prerequisiteIds": [],
+            "examWeight": 3
+          },
+          {
+            "id": "c-hub",
+            "name": "C-HUB",
+            "topics": ["Integrated Renal"],
+            "prerequisiteIds": ["c-weak", "c-new"],
+            "examWeight": 3
+          },
+          {
+            "id": "c-zero",
+            "name": "C-ZERO",
+            "topics": ["Zeta Topic"],
+            "prerequisiteIds": [],
+            "examWeight": 0
+          }
+        ],
+        "stateMap": {
+          "c-weak": {
+            "recallProbability": 0.35,
+            "confidence": 0.5,
+            "exposureCount": 5,
+            "lastExposureAt": 1768305600000,
+            "lastProbeAt": 1768132800000
+          },
+          "c-pristine": {
+            "recallProbability": 0.97,
+            "confidence": 0.9,
+            "exposureCount": 12,
+            "lastExposureAt": 1768392000000,
+            "lastProbeAt": 1768392000000
+          },
+          "c-strong": {
+            "recallProbability": 0.98,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "lastExposureAt": 1768435200000,
+            "lastProbeAt": 1768435200000
+          },
+          "c-prereq": {
+            "recallProbability": 0.55,
+            "confidence": 0.2,
+            "exposureCount": 2,
+            "lastExposureAt": 1767960000000,
+            "lastProbeAt": 1767960000000
+          },
+          "c-root": {
+            "recallProbability": 0.9,
+            "confidence": 0.8,
+            "exposureCount": 9,
+            "lastExposureAt": 1768392000000,
+            "lastProbeAt": 1768305600000
+          },
+          "c-hub": {
+            "recallProbability": 0.4,
+            "confidence": 0.45,
+            "exposureCount": 4,
+            "lastExposureAt": 1768219200000,
+            "lastProbeAt": 1767614400000
+          },
+          "c-zero": {
+            "recallProbability": 0.2,
+            "confidence": 0.1,
+            "exposureCount": 1,
+            "lastExposureAt": 1765886400000,
+            "lastProbeAt": null
+          }
+        },
+        "conceptEmbeddings": {
+          "c-weak": [0.9, 0.1, 0, 0.4],
+          "c-new": [0.1, 0.8, 0.2, 0],
+          "c-hub": [0.5, 0.5, 0.5, 0.5],
+          "c-zero": [0, 0, 0, 0]
+        },
+        "gapDirection": [0.8, 0.2, 0.1, 0.55],
+        "likedConceptIds": ["c-new"],
+        "recentFailureConceptIds": ["c-hub"],
+        "practiceMissConceptIds": ["c-weak"],
+        "chronicFailureConceptIds": ["c-strong"],
+        "bulk": {
+          "unseenCards": [
+            {
+              "id": "u-acid-1",
+              "topics": ["Acid-Base"],
+              "clusterId": "cl-renal",
+              "rotation": "rot-main",
+              "sourceFile": "u-acid-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-acid-1"
+            },
+            {
+              "id": "u-acid-2",
+              "topics": ["acid base"],
+              "clusterId": null,
+              "rotation": "rot-main",
+              "sourceFile": "u-acid-2.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-acid-2"
+            },
+            {
+              "id": "u-renal-1",
+              "topics": ["Renal Physiology"],
+              "clusterId": "cl-renal",
+              "rotation": "rot-cross",
+              "sourceFile": "u-renal-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-renal-1"
+            },
+            {
+              "id": "u-cardiac-1",
+              "topics": ["Cardiac Output"],
+              "clusterId": "cl-cardio",
+              "rotation": "rot-main",
+              "sourceFile": "u-cardiac-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-cardiac-1"
+            },
+            {
+              "id": "u-deferred",
+              "topics": ["Glycolysis"],
+              "clusterId": "cl-metab",
+              "rotation": "rot-main",
+              "sourceFile": "u-deferred.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-deferred"
+            }
+          ],
+          "seenCards": [
+            {
+              "id": "s-glyco-1",
+              "topics": ["Glycolysis"],
+              "clusterId": "cl-metab",
+              "rotation": "rot-main",
+              "sourceFile": "s-glyco-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "s-glyco-1"
+            },
+            {
+              "id": "s-nephron-1",
+              "topics": ["Nephron Anatomy"],
+              "clusterId": "cl-renal",
+              "rotation": "rot-main",
+              "sourceFile": "s-nephron-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "s-nephron-1"
+            }
+          ],
+          "rotationQuestions": [
+            {
+              "id": "q-1",
+              "rotation": "rot-cross"
+            },
+            {
+              "id": "q-2",
+              "rotation": "rot-main"
+            }
+          ],
+          "passSetDeferredCardIds": ["u-deferred"]
+        },
+        "recentClusterExposures": {
+          "cl-renal": 9,
+          "cl-cardio": 5,
+          "cl-metab": 0
+        }
+      },
+      "expected": {
+        "rankedStates": [
+          {
+            "conceptId": "c-weak",
+            "conceptName": "C-WEAK",
+            "currentRecall": 0.3170032824923673,
+            "recallOnExamDay": 0.07177934365066832,
+            "confidence": 0.5,
+            "exposureCount": 5,
+            "daysSinceProbe": 4,
+            "daysSinceExposure": 2,
+            "priority": 0.04960509410334045,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-new",
+            "conceptName": "C-NEW",
+            "currentRecall": 0,
+            "recallOnExamDay": 0,
+            "confidence": 0,
+            "exposureCount": 0,
+            "daysSinceProbe": "Infinity",
+            "daysSinceExposure": "Infinity",
+            "priority": 1.3068297085302203,
+            "intervention": "probe"
+          },
+          {
+            "conceptId": "c-pristine",
+            "conceptName": "C-PRISTINE",
+            "currentRecall": 0.9362957693222784,
+            "recallOnExamDay": 0.32408047265548806,
+            "confidence": 0.9,
+            "exposureCount": 12,
+            "daysSinceProbe": 1,
+            "daysSinceExposure": 1,
+            "priority": 0.08760976153198655,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-strong",
+            "conceptName": "C-STRONG",
+            "currentRecall": 0.9634108737782726,
+            "recallOnExamDay": 0.3458912923594134,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "daysSinceProbe": 0.5,
+            "daysSinceExposure": 0.5,
+            "priority": 0.10989053342429247,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-prereq",
+            "conceptName": "C-PREREQ",
+            "currentRecall": 0.3597978886557065,
+            "recallOnExamDay": 0.04310604873882552,
+            "confidence": 0.2,
+            "exposureCount": 2,
+            "daysSinceProbe": 6,
+            "daysSinceExposure": 6,
+            "priority": 0.270337378565333,
+            "intervention": "probe"
+          },
+          {
+            "conceptId": "c-root",
+            "conceptName": "C-ROOT",
+            "currentRecall": 0.8663679937969035,
+            "recallOnExamDay": 0.2763752256877902,
+            "confidence": 0.8,
+            "exposureCount": 9,
+            "daysSinceProbe": 2,
+            "daysSinceExposure": 1,
+            "priority": 1.121312480701124,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-hub",
+            "conceptName": "C-HUB",
+            "currentRecall": 0.3421042649969313,
+            "recallOnExamDay": 0.07163800133327329,
+            "confidence": 0.45,
+            "exposureCount": 4,
+            "daysSinceProbe": 10,
+            "daysSinceExposure": 3,
+            "priority": 0,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-zero",
+            "conceptName": "C-ZERO",
+            "currentRecall": 0.016823752407904454,
+            "recallOnExamDay": 0.0014151932254123547,
+            "confidence": 0.1,
+            "exposureCount": 1,
+            "daysSinceProbe": "Infinity",
+            "daysSinceExposure": 30,
+            "priority": 0.36567531754894733,
+            "intervention": "probe"
+          }
+        ],
+        "conceptClusters": {
+          "c-weak": "cl-renal",
+          "c-new": "c-new",
+          "c-pristine": "cl-renal",
+          "c-strong": "cl-metab",
+          "c-prereq": "cl-renal",
+          "c-root": "c-root",
+          "c-hub": "c-hub",
+          "c-zero": "c-zero"
+        },
+        "sortedConceptIds": ["c-new", "c-root", "c-zero", "c-prereq", "c-strong", "c-pristine", "c-weak", "c-hub"],
+        "sortedPriorities": [
+          1.4536533978397754, 1.0215692893082988, 0.44928583228383956, 0.20617599966788552, 0.13754662513940452,
+          0.09745935405783826, 0.057533551610272765, -0.013493944178335368
+        ],
+        "pristineConceptIds": ["c-new", "c-pristine", "c-weak"],
+        "weakConceptIds": ["c-new", "c-root", "c-zero", "c-prereq", "c-strong", "c-pristine", "c-weak", "c-hub"],
+        "cardRatio": 0.7,
+        "quota": {
+          "targetCardCount": 14,
+          "targetQuestionCount": 6,
+          "coverageReservation": 2,
+          "targetWeakCardCount": 12
+        },
+        "clusterRoundRobin": ["c-new", "c-root", "c-zero", "c-prereq", "c-strong", "c-hub", "c-pristine", "c-weak"],
+        "unseenCardIds": ["u-acid-1", "u-acid-2", "u-cardiac-1", "u-deferred", "u-renal-1"],
+        "crossSourceCardIds": [],
+        "crossSourceQuestionIds": [],
+        "maxCrossSourceItems": 0,
+        "maxNewCards": "Infinity",
+        "unknownItemRotation": "rot-main"
+      }
+    },
+    {
+      "name": "empty_pools",
+      "snapshot": {
+        "nowMs": 1768478400000,
+        "daysToExam": 30,
+        "examPressure": 0.20587037180094736,
+        "size": 20,
+        "cardRatio": 0.7,
+        "rotation": "rot-main",
+        "effectiveMaxNewCards": null,
+        "options": {
+          "examTargetTieBreakSeed": "a3f1c9e2b7d4058e6a1f3c5d7e9b2a4c6e8f0a1b3c5d7e9f1a2b3c4d5e6f7a8b"
+        },
+        "concepts": [
+          {
+            "id": "c-weak",
+            "name": "C-WEAK",
+            "topics": ["Renal Physiology"],
+            "prerequisiteIds": ["c-prereq"],
+            "examWeight": 4
+          },
+          {
+            "id": "c-new",
+            "name": "C-NEW",
+            "topics": ["cardiac_output"],
+            "prerequisiteIds": [],
+            "examWeight": 3
+          },
+          {
+            "id": "c-pristine",
+            "name": "C-PRISTINE",
+            "topics": ["Acid-Base"],
+            "prerequisiteIds": [],
+            "examWeight": 5
+          },
+          {
+            "id": "c-strong",
+            "name": "C-STRONG",
+            "topics": ["Glycolysis"],
+            "prerequisiteIds": [],
+            "examWeight": 1
+          },
+          {
+            "id": "c-prereq",
+            "name": "C-PREREQ",
+            "topics": ["Nephron Anatomy"],
+            "prerequisiteIds": ["c-root"],
+            "examWeight": 3
+          },
+          {
+            "id": "c-root",
+            "name": "C-ROOT",
+            "topics": ["Cell Membranes"],
+            "prerequisiteIds": [],
+            "examWeight": 3
+          },
+          {
+            "id": "c-hub",
+            "name": "C-HUB",
+            "topics": ["Integrated Renal"],
+            "prerequisiteIds": ["c-weak", "c-new"],
+            "examWeight": 3
+          },
+          {
+            "id": "c-zero",
+            "name": "C-ZERO",
+            "topics": ["Zeta Topic"],
+            "prerequisiteIds": [],
+            "examWeight": 0
+          }
+        ],
+        "stateMap": {
+          "c-weak": {
+            "recallProbability": 0.35,
+            "confidence": 0.5,
+            "exposureCount": 5,
+            "lastExposureAt": 1768305600000,
+            "lastProbeAt": 1768132800000
+          },
+          "c-pristine": {
+            "recallProbability": 0.97,
+            "confidence": 0.9,
+            "exposureCount": 12,
+            "lastExposureAt": 1768392000000,
+            "lastProbeAt": 1768392000000
+          },
+          "c-strong": {
+            "recallProbability": 0.98,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "lastExposureAt": 1768435200000,
+            "lastProbeAt": 1768435200000
+          },
+          "c-prereq": {
+            "recallProbability": 0.55,
+            "confidence": 0.2,
+            "exposureCount": 2,
+            "lastExposureAt": 1767960000000,
+            "lastProbeAt": 1767960000000
+          },
+          "c-root": {
+            "recallProbability": 0.9,
+            "confidence": 0.8,
+            "exposureCount": 9,
+            "lastExposureAt": 1768392000000,
+            "lastProbeAt": 1768305600000
+          },
+          "c-hub": {
+            "recallProbability": 0.4,
+            "confidence": 0.45,
+            "exposureCount": 4,
+            "lastExposureAt": 1768219200000,
+            "lastProbeAt": 1767614400000
+          },
+          "c-zero": {
+            "recallProbability": 0.2,
+            "confidence": 0.1,
+            "exposureCount": 1,
+            "lastExposureAt": 1765886400000,
+            "lastProbeAt": null
+          }
+        },
+        "conceptEmbeddings": {
+          "c-weak": [0.9, 0.1, 0, 0.4],
+          "c-new": [0.1, 0.8, 0.2, 0],
+          "c-hub": [0.5, 0.5, 0.5, 0.5],
+          "c-zero": [0, 0, 0, 0]
+        },
+        "gapDirection": [0.8, 0.2, 0.1, 0.55],
+        "likedConceptIds": ["c-new"],
+        "recentFailureConceptIds": ["c-hub"],
+        "practiceMissConceptIds": ["c-weak"],
+        "chronicFailureConceptIds": ["c-strong"],
+        "bulk": {
+          "unseenCards": [],
+          "seenCards": [],
+          "rotationQuestions": []
+        }
+      },
+      "expected": {
+        "rankedStates": [
+          {
+            "conceptId": "c-weak",
+            "conceptName": "C-WEAK",
+            "currentRecall": 0.3170032824923673,
+            "recallOnExamDay": 0.07177934365066832,
+            "confidence": 0.5,
+            "exposureCount": 5,
+            "daysSinceProbe": 4,
+            "daysSinceExposure": 2,
+            "priority": 0.13380027804721387,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-new",
+            "conceptName": "C-NEW",
+            "currentRecall": 0,
+            "recallOnExamDay": 0,
+            "confidence": 0,
+            "exposureCount": 0,
+            "daysSinceProbe": "Infinity",
+            "daysSinceExposure": "Infinity",
+            "priority": 1.3068297085302203,
+            "intervention": "probe"
+          },
+          {
+            "conceptId": "c-pristine",
+            "conceptName": "C-PRISTINE",
+            "currentRecall": 0.9362957693222784,
+            "recallOnExamDay": 0.32408047265548806,
+            "confidence": 0.9,
+            "exposureCount": 12,
+            "daysSinceProbe": 1,
+            "daysSinceExposure": 1,
+            "priority": 0.23631061818387958,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-strong",
+            "conceptName": "C-STRONG",
+            "currentRecall": 0.9634108737782726,
+            "recallOnExamDay": 0.3458912923594134,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "daysSinceProbe": 0.5,
+            "daysSinceExposure": 0.5,
+            "priority": 0.10989053342429247,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-prereq",
+            "conceptName": "C-PREREQ",
+            "currentRecall": 0.3597978886557065,
+            "recallOnExamDay": 0.04310604873882552,
+            "confidence": 0.2,
+            "exposureCount": 2,
+            "daysSinceProbe": 6,
+            "daysSinceExposure": 6,
+            "priority": 0.7291835056948449,
+            "intervention": "probe"
+          },
+          {
+            "conceptId": "c-root",
+            "conceptName": "C-ROOT",
+            "currentRecall": 0.8663679937969035,
+            "recallOnExamDay": 0.2763752256877902,
+            "confidence": 0.8,
+            "exposureCount": 9,
+            "daysSinceProbe": 2,
+            "daysSinceExposure": 1,
+            "priority": 1.121312480701124,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-hub",
+            "conceptName": "C-HUB",
+            "currentRecall": 0.3421042649969313,
+            "recallOnExamDay": 0.07163800133327329,
+            "confidence": 0.45,
+            "exposureCount": 4,
+            "daysSinceProbe": 10,
+            "daysSinceExposure": 3,
+            "priority": 0,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-zero",
+            "conceptName": "C-ZERO",
+            "currentRecall": 0.016823752407904454,
+            "recallOnExamDay": 0.0014151932254123547,
+            "confidence": 0.1,
+            "exposureCount": 1,
+            "daysSinceProbe": "Infinity",
+            "daysSinceExposure": 30,
+            "priority": 0.36567531754894733,
+            "intervention": "probe"
+          }
+        ],
+        "conceptClusters": {
+          "c-weak": "c-weak",
+          "c-new": "c-new",
+          "c-pristine": "c-pristine",
+          "c-strong": "c-strong",
+          "c-prereq": "c-prereq",
+          "c-root": "c-root",
+          "c-hub": "c-hub",
+          "c-zero": "c-zero"
+        },
+        "sortedConceptIds": ["c-new", "c-root", "c-prereq", "c-zero", "c-pristine", "c-weak", "c-strong", "c-hub"],
+        "sortedPriorities": [
+          1.4536533978397754, 1.0215692893082988, 0.5561204263569306, 0.44928583228383956, 0.26287801498924057,
+          0.15501687442547515, 0.13754662513940452, -0.013493944178335368
+        ],
+        "pristineConceptIds": [],
+        "weakConceptIds": ["c-new", "c-root", "c-prereq", "c-zero", "c-pristine", "c-weak", "c-strong", "c-hub"],
+        "cardRatio": 0.7,
+        "quota": {
+          "targetCardCount": 14,
+          "targetQuestionCount": 6,
+          "coverageReservation": 2,
+          "targetWeakCardCount": 12
+        },
+        "clusterRoundRobin": ["c-new", "c-root", "c-prereq", "c-zero", "c-pristine", "c-weak", "c-strong", "c-hub"],
+        "unseenCardIds": [],
+        "crossSourceCardIds": [],
+        "crossSourceQuestionIds": [],
+        "maxCrossSourceItems": 0,
+        "maxNewCards": "Infinity",
+        "unknownItemRotation": "rot-main"
+      }
+    },
+    {
+      "name": "crunch_no_new_cards",
+      "snapshot": {
+        "nowMs": 1768478400000,
+        "daysToExam": 5,
+        "examPressure": 0.9168273035060777,
+        "size": 20,
+        "cardRatio": 0.7,
+        "rotation": "rot-main",
+        "effectiveMaxNewCards": 0,
+        "options": {
+          "examTargetTieBreakSeed": "a3f1c9e2b7d4058e6a1f3c5d7e9b2a4c6e8f0a1b3c5d7e9f1a2b3c4d5e6f7a8b",
+          "mode": "crunch"
+        },
+        "concepts": [
+          {
+            "id": "c-weak",
+            "name": "C-WEAK",
+            "topics": ["Renal Physiology"],
+            "prerequisiteIds": ["c-prereq"],
+            "examWeight": 4
+          },
+          {
+            "id": "c-new",
+            "name": "C-NEW",
+            "topics": ["cardiac_output"],
+            "prerequisiteIds": [],
+            "examWeight": 3
+          },
+          {
+            "id": "c-pristine",
+            "name": "C-PRISTINE",
+            "topics": ["Acid-Base"],
+            "prerequisiteIds": [],
+            "examWeight": 5
+          },
+          {
+            "id": "c-strong",
+            "name": "C-STRONG",
+            "topics": ["Glycolysis"],
+            "prerequisiteIds": [],
+            "examWeight": 1
+          },
+          {
+            "id": "c-prereq",
+            "name": "C-PREREQ",
+            "topics": ["Nephron Anatomy"],
+            "prerequisiteIds": ["c-root"],
+            "examWeight": 3
+          },
+          {
+            "id": "c-root",
+            "name": "C-ROOT",
+            "topics": ["Cell Membranes"],
+            "prerequisiteIds": [],
+            "examWeight": 3
+          },
+          {
+            "id": "c-hub",
+            "name": "C-HUB",
+            "topics": ["Integrated Renal"],
+            "prerequisiteIds": ["c-weak", "c-new"],
+            "examWeight": 3
+          },
+          {
+            "id": "c-zero",
+            "name": "C-ZERO",
+            "topics": ["Zeta Topic"],
+            "prerequisiteIds": [],
+            "examWeight": 0
+          }
+        ],
+        "stateMap": {
+          "c-weak": {
+            "recallProbability": 0.35,
+            "confidence": 0.5,
+            "exposureCount": 5,
+            "lastExposureAt": 1768305600000,
+            "lastProbeAt": 1768132800000
+          },
+          "c-pristine": {
+            "recallProbability": 0.97,
+            "confidence": 0.9,
+            "exposureCount": 12,
+            "lastExposureAt": 1768392000000,
+            "lastProbeAt": 1768392000000
+          },
+          "c-strong": {
+            "recallProbability": 0.98,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "lastExposureAt": 1768435200000,
+            "lastProbeAt": 1768435200000
+          },
+          "c-prereq": {
+            "recallProbability": 0.55,
+            "confidence": 0.2,
+            "exposureCount": 2,
+            "lastExposureAt": 1767960000000,
+            "lastProbeAt": 1767960000000
+          },
+          "c-root": {
+            "recallProbability": 0.9,
+            "confidence": 0.8,
+            "exposureCount": 9,
+            "lastExposureAt": 1768392000000,
+            "lastProbeAt": 1768305600000
+          },
+          "c-hub": {
+            "recallProbability": 0.4,
+            "confidence": 0.45,
+            "exposureCount": 4,
+            "lastExposureAt": 1768219200000,
+            "lastProbeAt": 1767614400000
+          },
+          "c-zero": {
+            "recallProbability": 0.2,
+            "confidence": 0.1,
+            "exposureCount": 1,
+            "lastExposureAt": 1765886400000,
+            "lastProbeAt": null
+          }
+        },
+        "conceptEmbeddings": {
+          "c-weak": [0.9, 0.1, 0, 0.4],
+          "c-new": [0.1, 0.8, 0.2, 0],
+          "c-hub": [0.5, 0.5, 0.5, 0.5],
+          "c-zero": [0, 0, 0, 0]
+        },
+        "gapDirection": [0.8, 0.2, 0.1, 0.55],
+        "likedConceptIds": ["c-new"],
+        "recentFailureConceptIds": ["c-hub"],
+        "practiceMissConceptIds": ["c-weak"],
+        "chronicFailureConceptIds": ["c-strong"],
+        "bulk": {
+          "unseenCards": [
+            {
+              "id": "u-acid-1",
+              "topics": ["Acid-Base"],
+              "clusterId": "cl-renal",
+              "rotation": "rot-main",
+              "sourceFile": "u-acid-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-acid-1"
+            },
+            {
+              "id": "u-acid-2",
+              "topics": ["acid base"],
+              "clusterId": null,
+              "rotation": "rot-main",
+              "sourceFile": "u-acid-2.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-acid-2"
+            },
+            {
+              "id": "u-renal-1",
+              "topics": ["Renal Physiology"],
+              "clusterId": "cl-renal",
+              "rotation": "rot-cross",
+              "sourceFile": "u-renal-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-renal-1"
+            },
+            {
+              "id": "u-cardiac-1",
+              "topics": ["Cardiac Output"],
+              "clusterId": "cl-cardio",
+              "rotation": "rot-main",
+              "sourceFile": "u-cardiac-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-cardiac-1"
+            },
+            {
+              "id": "u-deferred",
+              "topics": ["Glycolysis"],
+              "clusterId": "cl-metab",
+              "rotation": "rot-main",
+              "sourceFile": "u-deferred.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-deferred"
+            }
+          ],
+          "seenCards": [
+            {
+              "id": "s-glyco-1",
+              "topics": ["Glycolysis"],
+              "clusterId": "cl-metab",
+              "rotation": "rot-main",
+              "sourceFile": "s-glyco-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "s-glyco-1"
+            },
+            {
+              "id": "s-nephron-1",
+              "topics": ["Nephron Anatomy"],
+              "clusterId": "cl-renal",
+              "rotation": "rot-main",
+              "sourceFile": "s-nephron-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "s-nephron-1"
+            }
+          ],
+          "rotationQuestions": [
+            {
+              "id": "q-1",
+              "rotation": "rot-cross"
+            },
+            {
+              "id": "q-2",
+              "rotation": "rot-main"
+            }
+          ],
+          "passSetDeferredCardIds": ["u-deferred"]
+        }
+      },
+      "expected": {
+        "rankedStates": [
+          {
+            "conceptId": "c-weak",
+            "conceptName": "C-WEAK",
+            "currentRecall": 0.3170032824923673,
+            "recallOnExamDay": 0.24748737341529162,
+            "confidence": 0.5,
+            "exposureCount": 5,
+            "daysSinceProbe": 4,
+            "daysSinceExposure": 2,
+            "priority": 0.7628453196609513,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-new",
+            "conceptName": "C-NEW",
+            "currentRecall": 0,
+            "recallOnExamDay": 0,
+            "confidence": 0,
+            "exposureCount": 0,
+            "daysSinceProbe": "Infinity",
+            "daysSinceExposure": "Infinity",
+            "priority": 1.3403353623311345,
+            "intervention": "probe"
+          },
+          {
+            "conceptId": "c-pristine",
+            "conceptName": "C-PRISTINE",
+            "currentRecall": 0.9362957693222784,
+            "recallOnExamDay": 0.7845483164171647,
+            "confidence": 0.9,
+            "exposureCount": 12,
+            "daysSinceProbe": 1,
+            "daysSinceExposure": 1,
+            "priority": 0.010301122388556887,
+            "intervention": "reinforce"
+          },
+          {
+            "conceptId": "c-strong",
+            "conceptName": "C-STRONG",
+            "currentRecall": 0.9634108737782726,
+            "recallOnExamDay": 0.812206058398136,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "daysSinceProbe": 0.5,
+            "daysSinceExposure": 0.5,
+            "priority": 0,
+            "intervention": "reinforce"
+          },
+          {
+            "conceptId": "c-prereq",
+            "conceptName": "C-PREREQ",
+            "currentRecall": 0.3597978886557065,
+            "recallOnExamDay": 0.2526224123693809,
+            "confidence": 0.2,
+            "exposureCount": 2,
+            "daysSinceProbe": 6,
+            "daysSinceExposure": 6,
+            "priority": 1.2833748906722107,
+            "intervention": "probe"
+          },
+          {
+            "conceptId": "c-root",
+            "conceptName": "C-ROOT",
+            "currentRecall": 0.8663679937969035,
+            "recallOnExamDay": 0.7161464633543655,
+            "confidence": 0.8,
+            "exposureCount": 9,
+            "daysSinceProbe": 2,
+            "daysSinceExposure": 1,
+            "priority": 1.090868657071379,
+            "intervention": "reinforce"
+          },
+          {
+            "conceptId": "c-hub",
+            "conceptName": "C-HUB",
+            "currentRecall": 0.3421042649969313,
+            "recallOnExamDay": 0.2636266538265106,
+            "confidence": 0.45,
+            "exposureCount": 4,
+            "daysSinceProbe": 10,
+            "daysSinceExposure": 3,
+            "priority": 0,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-zero",
+            "conceptName": "C-ZERO",
+            "currentRecall": 0.016823752407904454,
+            "recallOnExamDay": 0.011136233976754242,
+            "confidence": 0.1,
+            "exposureCount": 1,
+            "daysSinceProbe": "Infinity",
+            "daysSinceExposure": 30,
+            "priority": 0.36295458867441527,
+            "intervention": "probe"
+          }
+        ],
+        "conceptClusters": {
+          "c-weak": "cl-renal",
+          "c-new": "c-new",
+          "c-pristine": "cl-renal",
+          "c-strong": "cl-metab",
+          "c-prereq": "cl-renal",
+          "c-root": "c-root",
+          "c-hub": "c-hub",
+          "c-zero": "c-zero"
+        },
+        "sortedConceptIds": ["c-new", "c-root", "c-prereq", "c-weak", "c-zero", "c-pristine", "c-strong", "c-hub"],
+        "sortedPriorities": [
+          1.4909234470103907, 0.9938335102060992, 0.978781041812387, 0.8838090536868324, 0.4459430172833462,
+          0.015922409533743104, 0.012583473231643438, -0.013493944178335368
+        ],
+        "pristineConceptIds": ["c-new", "c-pristine", "c-weak"],
+        "weakConceptIds": ["c-new", "c-root", "c-prereq", "c-weak", "c-zero", "c-pristine", "c-hub"],
+        "cardRatio": 0.7,
+        "quota": {
+          "targetCardCount": 14,
+          "targetQuestionCount": 6,
+          "coverageReservation": 0,
+          "targetWeakCardCount": 14
+        },
+        "clusterRoundRobin": ["c-new", "c-root", "c-prereq", "c-zero", "c-hub", "c-weak", "c-pristine"],
+        "unseenCardIds": ["u-acid-1", "u-acid-2", "u-cardiac-1", "u-deferred", "u-renal-1"],
+        "crossSourceCardIds": [],
+        "crossSourceQuestionIds": [],
+        "maxCrossSourceItems": 0,
+        "maxNewCards": 0,
+        "unknownItemRotation": "rot-main"
+      }
+    },
+    {
+      "name": "explicit_card_ratio",
+      "snapshot": {
+        "nowMs": 1768478400000,
+        "daysToExam": 30,
+        "examPressure": 0.20587037180094736,
+        "size": 7,
+        "cardRatio": 0.5,
+        "rotation": "rot-main",
+        "effectiveMaxNewCards": null,
+        "options": {
+          "examTargetTieBreakSeed": "a3f1c9e2b7d4058e6a1f3c5d7e9b2a4c6e8f0a1b3c5d7e9f1a2b3c4d5e6f7a8b",
+          "cardRatio": 0.5
+        },
+        "concepts": [
+          {
+            "id": "c-weak",
+            "name": "C-WEAK",
+            "topics": ["Renal Physiology"],
+            "prerequisiteIds": ["c-prereq"],
+            "examWeight": 4
+          },
+          {
+            "id": "c-new",
+            "name": "C-NEW",
+            "topics": ["cardiac_output"],
+            "prerequisiteIds": [],
+            "examWeight": 3
+          },
+          {
+            "id": "c-pristine",
+            "name": "C-PRISTINE",
+            "topics": ["Acid-Base"],
+            "prerequisiteIds": [],
+            "examWeight": 5
+          },
+          {
+            "id": "c-strong",
+            "name": "C-STRONG",
+            "topics": ["Glycolysis"],
+            "prerequisiteIds": [],
+            "examWeight": 1
+          },
+          {
+            "id": "c-prereq",
+            "name": "C-PREREQ",
+            "topics": ["Nephron Anatomy"],
+            "prerequisiteIds": ["c-root"],
+            "examWeight": 3
+          },
+          {
+            "id": "c-root",
+            "name": "C-ROOT",
+            "topics": ["Cell Membranes"],
+            "prerequisiteIds": [],
+            "examWeight": 3
+          },
+          {
+            "id": "c-hub",
+            "name": "C-HUB",
+            "topics": ["Integrated Renal"],
+            "prerequisiteIds": ["c-weak", "c-new"],
+            "examWeight": 3
+          },
+          {
+            "id": "c-zero",
+            "name": "C-ZERO",
+            "topics": ["Zeta Topic"],
+            "prerequisiteIds": [],
+            "examWeight": 0
+          }
+        ],
+        "stateMap": {
+          "c-weak": {
+            "recallProbability": 0.35,
+            "confidence": 0.5,
+            "exposureCount": 5,
+            "lastExposureAt": 1768305600000,
+            "lastProbeAt": 1768132800000
+          },
+          "c-pristine": {
+            "recallProbability": 0.97,
+            "confidence": 0.9,
+            "exposureCount": 12,
+            "lastExposureAt": 1768392000000,
+            "lastProbeAt": 1768392000000
+          },
+          "c-strong": {
+            "recallProbability": 0.98,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "lastExposureAt": 1768435200000,
+            "lastProbeAt": 1768435200000
+          },
+          "c-prereq": {
+            "recallProbability": 0.55,
+            "confidence": 0.2,
+            "exposureCount": 2,
+            "lastExposureAt": 1767960000000,
+            "lastProbeAt": 1767960000000
+          },
+          "c-root": {
+            "recallProbability": 0.9,
+            "confidence": 0.8,
+            "exposureCount": 9,
+            "lastExposureAt": 1768392000000,
+            "lastProbeAt": 1768305600000
+          },
+          "c-hub": {
+            "recallProbability": 0.4,
+            "confidence": 0.45,
+            "exposureCount": 4,
+            "lastExposureAt": 1768219200000,
+            "lastProbeAt": 1767614400000
+          },
+          "c-zero": {
+            "recallProbability": 0.2,
+            "confidence": 0.1,
+            "exposureCount": 1,
+            "lastExposureAt": 1765886400000,
+            "lastProbeAt": null
+          }
+        },
+        "conceptEmbeddings": {
+          "c-weak": [0.9, 0.1, 0, 0.4],
+          "c-new": [0.1, 0.8, 0.2, 0],
+          "c-hub": [0.5, 0.5, 0.5, 0.5],
+          "c-zero": [0, 0, 0, 0]
+        },
+        "gapDirection": [0.8, 0.2, 0.1, 0.55],
+        "likedConceptIds": ["c-new"],
+        "recentFailureConceptIds": ["c-hub"],
+        "practiceMissConceptIds": ["c-weak"],
+        "chronicFailureConceptIds": ["c-strong"],
+        "bulk": {
+          "unseenCards": [
+            {
+              "id": "u-acid-1",
+              "topics": ["Acid-Base"],
+              "clusterId": "cl-renal",
+              "rotation": "rot-main",
+              "sourceFile": "u-acid-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-acid-1"
+            },
+            {
+              "id": "u-acid-2",
+              "topics": ["acid base"],
+              "clusterId": null,
+              "rotation": "rot-main",
+              "sourceFile": "u-acid-2.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-acid-2"
+            },
+            {
+              "id": "u-renal-1",
+              "topics": ["Renal Physiology"],
+              "clusterId": "cl-renal",
+              "rotation": "rot-cross",
+              "sourceFile": "u-renal-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-renal-1"
+            },
+            {
+              "id": "u-cardiac-1",
+              "topics": ["Cardiac Output"],
+              "clusterId": "cl-cardio",
+              "rotation": "rot-main",
+              "sourceFile": "u-cardiac-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-cardiac-1"
+            },
+            {
+              "id": "u-deferred",
+              "topics": ["Glycolysis"],
+              "clusterId": "cl-metab",
+              "rotation": "rot-main",
+              "sourceFile": "u-deferred.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-deferred"
+            }
+          ],
+          "seenCards": [
+            {
+              "id": "s-glyco-1",
+              "topics": ["Glycolysis"],
+              "clusterId": "cl-metab",
+              "rotation": "rot-main",
+              "sourceFile": "s-glyco-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "s-glyco-1"
+            },
+            {
+              "id": "s-nephron-1",
+              "topics": ["Nephron Anatomy"],
+              "clusterId": "cl-renal",
+              "rotation": "rot-main",
+              "sourceFile": "s-nephron-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "s-nephron-1"
+            }
+          ],
+          "rotationQuestions": [
+            {
+              "id": "q-1",
+              "rotation": "rot-cross"
+            },
+            {
+              "id": "q-2",
+              "rotation": "rot-main"
+            }
+          ],
+          "passSetDeferredCardIds": ["u-deferred"]
+        }
+      },
+      "expected": {
+        "rankedStates": [
+          {
+            "conceptId": "c-weak",
+            "conceptName": "C-WEAK",
+            "currentRecall": 0.3170032824923673,
+            "recallOnExamDay": 0.07177934365066832,
+            "confidence": 0.5,
+            "exposureCount": 5,
+            "daysSinceProbe": 4,
+            "daysSinceExposure": 2,
+            "priority": 0.13380027804721387,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-new",
+            "conceptName": "C-NEW",
+            "currentRecall": 0,
+            "recallOnExamDay": 0,
+            "confidence": 0,
+            "exposureCount": 0,
+            "daysSinceProbe": "Infinity",
+            "daysSinceExposure": "Infinity",
+            "priority": 1.3068297085302203,
+            "intervention": "probe"
+          },
+          {
+            "conceptId": "c-pristine",
+            "conceptName": "C-PRISTINE",
+            "currentRecall": 0.9362957693222784,
+            "recallOnExamDay": 0.32408047265548806,
+            "confidence": 0.9,
+            "exposureCount": 12,
+            "daysSinceProbe": 1,
+            "daysSinceExposure": 1,
+            "priority": 0.23631061818387958,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-strong",
+            "conceptName": "C-STRONG",
+            "currentRecall": 0.9634108737782726,
+            "recallOnExamDay": 0.3458912923594134,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "daysSinceProbe": 0.5,
+            "daysSinceExposure": 0.5,
+            "priority": 0.10989053342429247,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-prereq",
+            "conceptName": "C-PREREQ",
+            "currentRecall": 0.3597978886557065,
+            "recallOnExamDay": 0.04310604873882552,
+            "confidence": 0.2,
+            "exposureCount": 2,
+            "daysSinceProbe": 6,
+            "daysSinceExposure": 6,
+            "priority": 0.7291835056948449,
+            "intervention": "probe"
+          },
+          {
+            "conceptId": "c-root",
+            "conceptName": "C-ROOT",
+            "currentRecall": 0.8663679937969035,
+            "recallOnExamDay": 0.2763752256877902,
+            "confidence": 0.8,
+            "exposureCount": 9,
+            "daysSinceProbe": 2,
+            "daysSinceExposure": 1,
+            "priority": 1.121312480701124,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-hub",
+            "conceptName": "C-HUB",
+            "currentRecall": 0.3421042649969313,
+            "recallOnExamDay": 0.07163800133327329,
+            "confidence": 0.45,
+            "exposureCount": 4,
+            "daysSinceProbe": 10,
+            "daysSinceExposure": 3,
+            "priority": 0,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-zero",
+            "conceptName": "C-ZERO",
+            "currentRecall": 0.016823752407904454,
+            "recallOnExamDay": 0.0014151932254123547,
+            "confidence": 0.1,
+            "exposureCount": 1,
+            "daysSinceProbe": "Infinity",
+            "daysSinceExposure": 30,
+            "priority": 0.36567531754894733,
+            "intervention": "probe"
+          }
+        ],
+        "conceptClusters": {
+          "c-weak": "cl-renal",
+          "c-new": "c-new",
+          "c-pristine": "cl-renal",
+          "c-strong": "cl-metab",
+          "c-prereq": "cl-renal",
+          "c-root": "c-root",
+          "c-hub": "c-hub",
+          "c-zero": "c-zero"
+        },
+        "sortedConceptIds": ["c-new", "c-root", "c-prereq", "c-zero", "c-pristine", "c-weak", "c-strong", "c-hub"],
+        "sortedPriorities": [
+          1.4536533978397754, 1.0215692893082988, 0.5561204263569306, 0.44928583228383956, 0.26287801498924057,
+          0.15501687442547515, 0.13754662513940452, -0.013493944178335368
+        ],
+        "pristineConceptIds": ["c-new", "c-pristine", "c-weak"],
+        "weakConceptIds": ["c-new", "c-root", "c-prereq", "c-zero", "c-pristine", "c-weak", "c-strong", "c-hub"],
+        "cardRatio": 0.5,
+        "quota": {
+          "targetCardCount": 4,
+          "targetQuestionCount": 3,
+          "coverageReservation": 1,
+          "targetWeakCardCount": 3
+        },
+        "clusterRoundRobin": ["c-new", "c-root", "c-prereq", "c-zero", "c-strong", "c-hub", "c-pristine", "c-weak"],
+        "unseenCardIds": ["u-acid-1", "u-acid-2", "u-cardiac-1", "u-deferred", "u-renal-1"],
+        "crossSourceCardIds": [],
+        "crossSourceQuestionIds": [],
+        "maxCrossSourceItems": 0,
+        "maxNewCards": "Infinity",
+        "unknownItemRotation": "rot-main"
+      }
+    },
+    {
+      "name": "questions_only_challenge",
+      "snapshot": {
+        "nowMs": 1768478400000,
+        "daysToExam": 30,
+        "examPressure": 0.20587037180094736,
+        "size": 20,
+        "cardRatio": 0.7,
+        "rotation": "rot-main",
+        "effectiveMaxNewCards": null,
+        "options": {
+          "examTargetTieBreakSeed": "a3f1c9e2b7d4058e6a1f3c5d7e9b2a4c6e8f0a1b3c5d7e9f1a2b3c4d5e6f7a8b",
+          "reviewChallenge": 2
+        },
+        "concepts": [
+          {
+            "id": "c-weak",
+            "name": "C-WEAK",
+            "topics": ["Renal Physiology"],
+            "prerequisiteIds": ["c-prereq"],
+            "examWeight": 4
+          },
+          {
+            "id": "c-new",
+            "name": "C-NEW",
+            "topics": ["cardiac_output"],
+            "prerequisiteIds": [],
+            "examWeight": 3
+          },
+          {
+            "id": "c-pristine",
+            "name": "C-PRISTINE",
+            "topics": ["Acid-Base"],
+            "prerequisiteIds": [],
+            "examWeight": 5
+          },
+          {
+            "id": "c-strong",
+            "name": "C-STRONG",
+            "topics": ["Glycolysis"],
+            "prerequisiteIds": [],
+            "examWeight": 1
+          },
+          {
+            "id": "c-prereq",
+            "name": "C-PREREQ",
+            "topics": ["Nephron Anatomy"],
+            "prerequisiteIds": ["c-root"],
+            "examWeight": 3
+          },
+          {
+            "id": "c-root",
+            "name": "C-ROOT",
+            "topics": ["Cell Membranes"],
+            "prerequisiteIds": [],
+            "examWeight": 3
+          },
+          {
+            "id": "c-hub",
+            "name": "C-HUB",
+            "topics": ["Integrated Renal"],
+            "prerequisiteIds": ["c-weak", "c-new"],
+            "examWeight": 3
+          },
+          {
+            "id": "c-zero",
+            "name": "C-ZERO",
+            "topics": ["Zeta Topic"],
+            "prerequisiteIds": [],
+            "examWeight": 0
+          }
+        ],
+        "stateMap": {
+          "c-weak": {
+            "recallProbability": 0.35,
+            "confidence": 0.5,
+            "exposureCount": 5,
+            "lastExposureAt": 1768305600000,
+            "lastProbeAt": 1768132800000
+          },
+          "c-pristine": {
+            "recallProbability": 0.97,
+            "confidence": 0.9,
+            "exposureCount": 12,
+            "lastExposureAt": 1768392000000,
+            "lastProbeAt": 1768392000000
+          },
+          "c-strong": {
+            "recallProbability": 0.98,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "lastExposureAt": 1768435200000,
+            "lastProbeAt": 1768435200000
+          },
+          "c-prereq": {
+            "recallProbability": 0.55,
+            "confidence": 0.2,
+            "exposureCount": 2,
+            "lastExposureAt": 1767960000000,
+            "lastProbeAt": 1767960000000
+          },
+          "c-root": {
+            "recallProbability": 0.9,
+            "confidence": 0.8,
+            "exposureCount": 9,
+            "lastExposureAt": 1768392000000,
+            "lastProbeAt": 1768305600000
+          },
+          "c-hub": {
+            "recallProbability": 0.4,
+            "confidence": 0.45,
+            "exposureCount": 4,
+            "lastExposureAt": 1768219200000,
+            "lastProbeAt": 1767614400000
+          },
+          "c-zero": {
+            "recallProbability": 0.2,
+            "confidence": 0.1,
+            "exposureCount": 1,
+            "lastExposureAt": 1765886400000,
+            "lastProbeAt": null
+          }
+        },
+        "conceptEmbeddings": {
+          "c-weak": [0.9, 0.1, 0, 0.4],
+          "c-new": [0.1, 0.8, 0.2, 0],
+          "c-hub": [0.5, 0.5, 0.5, 0.5],
+          "c-zero": [0, 0, 0, 0]
+        },
+        "gapDirection": [0.8, 0.2, 0.1, 0.55],
+        "likedConceptIds": ["c-new"],
+        "recentFailureConceptIds": ["c-hub"],
+        "practiceMissConceptIds": ["c-weak"],
+        "chronicFailureConceptIds": ["c-strong"],
+        "bulk": {
+          "unseenCards": [
+            {
+              "id": "u-acid-1",
+              "topics": ["Acid-Base"],
+              "clusterId": "cl-renal",
+              "rotation": "rot-main",
+              "sourceFile": "u-acid-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-acid-1"
+            },
+            {
+              "id": "u-acid-2",
+              "topics": ["acid base"],
+              "clusterId": null,
+              "rotation": "rot-main",
+              "sourceFile": "u-acid-2.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-acid-2"
+            },
+            {
+              "id": "u-renal-1",
+              "topics": ["Renal Physiology"],
+              "clusterId": "cl-renal",
+              "rotation": "rot-cross",
+              "sourceFile": "u-renal-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-renal-1"
+            },
+            {
+              "id": "u-cardiac-1",
+              "topics": ["Cardiac Output"],
+              "clusterId": "cl-cardio",
+              "rotation": "rot-main",
+              "sourceFile": "u-cardiac-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-cardiac-1"
+            },
+            {
+              "id": "u-deferred",
+              "topics": ["Glycolysis"],
+              "clusterId": "cl-metab",
+              "rotation": "rot-main",
+              "sourceFile": "u-deferred.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-deferred"
+            }
+          ],
+          "seenCards": [
+            {
+              "id": "s-glyco-1",
+              "topics": ["Glycolysis"],
+              "clusterId": "cl-metab",
+              "rotation": "rot-main",
+              "sourceFile": "s-glyco-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "s-glyco-1"
+            },
+            {
+              "id": "s-nephron-1",
+              "topics": ["Nephron Anatomy"],
+              "clusterId": "cl-renal",
+              "rotation": "rot-main",
+              "sourceFile": "s-nephron-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "s-nephron-1"
+            }
+          ],
+          "rotationQuestions": [
+            {
+              "id": "q-1",
+              "rotation": "rot-cross"
+            },
+            {
+              "id": "q-2",
+              "rotation": "rot-main"
+            }
+          ],
+          "passSetDeferredCardIds": ["u-deferred"]
+        }
+      },
+      "expected": {
+        "rankedStates": [
+          {
+            "conceptId": "c-weak",
+            "conceptName": "C-WEAK",
+            "currentRecall": 0.3170032824923673,
+            "recallOnExamDay": 0.07177934365066832,
+            "confidence": 0.5,
+            "exposureCount": 5,
+            "daysSinceProbe": 4,
+            "daysSinceExposure": 2,
+            "priority": 0.13380027804721387,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-new",
+            "conceptName": "C-NEW",
+            "currentRecall": 0,
+            "recallOnExamDay": 0,
+            "confidence": 0,
+            "exposureCount": 0,
+            "daysSinceProbe": "Infinity",
+            "daysSinceExposure": "Infinity",
+            "priority": 1.3068297085302203,
+            "intervention": "probe"
+          },
+          {
+            "conceptId": "c-pristine",
+            "conceptName": "C-PRISTINE",
+            "currentRecall": 0.9362957693222784,
+            "recallOnExamDay": 0.32408047265548806,
+            "confidence": 0.9,
+            "exposureCount": 12,
+            "daysSinceProbe": 1,
+            "daysSinceExposure": 1,
+            "priority": 0.23631061818387958,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-strong",
+            "conceptName": "C-STRONG",
+            "currentRecall": 0.9634108737782726,
+            "recallOnExamDay": 0.3458912923594134,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "daysSinceProbe": 0.5,
+            "daysSinceExposure": 0.5,
+            "priority": 0.10989053342429247,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-prereq",
+            "conceptName": "C-PREREQ",
+            "currentRecall": 0.3597978886557065,
+            "recallOnExamDay": 0.04310604873882552,
+            "confidence": 0.2,
+            "exposureCount": 2,
+            "daysSinceProbe": 6,
+            "daysSinceExposure": 6,
+            "priority": 0.7291835056948449,
+            "intervention": "probe"
+          },
+          {
+            "conceptId": "c-root",
+            "conceptName": "C-ROOT",
+            "currentRecall": 0.8663679937969035,
+            "recallOnExamDay": 0.2763752256877902,
+            "confidence": 0.8,
+            "exposureCount": 9,
+            "daysSinceProbe": 2,
+            "daysSinceExposure": 1,
+            "priority": 1.121312480701124,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-hub",
+            "conceptName": "C-HUB",
+            "currentRecall": 0.3421042649969313,
+            "recallOnExamDay": 0.07163800133327329,
+            "confidence": 0.45,
+            "exposureCount": 4,
+            "daysSinceProbe": 10,
+            "daysSinceExposure": 3,
+            "priority": 0,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-zero",
+            "conceptName": "C-ZERO",
+            "currentRecall": 0.016823752407904454,
+            "recallOnExamDay": 0.0014151932254123547,
+            "confidence": 0.1,
+            "exposureCount": 1,
+            "daysSinceProbe": "Infinity",
+            "daysSinceExposure": 30,
+            "priority": 0.36567531754894733,
+            "intervention": "probe"
+          }
+        ],
+        "conceptClusters": {
+          "c-weak": "cl-renal",
+          "c-new": "c-new",
+          "c-pristine": "cl-renal",
+          "c-strong": "cl-metab",
+          "c-prereq": "cl-renal",
+          "c-root": "c-root",
+          "c-hub": "c-hub",
+          "c-zero": "c-zero"
+        },
+        "sortedConceptIds": ["c-new", "c-root", "c-prereq", "c-zero", "c-pristine", "c-weak", "c-strong", "c-hub"],
+        "sortedPriorities": [
+          1.4536533978397754, 1.0215692893082988, 0.5561204263569306, 0.44928583228383956, 0.26287801498924057,
+          0.15501687442547515, 0.13754662513940452, -0.013493944178335368
+        ],
+        "pristineConceptIds": ["c-new", "c-pristine", "c-weak"],
+        "weakConceptIds": ["c-new", "c-root", "c-prereq", "c-zero", "c-pristine", "c-weak", "c-strong", "c-hub"],
+        "cardRatio": 0.7,
+        "quota": {
+          "targetCardCount": 0,
+          "targetQuestionCount": 20,
+          "coverageReservation": 0,
+          "targetWeakCardCount": 0
+        },
+        "clusterRoundRobin": ["c-new", "c-root", "c-prereq", "c-zero", "c-strong", "c-hub", "c-pristine", "c-weak"],
+        "unseenCardIds": ["u-acid-1", "u-acid-2", "u-cardiac-1", "u-deferred", "u-renal-1"],
+        "crossSourceCardIds": [],
+        "crossSourceQuestionIds": [],
+        "maxCrossSourceItems": 0,
+        "maxNewCards": "Infinity",
+        "unknownItemRotation": "rot-main"
+      }
+    },
+    {
+      "name": "scaffolds_only_challenge",
+      "snapshot": {
+        "nowMs": 1768478400000,
+        "daysToExam": 30,
+        "examPressure": 0.20587037180094736,
+        "size": 9,
+        "cardRatio": 0.7,
+        "rotation": "rot-main",
+        "effectiveMaxNewCards": null,
+        "options": {
+          "examTargetTieBreakSeed": "a3f1c9e2b7d4058e6a1f3c5d7e9b2a4c6e8f0a1b3c5d7e9f1a2b3c4d5e6f7a8b",
+          "reviewChallenge": -1.6
+        },
+        "concepts": [
+          {
+            "id": "c-weak",
+            "name": "C-WEAK",
+            "topics": ["Renal Physiology"],
+            "prerequisiteIds": ["c-prereq"],
+            "examWeight": 4
+          },
+          {
+            "id": "c-new",
+            "name": "C-NEW",
+            "topics": ["cardiac_output"],
+            "prerequisiteIds": [],
+            "examWeight": 3
+          },
+          {
+            "id": "c-pristine",
+            "name": "C-PRISTINE",
+            "topics": ["Acid-Base"],
+            "prerequisiteIds": [],
+            "examWeight": 5
+          },
+          {
+            "id": "c-strong",
+            "name": "C-STRONG",
+            "topics": ["Glycolysis"],
+            "prerequisiteIds": [],
+            "examWeight": 1
+          },
+          {
+            "id": "c-prereq",
+            "name": "C-PREREQ",
+            "topics": ["Nephron Anatomy"],
+            "prerequisiteIds": ["c-root"],
+            "examWeight": 3
+          },
+          {
+            "id": "c-root",
+            "name": "C-ROOT",
+            "topics": ["Cell Membranes"],
+            "prerequisiteIds": [],
+            "examWeight": 3
+          },
+          {
+            "id": "c-hub",
+            "name": "C-HUB",
+            "topics": ["Integrated Renal"],
+            "prerequisiteIds": ["c-weak", "c-new"],
+            "examWeight": 3
+          },
+          {
+            "id": "c-zero",
+            "name": "C-ZERO",
+            "topics": ["Zeta Topic"],
+            "prerequisiteIds": [],
+            "examWeight": 0
+          }
+        ],
+        "stateMap": {
+          "c-weak": {
+            "recallProbability": 0.35,
+            "confidence": 0.5,
+            "exposureCount": 5,
+            "lastExposureAt": 1768305600000,
+            "lastProbeAt": 1768132800000
+          },
+          "c-pristine": {
+            "recallProbability": 0.97,
+            "confidence": 0.9,
+            "exposureCount": 12,
+            "lastExposureAt": 1768392000000,
+            "lastProbeAt": 1768392000000
+          },
+          "c-strong": {
+            "recallProbability": 0.98,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "lastExposureAt": 1768435200000,
+            "lastProbeAt": 1768435200000
+          },
+          "c-prereq": {
+            "recallProbability": 0.55,
+            "confidence": 0.2,
+            "exposureCount": 2,
+            "lastExposureAt": 1767960000000,
+            "lastProbeAt": 1767960000000
+          },
+          "c-root": {
+            "recallProbability": 0.9,
+            "confidence": 0.8,
+            "exposureCount": 9,
+            "lastExposureAt": 1768392000000,
+            "lastProbeAt": 1768305600000
+          },
+          "c-hub": {
+            "recallProbability": 0.4,
+            "confidence": 0.45,
+            "exposureCount": 4,
+            "lastExposureAt": 1768219200000,
+            "lastProbeAt": 1767614400000
+          },
+          "c-zero": {
+            "recallProbability": 0.2,
+            "confidence": 0.1,
+            "exposureCount": 1,
+            "lastExposureAt": 1765886400000,
+            "lastProbeAt": null
+          }
+        },
+        "conceptEmbeddings": {
+          "c-weak": [0.9, 0.1, 0, 0.4],
+          "c-new": [0.1, 0.8, 0.2, 0],
+          "c-hub": [0.5, 0.5, 0.5, 0.5],
+          "c-zero": [0, 0, 0, 0]
+        },
+        "gapDirection": [0.8, 0.2, 0.1, 0.55],
+        "likedConceptIds": ["c-new"],
+        "recentFailureConceptIds": ["c-hub"],
+        "practiceMissConceptIds": ["c-weak"],
+        "chronicFailureConceptIds": ["c-strong"],
+        "bulk": {
+          "unseenCards": [
+            {
+              "id": "u-acid-1",
+              "topics": ["Acid-Base"],
+              "clusterId": "cl-renal",
+              "rotation": "rot-main",
+              "sourceFile": "u-acid-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-acid-1"
+            },
+            {
+              "id": "u-acid-2",
+              "topics": ["acid base"],
+              "clusterId": null,
+              "rotation": "rot-main",
+              "sourceFile": "u-acid-2.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-acid-2"
+            },
+            {
+              "id": "u-renal-1",
+              "topics": ["Renal Physiology"],
+              "clusterId": "cl-renal",
+              "rotation": "rot-cross",
+              "sourceFile": "u-renal-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-renal-1"
+            },
+            {
+              "id": "u-cardiac-1",
+              "topics": ["Cardiac Output"],
+              "clusterId": "cl-cardio",
+              "rotation": "rot-main",
+              "sourceFile": "u-cardiac-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-cardiac-1"
+            },
+            {
+              "id": "u-deferred",
+              "topics": ["Glycolysis"],
+              "clusterId": "cl-metab",
+              "rotation": "rot-main",
+              "sourceFile": "u-deferred.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-deferred"
+            }
+          ],
+          "seenCards": [
+            {
+              "id": "s-glyco-1",
+              "topics": ["Glycolysis"],
+              "clusterId": "cl-metab",
+              "rotation": "rot-main",
+              "sourceFile": "s-glyco-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "s-glyco-1"
+            },
+            {
+              "id": "s-nephron-1",
+              "topics": ["Nephron Anatomy"],
+              "clusterId": "cl-renal",
+              "rotation": "rot-main",
+              "sourceFile": "s-nephron-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "s-nephron-1"
+            }
+          ],
+          "rotationQuestions": [
+            {
+              "id": "q-1",
+              "rotation": "rot-cross"
+            },
+            {
+              "id": "q-2",
+              "rotation": "rot-main"
+            }
+          ],
+          "passSetDeferredCardIds": ["u-deferred"]
+        }
+      },
+      "expected": {
+        "rankedStates": [
+          {
+            "conceptId": "c-weak",
+            "conceptName": "C-WEAK",
+            "currentRecall": 0.3170032824923673,
+            "recallOnExamDay": 0.07177934365066832,
+            "confidence": 0.5,
+            "exposureCount": 5,
+            "daysSinceProbe": 4,
+            "daysSinceExposure": 2,
+            "priority": 0.13380027804721387,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-new",
+            "conceptName": "C-NEW",
+            "currentRecall": 0,
+            "recallOnExamDay": 0,
+            "confidence": 0,
+            "exposureCount": 0,
+            "daysSinceProbe": "Infinity",
+            "daysSinceExposure": "Infinity",
+            "priority": 1.3068297085302203,
+            "intervention": "probe"
+          },
+          {
+            "conceptId": "c-pristine",
+            "conceptName": "C-PRISTINE",
+            "currentRecall": 0.9362957693222784,
+            "recallOnExamDay": 0.32408047265548806,
+            "confidence": 0.9,
+            "exposureCount": 12,
+            "daysSinceProbe": 1,
+            "daysSinceExposure": 1,
+            "priority": 0.23631061818387958,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-strong",
+            "conceptName": "C-STRONG",
+            "currentRecall": 0.9634108737782726,
+            "recallOnExamDay": 0.3458912923594134,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "daysSinceProbe": 0.5,
+            "daysSinceExposure": 0.5,
+            "priority": 0.10989053342429247,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-prereq",
+            "conceptName": "C-PREREQ",
+            "currentRecall": 0.3597978886557065,
+            "recallOnExamDay": 0.04310604873882552,
+            "confidence": 0.2,
+            "exposureCount": 2,
+            "daysSinceProbe": 6,
+            "daysSinceExposure": 6,
+            "priority": 0.7291835056948449,
+            "intervention": "probe"
+          },
+          {
+            "conceptId": "c-root",
+            "conceptName": "C-ROOT",
+            "currentRecall": 0.8663679937969035,
+            "recallOnExamDay": 0.2763752256877902,
+            "confidence": 0.8,
+            "exposureCount": 9,
+            "daysSinceProbe": 2,
+            "daysSinceExposure": 1,
+            "priority": 1.121312480701124,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-hub",
+            "conceptName": "C-HUB",
+            "currentRecall": 0.3421042649969313,
+            "recallOnExamDay": 0.07163800133327329,
+            "confidence": 0.45,
+            "exposureCount": 4,
+            "daysSinceProbe": 10,
+            "daysSinceExposure": 3,
+            "priority": 0,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-zero",
+            "conceptName": "C-ZERO",
+            "currentRecall": 0.016823752407904454,
+            "recallOnExamDay": 0.0014151932254123547,
+            "confidence": 0.1,
+            "exposureCount": 1,
+            "daysSinceProbe": "Infinity",
+            "daysSinceExposure": 30,
+            "priority": 0.36567531754894733,
+            "intervention": "probe"
+          }
+        ],
+        "conceptClusters": {
+          "c-weak": "cl-renal",
+          "c-new": "c-new",
+          "c-pristine": "cl-renal",
+          "c-strong": "cl-metab",
+          "c-prereq": "cl-renal",
+          "c-root": "c-root",
+          "c-hub": "c-hub",
+          "c-zero": "c-zero"
+        },
+        "sortedConceptIds": ["c-new", "c-root", "c-prereq", "c-zero", "c-pristine", "c-weak", "c-strong", "c-hub"],
+        "sortedPriorities": [
+          1.4536533978397754, 1.0215692893082988, 0.5561204263569306, 0.44928583228383956, 0.26287801498924057,
+          0.15501687442547515, 0.13754662513940452, -0.013493944178335368
+        ],
+        "pristineConceptIds": ["c-new", "c-pristine", "c-weak"],
+        "weakConceptIds": ["c-new", "c-root", "c-prereq", "c-zero", "c-pristine", "c-weak", "c-strong", "c-hub"],
+        "cardRatio": 0.7,
+        "quota": {
+          "targetCardCount": 9,
+          "targetQuestionCount": 0,
+          "coverageReservation": 2,
+          "targetWeakCardCount": 7
+        },
+        "clusterRoundRobin": ["c-new", "c-root", "c-prereq", "c-zero", "c-strong", "c-hub", "c-pristine", "c-weak"],
+        "unseenCardIds": ["u-acid-1", "u-acid-2", "u-cardiac-1", "u-deferred", "u-renal-1"],
+        "crossSourceCardIds": [],
+        "crossSourceQuestionIds": [],
+        "maxCrossSourceItems": 0,
+        "maxNewCards": "Infinity",
+        "unknownItemRotation": "rot-main"
+      }
+    },
+    {
+      "name": "maintenance_shift",
+      "snapshot": {
+        "nowMs": 1768478400000,
+        "daysToExam": 30,
+        "examPressure": 0.20587037180094736,
+        "size": 20,
+        "cardRatio": 0.7,
+        "rotation": "rot-main",
+        "effectiveMaxNewCards": null,
+        "options": {
+          "examTargetTieBreakSeed": "a3f1c9e2b7d4058e6a1f3c5d7e9b2a4c6e8f0a1b3c5d7e9f1a2b3c4d5e6f7a8b"
+        },
+        "concepts": [
+          {
+            "id": "c-weak",
+            "name": "C-WEAK",
+            "topics": ["Renal Physiology"],
+            "prerequisiteIds": ["c-prereq"],
+            "examWeight": 4
+          },
+          {
+            "id": "c-new",
+            "name": "C-NEW",
+            "topics": ["cardiac_output"],
+            "prerequisiteIds": [],
+            "examWeight": 3
+          },
+          {
+            "id": "c-pristine",
+            "name": "C-PRISTINE",
+            "topics": ["Acid-Base"],
+            "prerequisiteIds": [],
+            "examWeight": 5
+          },
+          {
+            "id": "c-strong",
+            "name": "C-STRONG",
+            "topics": ["Glycolysis"],
+            "prerequisiteIds": [],
+            "examWeight": 1
+          },
+          {
+            "id": "c-prereq",
+            "name": "C-PREREQ",
+            "topics": ["Nephron Anatomy"],
+            "prerequisiteIds": ["c-root"],
+            "examWeight": 3
+          },
+          {
+            "id": "c-root",
+            "name": "C-ROOT",
+            "topics": ["Cell Membranes"],
+            "prerequisiteIds": [],
+            "examWeight": 3
+          },
+          {
+            "id": "c-hub",
+            "name": "C-HUB",
+            "topics": ["Integrated Renal"],
+            "prerequisiteIds": ["c-weak", "c-new"],
+            "examWeight": 3
+          },
+          {
+            "id": "c-zero",
+            "name": "C-ZERO",
+            "topics": ["Zeta Topic"],
+            "prerequisiteIds": [],
+            "examWeight": 0
+          }
+        ],
+        "stateMap": {
+          "c-strong": {
+            "recallProbability": 0.99,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "lastExposureAt": 1768478400000,
+            "lastProbeAt": 1768478400000
+          }
+        },
+        "conceptEmbeddings": {
+          "c-weak": [0.9, 0.1, 0, 0.4],
+          "c-new": [0.1, 0.8, 0.2, 0],
+          "c-hub": [0.5, 0.5, 0.5, 0.5],
+          "c-zero": [0, 0, 0, 0]
+        },
+        "gapDirection": [0.8, 0.2, 0.1, 0.55],
+        "likedConceptIds": ["c-new"],
+        "recentFailureConceptIds": ["c-hub"],
+        "practiceMissConceptIds": ["c-weak"],
+        "chronicFailureConceptIds": ["c-strong"],
+        "bulk": {
+          "unseenCards": [],
+          "seenCards": [
+            {
+              "id": "s-glyco-1",
+              "topics": ["Glycolysis"],
+              "clusterId": "cl-metab",
+              "rotation": "rot-main",
+              "sourceFile": "s-glyco-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "s-glyco-1"
+            },
+            {
+              "id": "s-nephron-1",
+              "topics": ["Nephron Anatomy"],
+              "clusterId": "cl-renal",
+              "rotation": "rot-main",
+              "sourceFile": "s-nephron-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "s-nephron-1"
+            }
+          ],
+          "rotationQuestions": [
+            {
+              "id": "q-1",
+              "rotation": "rot-cross"
+            },
+            {
+              "id": "q-2",
+              "rotation": "rot-main"
+            }
+          ],
+          "passSetDeferredCardIds": ["u-deferred"]
+        }
+      },
+      "expected": {
+        "rankedStates": [
+          {
+            "conceptId": "c-weak",
+            "conceptName": "C-WEAK",
+            "currentRecall": 0,
+            "recallOnExamDay": 0,
+            "confidence": 0,
+            "exposureCount": 0,
+            "daysSinceProbe": "Infinity",
+            "daysSinceExposure": "Infinity",
+            "priority": 0,
+            "intervention": "probe"
+          },
+          {
+            "conceptId": "c-new",
+            "conceptName": "C-NEW",
+            "currentRecall": 0,
+            "recallOnExamDay": 0,
+            "confidence": 0,
+            "exposureCount": 0,
+            "daysSinceProbe": "Infinity",
+            "daysSinceExposure": "Infinity",
+            "priority": 1.3068297085302203,
+            "intervention": "probe"
+          },
+          {
+            "conceptId": "c-pristine",
+            "conceptName": "C-PRISTINE",
+            "currentRecall": 0,
+            "recallOnExamDay": 0,
+            "confidence": 0,
+            "exposureCount": 0,
+            "daysSinceProbe": "Infinity",
+            "daysSinceExposure": "Infinity",
+            "priority": 1.8333333333333335,
+            "intervention": "probe"
+          },
+          {
+            "conceptId": "c-strong",
+            "conceptName": "C-STRONG",
+            "currentRecall": 0.99,
+            "recallOnExamDay": 0.3554375280121963,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "daysSinceProbe": 0,
+            "daysSinceExposure": 0,
+            "priority": 0.10556367713816008,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-prereq",
+            "conceptName": "C-PREREQ",
+            "currentRecall": 0,
+            "recallOnExamDay": 0,
+            "confidence": 0,
+            "exposureCount": 0,
+            "daysSinceProbe": "Infinity",
+            "daysSinceExposure": "Infinity",
+            "priority": 0,
+            "intervention": "probe"
+          },
+          {
+            "conceptId": "c-root",
+            "conceptName": "C-ROOT",
+            "currentRecall": 0,
+            "recallOnExamDay": 0,
+            "confidence": 0,
+            "exposureCount": 0,
+            "daysSinceProbe": "Infinity",
+            "daysSinceExposure": "Infinity",
+            "priority": 1.4219472212591708,
+            "intervention": "probe"
+          },
+          {
+            "conceptId": "c-hub",
+            "conceptName": "C-HUB",
+            "currentRecall": 0,
+            "recallOnExamDay": 0,
+            "confidence": 0,
+            "exposureCount": 0,
+            "daysSinceProbe": "Infinity",
+            "daysSinceExposure": "Infinity",
+            "priority": 0,
+            "intervention": "probe"
+          },
+          {
+            "conceptId": "c-zero",
+            "conceptName": "C-ZERO",
+            "currentRecall": 0,
+            "recallOnExamDay": 0,
+            "confidence": 0,
+            "exposureCount": 0,
+            "daysSinceProbe": "Infinity",
+            "daysSinceExposure": "Infinity",
+            "priority": 0.3666666666666667,
+            "intervention": "probe"
+          }
+        ],
+        "conceptClusters": {
+          "c-weak": "c-weak",
+          "c-new": "c-new",
+          "c-pristine": "c-pristine",
+          "c-strong": "cl-metab",
+          "c-prereq": "cl-renal",
+          "c-root": "c-root",
+          "c-hub": "c-hub",
+          "c-zero": "c-zero"
+        },
+        "sortedConceptIds": ["c-pristine", "c-new", "c-root", "c-zero", "c-strong", "c-weak", "c-prereq", "c-hub"],
+        "sortedPriorities": [
+          2.0394471953234947, 1.4536533978397754, 1.295461913834547, 0.45050385026882095, 0.13213083124819783,
+          0.007928457506932319, -0.011866908534429968, -0.013493944178335368
+        ],
+        "pristineConceptIds": [],
+        "weakConceptIds": ["c-pristine", "c-new", "c-root", "c-zero", "c-strong", "c-weak", "c-prereq", "c-hub"],
+        "cardRatio": 0.9,
+        "quota": {
+          "targetCardCount": 18,
+          "targetQuestionCount": 2,
+          "coverageReservation": 2,
+          "targetWeakCardCount": 16
+        },
+        "clusterRoundRobin": ["c-pristine", "c-new", "c-root", "c-zero", "c-strong", "c-weak", "c-prereq", "c-hub"],
+        "unseenCardIds": [],
+        "crossSourceCardIds": [],
+        "crossSourceQuestionIds": [],
+        "maxCrossSourceItems": 0,
+        "maxNewCards": "Infinity",
+        "unknownItemRotation": "rot-main"
+      }
+    },
+    {
+      "name": "exam_day_horizon",
+      "snapshot": {
+        "nowMs": 1768478400000,
+        "daysToExam": 0,
+        "examPressure": 0.958908721799535,
+        "size": 20,
+        "cardRatio": 0.7,
+        "rotation": "rot-main",
+        "effectiveMaxNewCards": null,
+        "options": {
+          "examTargetTieBreakSeed": "a3f1c9e2b7d4058e6a1f3c5d7e9b2a4c6e8f0a1b3c5d7e9f1a2b3c4d5e6f7a8b"
+        },
+        "concepts": [
+          {
+            "id": "c-weak",
+            "name": "C-WEAK",
+            "topics": ["Renal Physiology"],
+            "prerequisiteIds": ["c-prereq"],
+            "examWeight": 4
+          },
+          {
+            "id": "c-new",
+            "name": "C-NEW",
+            "topics": ["cardiac_output"],
+            "prerequisiteIds": [],
+            "examWeight": 3
+          },
+          {
+            "id": "c-pristine",
+            "name": "C-PRISTINE",
+            "topics": ["Acid-Base"],
+            "prerequisiteIds": [],
+            "examWeight": 5
+          },
+          {
+            "id": "c-strong",
+            "name": "C-STRONG",
+            "topics": ["Glycolysis"],
+            "prerequisiteIds": [],
+            "examWeight": 1
+          },
+          {
+            "id": "c-prereq",
+            "name": "C-PREREQ",
+            "topics": ["Nephron Anatomy"],
+            "prerequisiteIds": ["c-root"],
+            "examWeight": 3
+          },
+          {
+            "id": "c-root",
+            "name": "C-ROOT",
+            "topics": ["Cell Membranes"],
+            "prerequisiteIds": [],
+            "examWeight": 3
+          },
+          {
+            "id": "c-hub",
+            "name": "C-HUB",
+            "topics": ["Integrated Renal"],
+            "prerequisiteIds": ["c-weak", "c-new"],
+            "examWeight": 3
+          },
+          {
+            "id": "c-zero",
+            "name": "C-ZERO",
+            "topics": ["Zeta Topic"],
+            "prerequisiteIds": [],
+            "examWeight": 0
+          }
+        ],
+        "stateMap": {
+          "c-weak": {
+            "recallProbability": 0.35,
+            "confidence": 0.5,
+            "exposureCount": 5,
+            "lastExposureAt": 1768305600000,
+            "lastProbeAt": 1768132800000
+          },
+          "c-pristine": {
+            "recallProbability": 0.97,
+            "confidence": 0.9,
+            "exposureCount": 12,
+            "lastExposureAt": 1768392000000,
+            "lastProbeAt": 1768392000000
+          },
+          "c-strong": {
+            "recallProbability": 0.98,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "lastExposureAt": 1768435200000,
+            "lastProbeAt": 1768435200000
+          },
+          "c-prereq": {
+            "recallProbability": 0.55,
+            "confidence": 0.2,
+            "exposureCount": 2,
+            "lastExposureAt": 1767960000000,
+            "lastProbeAt": 1767960000000
+          },
+          "c-root": {
+            "recallProbability": 0.9,
+            "confidence": 0.8,
+            "exposureCount": 9,
+            "lastExposureAt": 1768392000000,
+            "lastProbeAt": 1768305600000
+          },
+          "c-hub": {
+            "recallProbability": 0.4,
+            "confidence": 0.45,
+            "exposureCount": 4,
+            "lastExposureAt": 1768219200000,
+            "lastProbeAt": 1767614400000
+          },
+          "c-zero": {
+            "recallProbability": 0.2,
+            "confidence": 0.1,
+            "exposureCount": 1,
+            "lastExposureAt": 1765886400000,
+            "lastProbeAt": null
+          }
+        },
+        "conceptEmbeddings": {
+          "c-weak": [0.9, 0.1, 0, 0.4],
+          "c-new": [0.1, 0.8, 0.2, 0],
+          "c-hub": [0.5, 0.5, 0.5, 0.5],
+          "c-zero": [0, 0, 0, 0]
+        },
+        "gapDirection": [0.8, 0.2, 0.1, 0.55],
+        "likedConceptIds": ["c-new"],
+        "recentFailureConceptIds": ["c-hub"],
+        "practiceMissConceptIds": ["c-weak"],
+        "chronicFailureConceptIds": ["c-strong"],
+        "bulk": {
+          "unseenCards": [
+            {
+              "id": "u-acid-1",
+              "topics": ["Acid-Base"],
+              "clusterId": "cl-renal",
+              "rotation": "rot-main",
+              "sourceFile": "u-acid-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-acid-1"
+            },
+            {
+              "id": "u-acid-2",
+              "topics": ["acid base"],
+              "clusterId": null,
+              "rotation": "rot-main",
+              "sourceFile": "u-acid-2.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-acid-2"
+            },
+            {
+              "id": "u-renal-1",
+              "topics": ["Renal Physiology"],
+              "clusterId": "cl-renal",
+              "rotation": "rot-cross",
+              "sourceFile": "u-renal-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-renal-1"
+            },
+            {
+              "id": "u-cardiac-1",
+              "topics": ["Cardiac Output"],
+              "clusterId": "cl-cardio",
+              "rotation": "rot-main",
+              "sourceFile": "u-cardiac-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-cardiac-1"
+            },
+            {
+              "id": "u-deferred",
+              "topics": ["Glycolysis"],
+              "clusterId": "cl-metab",
+              "rotation": "rot-main",
+              "sourceFile": "u-deferred.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-deferred"
+            }
+          ],
+          "seenCards": [
+            {
+              "id": "s-glyco-1",
+              "topics": ["Glycolysis"],
+              "clusterId": "cl-metab",
+              "rotation": "rot-main",
+              "sourceFile": "s-glyco-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "s-glyco-1"
+            },
+            {
+              "id": "s-nephron-1",
+              "topics": ["Nephron Anatomy"],
+              "clusterId": "cl-renal",
+              "rotation": "rot-main",
+              "sourceFile": "s-nephron-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "s-nephron-1"
+            }
+          ],
+          "rotationQuestions": [
+            {
+              "id": "q-1",
+              "rotation": "rot-cross"
+            },
+            {
+              "id": "q-2",
+              "rotation": "rot-main"
+            }
+          ],
+          "passSetDeferredCardIds": ["u-deferred"]
+        }
+      },
+      "expected": {
+        "rankedStates": [
+          {
+            "conceptId": "c-weak",
+            "conceptName": "C-WEAK",
+            "currentRecall": 0.3170032824923673,
+            "recallOnExamDay": 0.3170032824923673,
+            "confidence": 0.5,
+            "exposureCount": 5,
+            "daysSinceProbe": 4,
+            "daysSinceExposure": 2,
+            "priority": 1.0256811477764043,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-new",
+            "conceptName": "C-NEW",
+            "currentRecall": 0,
+            "recallOnExamDay": 0,
+            "confidence": 0,
+            "exposureCount": 0,
+            "daysSinceProbe": "Infinity",
+            "daysSinceExposure": "Infinity",
+            "priority": 1.3423185562067612,
+            "intervention": "probe"
+          },
+          {
+            "conceptId": "c-pristine",
+            "conceptName": "C-PRISTINE",
+            "currentRecall": 0.9362957693222784,
+            "recallOnExamDay": 0.9362957693222784,
+            "confidence": 0.9,
+            "exposureCount": 12,
+            "daysSinceProbe": 1,
+            "daysSinceExposure": 1,
+            "priority": 0,
+            "intervention": "reinforce"
+          },
+          {
+            "conceptId": "c-strong",
+            "conceptName": "C-STRONG",
+            "currentRecall": 0.9634108737782726,
+            "recallOnExamDay": 0.9634108737782726,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "daysSinceProbe": 0.5,
+            "daysSinceExposure": 0.5,
+            "priority": 0,
+            "intervention": "reinforce"
+          },
+          {
+            "conceptId": "c-prereq",
+            "conceptName": "C-PREREQ",
+            "currentRecall": 0.3597978886557065,
+            "recallOnExamDay": 0.3597978886557065,
+            "confidence": 0.2,
+            "exposureCount": 2,
+            "daysSinceProbe": 6,
+            "daysSinceExposure": 6,
+            "priority": 1.2115537682382065,
+            "intervention": "probe"
+          },
+          {
+            "conceptId": "c-root",
+            "conceptName": "C-ROOT",
+            "currentRecall": 0.8663679937969035,
+            "recallOnExamDay": 0.8663679937969035,
+            "confidence": 0.8,
+            "exposureCount": 9,
+            "daysSinceProbe": 2,
+            "daysSinceExposure": 1,
+            "priority": 0,
+            "intervention": "reinforce"
+          },
+          {
+            "conceptId": "c-hub",
+            "conceptName": "C-HUB",
+            "currentRecall": 0.3421042649969313,
+            "recallOnExamDay": 0.3421042649969313,
+            "confidence": 0.45,
+            "exposureCount": 4,
+            "daysSinceProbe": 10,
+            "daysSinceExposure": 3,
+            "priority": 0,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-zero",
+            "conceptName": "C-ZERO",
+            "currentRecall": 0.016823752407904454,
+            "recallOnExamDay": 0.016823752407904454,
+            "confidence": 0.1,
+            "exposureCount": 1,
+            "daysSinceProbe": "Infinity",
+            "daysSinceExposure": 30,
+            "priority": 0.3610587491973652,
+            "intervention": "probe"
+          }
+        ],
+        "conceptClusters": {
+          "c-weak": "cl-renal",
+          "c-new": "c-new",
+          "c-pristine": "cl-renal",
+          "c-strong": "cl-metab",
+          "c-prereq": "cl-renal",
+          "c-root": "c-root",
+          "c-hub": "c-hub",
+          "c-zero": "c-zero"
+        },
+        "sortedConceptIds": ["c-new", "c-weak", "c-prereq", "c-zero", "c-strong", "c-pristine", "c-root", "c-hub"],
+        "sortedPriorities": [
+          1.4931294547993643, 1.18832253569254, 0.9240058131936713, 0.44361370005452067, 0.012583473231643438,
+          0.005621287145186216, -0.00444760907907039, -0.013493944178335368
+        ],
+        "pristineConceptIds": ["c-new", "c-pristine", "c-weak"],
+        "weakConceptIds": ["c-new", "c-weak", "c-prereq", "c-zero", "c-pristine", "c-hub"],
+        "cardRatio": 0.7,
+        "quota": {
+          "targetCardCount": 14,
+          "targetQuestionCount": 6,
+          "coverageReservation": 2,
+          "targetWeakCardCount": 12
+        },
+        "clusterRoundRobin": ["c-new", "c-weak", "c-zero", "c-hub", "c-prereq", "c-pristine"],
+        "unseenCardIds": ["u-acid-1", "u-acid-2", "u-cardiac-1", "u-deferred", "u-renal-1"],
+        "crossSourceCardIds": [],
+        "crossSourceQuestionIds": [],
+        "maxCrossSourceItems": 0,
+        "maxNewCards": "Infinity",
+        "unknownItemRotation": "rot-main"
+      }
+    },
+    {
+      "name": "far_exam_horizon",
+      "snapshot": {
+        "nowMs": 1768478400000,
+        "daysToExam": 120,
+        "examPressure": 3.5540766457441055e-7,
+        "size": 20,
+        "cardRatio": 0.7,
+        "rotation": "rot-main",
+        "effectiveMaxNewCards": null,
+        "options": {
+          "examTargetTieBreakSeed": "a3f1c9e2b7d4058e6a1f3c5d7e9b2a4c6e8f0a1b3c5d7e9f1a2b3c4d5e6f7a8b"
+        },
+        "concepts": [
+          {
+            "id": "c-weak",
+            "name": "C-WEAK",
+            "topics": ["Renal Physiology"],
+            "prerequisiteIds": ["c-prereq"],
+            "examWeight": 4
+          },
+          {
+            "id": "c-new",
+            "name": "C-NEW",
+            "topics": ["cardiac_output"],
+            "prerequisiteIds": [],
+            "examWeight": 3
+          },
+          {
+            "id": "c-pristine",
+            "name": "C-PRISTINE",
+            "topics": ["Acid-Base"],
+            "prerequisiteIds": [],
+            "examWeight": 5
+          },
+          {
+            "id": "c-strong",
+            "name": "C-STRONG",
+            "topics": ["Glycolysis"],
+            "prerequisiteIds": [],
+            "examWeight": 1
+          },
+          {
+            "id": "c-prereq",
+            "name": "C-PREREQ",
+            "topics": ["Nephron Anatomy"],
+            "prerequisiteIds": ["c-root"],
+            "examWeight": 3
+          },
+          {
+            "id": "c-root",
+            "name": "C-ROOT",
+            "topics": ["Cell Membranes"],
+            "prerequisiteIds": [],
+            "examWeight": 3
+          },
+          {
+            "id": "c-hub",
+            "name": "C-HUB",
+            "topics": ["Integrated Renal"],
+            "prerequisiteIds": ["c-weak", "c-new"],
+            "examWeight": 3
+          },
+          {
+            "id": "c-zero",
+            "name": "C-ZERO",
+            "topics": ["Zeta Topic"],
+            "prerequisiteIds": [],
+            "examWeight": 0
+          }
+        ],
+        "stateMap": {
+          "c-weak": {
+            "recallProbability": 0.35,
+            "confidence": 0.5,
+            "exposureCount": 5,
+            "lastExposureAt": 1768305600000,
+            "lastProbeAt": 1768132800000
+          },
+          "c-pristine": {
+            "recallProbability": 0.97,
+            "confidence": 0.9,
+            "exposureCount": 12,
+            "lastExposureAt": 1768392000000,
+            "lastProbeAt": 1768392000000
+          },
+          "c-strong": {
+            "recallProbability": 0.98,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "lastExposureAt": 1768435200000,
+            "lastProbeAt": 1768435200000
+          },
+          "c-prereq": {
+            "recallProbability": 0.55,
+            "confidence": 0.2,
+            "exposureCount": 2,
+            "lastExposureAt": 1767960000000,
+            "lastProbeAt": 1767960000000
+          },
+          "c-root": {
+            "recallProbability": 0.9,
+            "confidence": 0.8,
+            "exposureCount": 9,
+            "lastExposureAt": 1768392000000,
+            "lastProbeAt": 1768305600000
+          },
+          "c-hub": {
+            "recallProbability": 0.4,
+            "confidence": 0.45,
+            "exposureCount": 4,
+            "lastExposureAt": 1768219200000,
+            "lastProbeAt": 1767614400000
+          },
+          "c-zero": {
+            "recallProbability": 0.2,
+            "confidence": 0.1,
+            "exposureCount": 1,
+            "lastExposureAt": 1765886400000,
+            "lastProbeAt": null
+          }
+        },
+        "conceptEmbeddings": {
+          "c-weak": [0.9, 0.1, 0, 0.4],
+          "c-new": [0.1, 0.8, 0.2, 0],
+          "c-hub": [0.5, 0.5, 0.5, 0.5],
+          "c-zero": [0, 0, 0, 0]
+        },
+        "gapDirection": [0.8, 0.2, 0.1, 0.55],
+        "likedConceptIds": ["c-new"],
+        "recentFailureConceptIds": ["c-hub"],
+        "practiceMissConceptIds": ["c-weak"],
+        "chronicFailureConceptIds": ["c-strong"],
+        "bulk": {
+          "unseenCards": [
+            {
+              "id": "u-acid-1",
+              "topics": ["Acid-Base"],
+              "clusterId": "cl-renal",
+              "rotation": "rot-main",
+              "sourceFile": "u-acid-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-acid-1"
+            },
+            {
+              "id": "u-acid-2",
+              "topics": ["acid base"],
+              "clusterId": null,
+              "rotation": "rot-main",
+              "sourceFile": "u-acid-2.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-acid-2"
+            },
+            {
+              "id": "u-renal-1",
+              "topics": ["Renal Physiology"],
+              "clusterId": "cl-renal",
+              "rotation": "rot-cross",
+              "sourceFile": "u-renal-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-renal-1"
+            },
+            {
+              "id": "u-cardiac-1",
+              "topics": ["Cardiac Output"],
+              "clusterId": "cl-cardio",
+              "rotation": "rot-main",
+              "sourceFile": "u-cardiac-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-cardiac-1"
+            },
+            {
+              "id": "u-deferred",
+              "topics": ["Glycolysis"],
+              "clusterId": "cl-metab",
+              "rotation": "rot-main",
+              "sourceFile": "u-deferred.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-deferred"
+            }
+          ],
+          "seenCards": [
+            {
+              "id": "s-glyco-1",
+              "topics": ["Glycolysis"],
+              "clusterId": "cl-metab",
+              "rotation": "rot-main",
+              "sourceFile": "s-glyco-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "s-glyco-1"
+            },
+            {
+              "id": "s-nephron-1",
+              "topics": ["Nephron Anatomy"],
+              "clusterId": "cl-renal",
+              "rotation": "rot-main",
+              "sourceFile": "s-nephron-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "s-nephron-1"
+            }
+          ],
+          "rotationQuestions": [
+            {
+              "id": "q-1",
+              "rotation": "rot-cross"
+            },
+            {
+              "id": "q-2",
+              "rotation": "rot-main"
+            }
+          ],
+          "passSetDeferredCardIds": ["u-deferred"]
+        }
+      },
+      "expected": {
+        "rankedStates": [
+          {
+            "conceptId": "c-weak",
+            "conceptName": "C-WEAK",
+            "currentRecall": 0.3170032824923673,
+            "recallOnExamDay": 0.0008333101151788407,
+            "confidence": 0.5,
+            "exposureCount": 5,
+            "daysSinceProbe": 4,
+            "daysSinceExposure": 2,
+            "priority": 0.00022414711776813032,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-new",
+            "conceptName": "C-NEW",
+            "currentRecall": 0,
+            "recallOnExamDay": 0,
+            "confidence": 0,
+            "exposureCount": 0,
+            "daysSinceProbe": "Infinity",
+            "daysSinceExposure": "Infinity",
+            "priority": 1.29712756035548,
+            "intervention": "probe"
+          },
+          {
+            "conceptId": "c-pristine",
+            "conceptName": "C-PRISTINE",
+            "currentRecall": 0.9362957693222784,
+            "recallOnExamDay": 0.013439164541899955,
+            "confidence": 0.9,
+            "exposureCount": 12,
+            "daysSinceProbe": 1,
+            "daysSinceExposure": 1,
+            "priority": 0.23631061818387958,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-strong",
+            "conceptName": "C-STRONG",
+            "currentRecall": 0.9634108737782726,
+            "recallOnExamDay": 0.016007513791988046,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "daysSinceProbe": 0.5,
+            "daysSinceExposure": 0.5,
+            "priority": 0.10989053342429247,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-prereq",
+            "conceptName": "C-PREREQ",
+            "currentRecall": 0.3597978886557065,
+            "recallOnExamDay": 0.00007412710357917435,
+            "confidence": 0.2,
+            "exposureCount": 2,
+            "daysSinceProbe": 6,
+            "daysSinceExposure": 6,
+            "priority": 0.023060265072967115,
+            "intervention": "probe"
+          },
+          {
+            "conceptId": "c-root",
+            "conceptName": "C-ROOT",
+            "currentRecall": 0.8663679937969035,
+            "recallOnExamDay": 0.00897199951766833,
+            "confidence": 0.8,
+            "exposureCount": 9,
+            "daysSinceProbe": 2,
+            "daysSinceExposure": 1,
+            "priority": 1.0923554595283835,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-hub",
+            "conceptName": "C-HUB",
+            "currentRecall": 0.3421042649969313,
+            "recallOnExamDay": 0.0006578068282558526,
+            "confidence": 0.45,
+            "exposureCount": 4,
+            "daysSinceProbe": 10,
+            "daysSinceExposure": 3,
+            "priority": 0,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-zero",
+            "conceptName": "C-ZERO",
+            "currentRecall": 0.016823752407904454,
+            "recallOnExamDay": 8.423534497633463e-7,
+            "confidence": 0.1,
+            "exposureCount": 1,
+            "daysSinceProbe": "Infinity",
+            "daysSinceExposure": 30,
+            "priority": 0.36567531754894733,
+            "intervention": "probe"
+          }
+        ],
+        "conceptClusters": {
+          "c-weak": "cl-renal",
+          "c-new": "c-new",
+          "c-pristine": "cl-renal",
+          "c-strong": "cl-metab",
+          "c-prereq": "cl-renal",
+          "c-root": "c-root",
+          "c-hub": "c-hub",
+          "c-zero": "c-zero"
+        },
+        "sortedConceptIds": ["c-new", "c-root", "c-zero", "c-pristine", "c-strong", "c-prereq", "c-weak", "c-hub"],
+        "sortedPriorities": [
+          1.4428612031349135, 0.9951880583409726, 0.44928583228383956, 0.26287801498924057, 0.13754662513940452,
+          0.011193356538537147, 0.008152604624700448, -0.013493944178335368
+        ],
+        "pristineConceptIds": ["c-new", "c-pristine", "c-weak"],
+        "weakConceptIds": ["c-new", "c-root", "c-zero", "c-pristine", "c-strong", "c-prereq", "c-weak", "c-hub"],
+        "cardRatio": 0.7687309728156616,
+        "quota": {
+          "targetCardCount": 16,
+          "targetQuestionCount": 4,
+          "coverageReservation": 2,
+          "targetWeakCardCount": 14
+        },
+        "clusterRoundRobin": ["c-new", "c-root", "c-zero", "c-pristine", "c-strong", "c-hub", "c-prereq", "c-weak"],
+        "unseenCardIds": ["u-acid-1", "u-acid-2", "u-cardiac-1", "u-deferred", "u-renal-1"],
+        "crossSourceCardIds": [],
+        "crossSourceQuestionIds": [],
+        "maxCrossSourceItems": 0,
+        "maxNewCards": "Infinity",
+        "unknownItemRotation": "rot-main"
+      }
+    },
+    {
+      "name": "cross_source_scope",
+      "snapshot": {
+        "nowMs": 1768478400000,
+        "daysToExam": 30,
+        "examPressure": 0.20587037180094736,
+        "size": 20,
+        "cardRatio": 0.7,
+        "rotation": "rot-main",
+        "effectiveMaxNewCards": null,
+        "options": {
+          "examTargetTieBreakSeed": "a3f1c9e2b7d4058e6a1f3c5d7e9b2a4c6e8f0a1b3c5d7e9f1a2b3c4d5e6f7a8b",
+          "crossSourceRotations": ["rot-cross"],
+          "maxCrossSourceItems": 1.7
+        },
+        "concepts": [
+          {
+            "id": "c-weak",
+            "name": "C-WEAK",
+            "topics": ["Renal Physiology"],
+            "prerequisiteIds": ["c-prereq"],
+            "examWeight": 4
+          },
+          {
+            "id": "c-new",
+            "name": "C-NEW",
+            "topics": ["cardiac_output"],
+            "prerequisiteIds": [],
+            "examWeight": 3
+          },
+          {
+            "id": "c-pristine",
+            "name": "C-PRISTINE",
+            "topics": ["Acid-Base"],
+            "prerequisiteIds": [],
+            "examWeight": 5
+          },
+          {
+            "id": "c-strong",
+            "name": "C-STRONG",
+            "topics": ["Glycolysis"],
+            "prerequisiteIds": [],
+            "examWeight": 1
+          },
+          {
+            "id": "c-prereq",
+            "name": "C-PREREQ",
+            "topics": ["Nephron Anatomy"],
+            "prerequisiteIds": ["c-root"],
+            "examWeight": 3
+          },
+          {
+            "id": "c-root",
+            "name": "C-ROOT",
+            "topics": ["Cell Membranes"],
+            "prerequisiteIds": [],
+            "examWeight": 3
+          },
+          {
+            "id": "c-hub",
+            "name": "C-HUB",
+            "topics": ["Integrated Renal"],
+            "prerequisiteIds": ["c-weak", "c-new"],
+            "examWeight": 3
+          },
+          {
+            "id": "c-zero",
+            "name": "C-ZERO",
+            "topics": ["Zeta Topic"],
+            "prerequisiteIds": [],
+            "examWeight": 0
+          }
+        ],
+        "stateMap": {
+          "c-weak": {
+            "recallProbability": 0.35,
+            "confidence": 0.5,
+            "exposureCount": 5,
+            "lastExposureAt": 1768305600000,
+            "lastProbeAt": 1768132800000
+          },
+          "c-pristine": {
+            "recallProbability": 0.97,
+            "confidence": 0.9,
+            "exposureCount": 12,
+            "lastExposureAt": 1768392000000,
+            "lastProbeAt": 1768392000000
+          },
+          "c-strong": {
+            "recallProbability": 0.98,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "lastExposureAt": 1768435200000,
+            "lastProbeAt": 1768435200000
+          },
+          "c-prereq": {
+            "recallProbability": 0.55,
+            "confidence": 0.2,
+            "exposureCount": 2,
+            "lastExposureAt": 1767960000000,
+            "lastProbeAt": 1767960000000
+          },
+          "c-root": {
+            "recallProbability": 0.9,
+            "confidence": 0.8,
+            "exposureCount": 9,
+            "lastExposureAt": 1768392000000,
+            "lastProbeAt": 1768305600000
+          },
+          "c-hub": {
+            "recallProbability": 0.4,
+            "confidence": 0.45,
+            "exposureCount": 4,
+            "lastExposureAt": 1768219200000,
+            "lastProbeAt": 1767614400000
+          },
+          "c-zero": {
+            "recallProbability": 0.2,
+            "confidence": 0.1,
+            "exposureCount": 1,
+            "lastExposureAt": 1765886400000,
+            "lastProbeAt": null
+          }
+        },
+        "conceptEmbeddings": {
+          "c-weak": [0.9, 0.1, 0, 0.4],
+          "c-new": [0.1, 0.8, 0.2, 0],
+          "c-hub": [0.5, 0.5, 0.5, 0.5],
+          "c-zero": [0, 0, 0, 0]
+        },
+        "gapDirection": [0.8, 0.2, 0.1, 0.55],
+        "likedConceptIds": ["c-new"],
+        "recentFailureConceptIds": ["c-hub"],
+        "practiceMissConceptIds": ["c-weak"],
+        "chronicFailureConceptIds": ["c-strong"],
+        "bulk": {
+          "unseenCards": [
+            {
+              "id": "u-acid-1",
+              "topics": ["Acid-Base"],
+              "clusterId": "cl-renal",
+              "rotation": "rot-main",
+              "sourceFile": "u-acid-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-acid-1"
+            },
+            {
+              "id": "u-acid-2",
+              "topics": ["acid base"],
+              "clusterId": null,
+              "rotation": "rot-main",
+              "sourceFile": "u-acid-2.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-acid-2"
+            },
+            {
+              "id": "u-renal-1",
+              "topics": ["Renal Physiology"],
+              "clusterId": "cl-renal",
+              "rotation": "rot-cross",
+              "sourceFile": "u-renal-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-renal-1"
+            },
+            {
+              "id": "u-cardiac-1",
+              "topics": ["Cardiac Output"],
+              "clusterId": "cl-cardio",
+              "rotation": "rot-main",
+              "sourceFile": "u-cardiac-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-cardiac-1"
+            },
+            {
+              "id": "u-deferred",
+              "topics": ["Glycolysis"],
+              "clusterId": "cl-metab",
+              "rotation": "rot-main",
+              "sourceFile": "u-deferred.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-deferred"
+            }
+          ],
+          "seenCards": [
+            {
+              "id": "s-glyco-1",
+              "topics": ["Glycolysis"],
+              "clusterId": "cl-metab",
+              "rotation": "rot-main",
+              "sourceFile": "s-glyco-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "s-glyco-1"
+            },
+            {
+              "id": "s-nephron-1",
+              "topics": ["Nephron Anatomy"],
+              "clusterId": "cl-renal",
+              "rotation": "rot-main",
+              "sourceFile": "s-nephron-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "s-nephron-1"
+            }
+          ],
+          "rotationQuestions": [
+            {
+              "id": "q-1",
+              "rotation": "rot-cross"
+            },
+            {
+              "id": "q-2",
+              "rotation": "rot-main"
+            }
+          ],
+          "passSetDeferredCardIds": ["u-deferred"]
+        }
+      },
+      "expected": {
+        "rankedStates": [
+          {
+            "conceptId": "c-weak",
+            "conceptName": "C-WEAK",
+            "currentRecall": 0.3170032824923673,
+            "recallOnExamDay": 0.07177934365066832,
+            "confidence": 0.5,
+            "exposureCount": 5,
+            "daysSinceProbe": 4,
+            "daysSinceExposure": 2,
+            "priority": 0.13380027804721387,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-new",
+            "conceptName": "C-NEW",
+            "currentRecall": 0,
+            "recallOnExamDay": 0,
+            "confidence": 0,
+            "exposureCount": 0,
+            "daysSinceProbe": "Infinity",
+            "daysSinceExposure": "Infinity",
+            "priority": 1.3068297085302203,
+            "intervention": "probe"
+          },
+          {
+            "conceptId": "c-pristine",
+            "conceptName": "C-PRISTINE",
+            "currentRecall": 0.9362957693222784,
+            "recallOnExamDay": 0.32408047265548806,
+            "confidence": 0.9,
+            "exposureCount": 12,
+            "daysSinceProbe": 1,
+            "daysSinceExposure": 1,
+            "priority": 0.23631061818387958,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-strong",
+            "conceptName": "C-STRONG",
+            "currentRecall": 0.9634108737782726,
+            "recallOnExamDay": 0.3458912923594134,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "daysSinceProbe": 0.5,
+            "daysSinceExposure": 0.5,
+            "priority": 0.10989053342429247,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-prereq",
+            "conceptName": "C-PREREQ",
+            "currentRecall": 0.3597978886557065,
+            "recallOnExamDay": 0.04310604873882552,
+            "confidence": 0.2,
+            "exposureCount": 2,
+            "daysSinceProbe": 6,
+            "daysSinceExposure": 6,
+            "priority": 0.7291835056948449,
+            "intervention": "probe"
+          },
+          {
+            "conceptId": "c-root",
+            "conceptName": "C-ROOT",
+            "currentRecall": 0.8663679937969035,
+            "recallOnExamDay": 0.2763752256877902,
+            "confidence": 0.8,
+            "exposureCount": 9,
+            "daysSinceProbe": 2,
+            "daysSinceExposure": 1,
+            "priority": 1.121312480701124,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-hub",
+            "conceptName": "C-HUB",
+            "currentRecall": 0.3421042649969313,
+            "recallOnExamDay": 0.07163800133327329,
+            "confidence": 0.45,
+            "exposureCount": 4,
+            "daysSinceProbe": 10,
+            "daysSinceExposure": 3,
+            "priority": 0,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-zero",
+            "conceptName": "C-ZERO",
+            "currentRecall": 0.016823752407904454,
+            "recallOnExamDay": 0.0014151932254123547,
+            "confidence": 0.1,
+            "exposureCount": 1,
+            "daysSinceProbe": "Infinity",
+            "daysSinceExposure": 30,
+            "priority": 0.36567531754894733,
+            "intervention": "probe"
+          }
+        ],
+        "conceptClusters": {
+          "c-weak": "cl-renal",
+          "c-new": "c-new",
+          "c-pristine": "cl-renal",
+          "c-strong": "cl-metab",
+          "c-prereq": "cl-renal",
+          "c-root": "c-root",
+          "c-hub": "c-hub",
+          "c-zero": "c-zero"
+        },
+        "sortedConceptIds": ["c-new", "c-root", "c-prereq", "c-zero", "c-pristine", "c-weak", "c-strong", "c-hub"],
+        "sortedPriorities": [
+          1.4536533978397754, 1.0215692893082988, 0.5561204263569306, 0.44928583228383956, 0.26287801498924057,
+          0.15501687442547515, 0.13754662513940452, -0.013493944178335368
+        ],
+        "pristineConceptIds": ["c-new", "c-pristine", "c-weak"],
+        "weakConceptIds": ["c-new", "c-root", "c-prereq", "c-zero", "c-pristine", "c-weak", "c-strong", "c-hub"],
+        "cardRatio": 0.7,
+        "quota": {
+          "targetCardCount": 14,
+          "targetQuestionCount": 6,
+          "coverageReservation": 2,
+          "targetWeakCardCount": 12
+        },
+        "clusterRoundRobin": ["c-new", "c-root", "c-prereq", "c-zero", "c-strong", "c-hub", "c-pristine", "c-weak"],
+        "unseenCardIds": ["u-acid-1", "u-acid-2", "u-cardiac-1", "u-deferred", "u-renal-1"],
+        "crossSourceCardIds": ["u-renal-1"],
+        "crossSourceQuestionIds": ["q-1"],
+        "maxCrossSourceItems": 1,
+        "maxNewCards": "Infinity",
+        "unknownItemRotation": "__outside-authorized-candidate-scope__"
+      }
+    },
+    {
+      "name": "teaching_pace_boosts",
+      "snapshot": {
+        "nowMs": 1768478400000,
+        "daysToExam": 30,
+        "examPressure": 0.20587037180094736,
+        "size": 20,
+        "cardRatio": 0.7,
+        "rotation": "rot-main",
+        "effectiveMaxNewCards": null,
+        "options": {
+          "examTargetTieBreakSeed": "a3f1c9e2b7d4058e6a1f3c5d7e9b2a4c6e8f0a1b3c5d7e9f1a2b3c4d5e6f7a8b",
+          "currentTeachingWeek": 3,
+          "topicTeachingWeeks": {
+            "renal-physiology": 3,
+            "cardiac-output": 2,
+            "acid-base": 1
+          },
+          "topicRecencyDays": {
+            "glycolysis": 2,
+            "zeta-topic": 13.5,
+            "cell-membranes": 14
+          }
+        },
+        "concepts": [
+          {
+            "id": "c-weak",
+            "name": "C-WEAK",
+            "topics": ["Renal Physiology"],
+            "prerequisiteIds": ["c-prereq"],
+            "examWeight": 4
+          },
+          {
+            "id": "c-new",
+            "name": "C-NEW",
+            "topics": ["cardiac_output"],
+            "prerequisiteIds": [],
+            "examWeight": 3
+          },
+          {
+            "id": "c-pristine",
+            "name": "C-PRISTINE",
+            "topics": ["Acid-Base"],
+            "prerequisiteIds": [],
+            "examWeight": 5
+          },
+          {
+            "id": "c-strong",
+            "name": "C-STRONG",
+            "topics": ["Glycolysis"],
+            "prerequisiteIds": [],
+            "examWeight": 1
+          },
+          {
+            "id": "c-prereq",
+            "name": "C-PREREQ",
+            "topics": ["Nephron Anatomy"],
+            "prerequisiteIds": ["c-root"],
+            "examWeight": 3
+          },
+          {
+            "id": "c-root",
+            "name": "C-ROOT",
+            "topics": ["Cell Membranes"],
+            "prerequisiteIds": [],
+            "examWeight": 3
+          },
+          {
+            "id": "c-hub",
+            "name": "C-HUB",
+            "topics": ["Integrated Renal"],
+            "prerequisiteIds": ["c-weak", "c-new"],
+            "examWeight": 3
+          },
+          {
+            "id": "c-zero",
+            "name": "C-ZERO",
+            "topics": ["Zeta Topic"],
+            "prerequisiteIds": [],
+            "examWeight": 0
+          }
+        ],
+        "stateMap": {
+          "c-weak": {
+            "recallProbability": 0.35,
+            "confidence": 0.5,
+            "exposureCount": 5,
+            "lastExposureAt": 1768305600000,
+            "lastProbeAt": 1768132800000
+          },
+          "c-pristine": {
+            "recallProbability": 0.97,
+            "confidence": 0.9,
+            "exposureCount": 12,
+            "lastExposureAt": 1768392000000,
+            "lastProbeAt": 1768392000000
+          },
+          "c-strong": {
+            "recallProbability": 0.98,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "lastExposureAt": 1768435200000,
+            "lastProbeAt": 1768435200000
+          },
+          "c-prereq": {
+            "recallProbability": 0.55,
+            "confidence": 0.2,
+            "exposureCount": 2,
+            "lastExposureAt": 1767960000000,
+            "lastProbeAt": 1767960000000
+          },
+          "c-root": {
+            "recallProbability": 0.9,
+            "confidence": 0.8,
+            "exposureCount": 9,
+            "lastExposureAt": 1768392000000,
+            "lastProbeAt": 1768305600000
+          },
+          "c-hub": {
+            "recallProbability": 0.4,
+            "confidence": 0.45,
+            "exposureCount": 4,
+            "lastExposureAt": 1768219200000,
+            "lastProbeAt": 1767614400000
+          },
+          "c-zero": {
+            "recallProbability": 0.2,
+            "confidence": 0.1,
+            "exposureCount": 1,
+            "lastExposureAt": 1765886400000,
+            "lastProbeAt": null
+          }
+        },
+        "conceptEmbeddings": {
+          "c-weak": [0.9, 0.1, 0, 0.4],
+          "c-new": [0.1, 0.8, 0.2, 0],
+          "c-hub": [0.5, 0.5, 0.5, 0.5],
+          "c-zero": [0, 0, 0, 0]
+        },
+        "gapDirection": [0.8, 0.2, 0.1, 0.55],
+        "likedConceptIds": ["c-new"],
+        "recentFailureConceptIds": ["c-hub"],
+        "practiceMissConceptIds": ["c-weak"],
+        "chronicFailureConceptIds": ["c-strong"],
+        "bulk": {
+          "unseenCards": [
+            {
+              "id": "u-acid-1",
+              "topics": ["Acid-Base"],
+              "clusterId": "cl-renal",
+              "rotation": "rot-main",
+              "sourceFile": "u-acid-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-acid-1"
+            },
+            {
+              "id": "u-acid-2",
+              "topics": ["acid base"],
+              "clusterId": null,
+              "rotation": "rot-main",
+              "sourceFile": "u-acid-2.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-acid-2"
+            },
+            {
+              "id": "u-renal-1",
+              "topics": ["Renal Physiology"],
+              "clusterId": "cl-renal",
+              "rotation": "rot-cross",
+              "sourceFile": "u-renal-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-renal-1"
+            },
+            {
+              "id": "u-cardiac-1",
+              "topics": ["Cardiac Output"],
+              "clusterId": "cl-cardio",
+              "rotation": "rot-main",
+              "sourceFile": "u-cardiac-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-cardiac-1"
+            },
+            {
+              "id": "u-deferred",
+              "topics": ["Glycolysis"],
+              "clusterId": "cl-metab",
+              "rotation": "rot-main",
+              "sourceFile": "u-deferred.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "u-deferred"
+            }
+          ],
+          "seenCards": [
+            {
+              "id": "s-glyco-1",
+              "topics": ["Glycolysis"],
+              "clusterId": "cl-metab",
+              "rotation": "rot-main",
+              "sourceFile": "s-glyco-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "s-glyco-1"
+            },
+            {
+              "id": "s-nephron-1",
+              "topics": ["Nephron Anatomy"],
+              "clusterId": "cl-renal",
+              "rotation": "rot-main",
+              "sourceFile": "s-nephron-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "s-nephron-1"
+            }
+          ],
+          "rotationQuestions": [
+            {
+              "id": "q-1",
+              "rotation": "rot-cross"
+            },
+            {
+              "id": "q-2",
+              "rotation": "rot-main"
+            }
+          ],
+          "passSetDeferredCardIds": ["u-deferred"]
+        }
+      },
+      "expected": {
+        "rankedStates": [
+          {
+            "conceptId": "c-weak",
+            "conceptName": "C-WEAK",
+            "currentRecall": 0.3170032824923673,
+            "recallOnExamDay": 0.07177934365066832,
+            "confidence": 0.5,
+            "exposureCount": 5,
+            "daysSinceProbe": 4,
+            "daysSinceExposure": 2,
+            "priority": 0.1567901707079208,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-new",
+            "conceptName": "C-NEW",
+            "currentRecall": 0,
+            "recallOnExamDay": 0,
+            "confidence": 0,
+            "exposureCount": 0,
+            "daysSinceProbe": "Infinity",
+            "daysSinceExposure": "Infinity",
+            "priority": 1.4068297085302204,
+            "intervention": "probe"
+          },
+          {
+            "conceptId": "c-pristine",
+            "conceptName": "C-PRISTINE",
+            "currentRecall": 0.9362957693222784,
+            "recallOnExamDay": 0.32408047265548806,
+            "confidence": 0.9,
+            "exposureCount": 12,
+            "daysSinceProbe": 1,
+            "daysSinceExposure": 1,
+            "priority": 0.23631061818387958,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-strong",
+            "conceptName": "C-STRONG",
+            "currentRecall": 0.9634108737782726,
+            "recallOnExamDay": 0.3458912923594134,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "daysSinceProbe": 0.5,
+            "daysSinceExposure": 0.5,
+            "priority": 0.16703339056714964,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-prereq",
+            "conceptName": "C-PREREQ",
+            "currentRecall": 0.3597978886557065,
+            "recallOnExamDay": 0.04310604873882552,
+            "confidence": 0.2,
+            "exposureCount": 2,
+            "daysSinceProbe": 6,
+            "daysSinceExposure": 6,
+            "priority": 0.8544736080066431,
+            "intervention": "probe"
+          },
+          {
+            "conceptId": "c-root",
+            "conceptName": "C-ROOT",
+            "currentRecall": 0.8663679937969035,
+            "recallOnExamDay": 0.2763752256877902,
+            "confidence": 0.8,
+            "exposureCount": 9,
+            "daysSinceProbe": 2,
+            "daysSinceExposure": 1,
+            "priority": 1.3139791473677906,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-hub",
+            "conceptName": "C-HUB",
+            "currentRecall": 0.3421042649969313,
+            "recallOnExamDay": 0.07163800133327329,
+            "confidence": 0.45,
+            "exposureCount": 4,
+            "daysSinceProbe": 10,
+            "daysSinceExposure": 3,
+            "priority": 0,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-zero",
+            "conceptName": "C-ZERO",
+            "currentRecall": 0.016823752407904454,
+            "recallOnExamDay": 0.0014151932254123547,
+            "confidence": 0.1,
+            "exposureCount": 1,
+            "daysSinceProbe": "Infinity",
+            "daysSinceExposure": 30,
+            "priority": 0.3680562699298997,
+            "intervention": "probe"
+          }
+        ],
+        "conceptClusters": {
+          "c-weak": "cl-renal",
+          "c-new": "c-new",
+          "c-pristine": "cl-renal",
+          "c-strong": "cl-metab",
+          "c-prereq": "cl-renal",
+          "c-root": "c-root",
+          "c-hub": "c-hub",
+          "c-zero": "c-zero"
+        },
+        "sortedConceptIds": ["c-new", "c-root", "c-prereq", "c-zero", "c-pristine", "c-strong", "c-weak", "c-hub"],
+        "sortedPriorities": [
+          1.5648885027927144, 1.1970978356569475, 0.6516744049806591, 0.4522111819609098, 0.26287801498924057,
+          0.20907059454699706, 0.1816522548271691, -0.013493944178335368
+        ],
+        "pristineConceptIds": ["c-new", "c-pristine", "c-weak"],
+        "weakConceptIds": ["c-new", "c-root", "c-prereq", "c-zero", "c-pristine", "c-strong", "c-weak", "c-hub"],
+        "cardRatio": 0.7,
+        "quota": {
+          "targetCardCount": 14,
+          "targetQuestionCount": 6,
+          "coverageReservation": 2,
+          "targetWeakCardCount": 12
+        },
+        "clusterRoundRobin": ["c-new", "c-root", "c-prereq", "c-zero", "c-strong", "c-hub", "c-pristine", "c-weak"],
+        "unseenCardIds": ["u-acid-1", "u-acid-2", "u-cardiac-1", "u-deferred", "u-renal-1"],
+        "crossSourceCardIds": [],
+        "crossSourceQuestionIds": [],
+        "maxCrossSourceItems": 0,
+        "maxNewCards": "Infinity",
+        "unknownItemRotation": "rot-main"
+      }
+    },
+    {
+      "name": "all_strong_no_unseen",
+      "snapshot": {
+        "nowMs": 1768478400000,
+        "daysToExam": 30,
+        "examPressure": 0.20587037180094736,
+        "size": 20,
+        "cardRatio": 0.7,
+        "rotation": "rot-main",
+        "effectiveMaxNewCards": null,
+        "options": {
+          "examTargetTieBreakSeed": "a3f1c9e2b7d4058e6a1f3c5d7e9b2a4c6e8f0a1b3c5d7e9f1a2b3c4d5e6f7a8b"
+        },
+        "concepts": [
+          {
+            "id": "c-weak",
+            "name": "C-WEAK",
+            "topics": ["Renal Physiology"],
+            "prerequisiteIds": ["c-prereq"],
+            "examWeight": 4
+          },
+          {
+            "id": "c-new",
+            "name": "C-NEW",
+            "topics": ["cardiac_output"],
+            "prerequisiteIds": [],
+            "examWeight": 3
+          },
+          {
+            "id": "c-pristine",
+            "name": "C-PRISTINE",
+            "topics": ["Acid-Base"],
+            "prerequisiteIds": [],
+            "examWeight": 5
+          },
+          {
+            "id": "c-strong",
+            "name": "C-STRONG",
+            "topics": ["Glycolysis"],
+            "prerequisiteIds": [],
+            "examWeight": 1
+          },
+          {
+            "id": "c-prereq",
+            "name": "C-PREREQ",
+            "topics": ["Nephron Anatomy"],
+            "prerequisiteIds": ["c-root"],
+            "examWeight": 3
+          },
+          {
+            "id": "c-root",
+            "name": "C-ROOT",
+            "topics": ["Cell Membranes"],
+            "prerequisiteIds": [],
+            "examWeight": 3
+          },
+          {
+            "id": "c-hub",
+            "name": "C-HUB",
+            "topics": ["Integrated Renal"],
+            "prerequisiteIds": ["c-weak", "c-new"],
+            "examWeight": 3
+          },
+          {
+            "id": "c-zero",
+            "name": "C-ZERO",
+            "topics": ["Zeta Topic"],
+            "prerequisiteIds": [],
+            "examWeight": 0
+          }
+        ],
+        "stateMap": {
+          "c-weak": {
+            "recallProbability": 0.99,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "lastExposureAt": 1768469760000,
+            "lastProbeAt": 1768469760000
+          },
+          "c-pristine": {
+            "recallProbability": 0.99,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "lastExposureAt": 1768469760000,
+            "lastProbeAt": 1768469760000
+          },
+          "c-strong": {
+            "recallProbability": 0.99,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "lastExposureAt": 1768469760000,
+            "lastProbeAt": 1768469760000
+          },
+          "c-prereq": {
+            "recallProbability": 0.99,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "lastExposureAt": 1768469760000,
+            "lastProbeAt": 1768469760000
+          },
+          "c-root": {
+            "recallProbability": 0.99,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "lastExposureAt": 1768469760000,
+            "lastProbeAt": 1768469760000
+          },
+          "c-hub": {
+            "recallProbability": 0.99,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "lastExposureAt": 1768469760000,
+            "lastProbeAt": 1768469760000
+          },
+          "c-zero": {
+            "recallProbability": 0.99,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "lastExposureAt": 1768469760000,
+            "lastProbeAt": 1768469760000
+          },
+          "c-new": {
+            "recallProbability": 0.99,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "lastExposureAt": 1768469760000,
+            "lastProbeAt": 1768469760000
+          }
+        },
+        "conceptEmbeddings": {
+          "c-weak": [0.9, 0.1, 0, 0.4],
+          "c-new": [0.1, 0.8, 0.2, 0],
+          "c-hub": [0.5, 0.5, 0.5, 0.5],
+          "c-zero": [0, 0, 0, 0]
+        },
+        "gapDirection": [0.8, 0.2, 0.1, 0.55],
+        "likedConceptIds": ["c-new"],
+        "recentFailureConceptIds": ["c-hub"],
+        "practiceMissConceptIds": ["c-weak"],
+        "chronicFailureConceptIds": ["c-strong"],
+        "bulk": {
+          "unseenCards": [],
+          "seenCards": [
+            {
+              "id": "s-glyco-1",
+              "topics": ["Glycolysis"],
+              "clusterId": "cl-metab",
+              "rotation": "rot-main",
+              "sourceFile": "s-glyco-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "s-glyco-1"
+            },
+            {
+              "id": "s-nephron-1",
+              "topics": ["Nephron Anatomy"],
+              "clusterId": "cl-renal",
+              "rotation": "rot-main",
+              "sourceFile": "s-nephron-1.md",
+              "similarCards": null,
+              "variantGroupId": null,
+              "variantIndex": null,
+              "variantType": null,
+              "stableId": "s-nephron-1"
+            }
+          ],
+          "rotationQuestions": [
+            {
+              "id": "q-1",
+              "rotation": "rot-cross"
+            },
+            {
+              "id": "q-2",
+              "rotation": "rot-main"
+            }
+          ],
+          "passSetDeferredCardIds": ["u-deferred"]
+        }
+      },
+      "expected": {
+        "rankedStates": [
+          {
+            "conceptId": "c-weak",
+            "conceptName": "C-WEAK",
+            "currentRecall": 0.9866253916598462,
+            "recallOnExamDay": 0.3542259497834755,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "daysSinceProbe": 0.1,
+            "daysSinceExposure": 0.1,
+            "priority": 0.2623759220801812,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-new",
+            "conceptName": "C-NEW",
+            "currentRecall": 0.9866253916598462,
+            "recallOnExamDay": 0.3542259497834755,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "daysSinceProbe": 0.1,
+            "daysSinceExposure": 0.1,
+            "priority": 0.2441634212978599,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-pristine",
+            "conceptName": "C-PRISTINE",
+            "currentRecall": 0.9866253916598462,
+            "recallOnExamDay": 0.3542259497834755,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "daysSinceProbe": 0.1,
+            "daysSinceExposure": 0.1,
+            "priority": 0.21222565628053555,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-strong",
+            "conceptName": "C-STRONG",
+            "currentRecall": 0.9866253916598462,
+            "recallOnExamDay": 0.3542259497834755,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "daysSinceProbe": 0.1,
+            "daysSinceExposure": 0.1,
+            "priority": 0.10611282814026775,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-prereq",
+            "conceptName": "C-PREREQ",
+            "currentRecall": 0.9866253916598462,
+            "recallOnExamDay": 0.3542259497834755,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "daysSinceProbe": 0.1,
+            "daysSinceExposure": 0.1,
+            "priority": 0.22301953376815395,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-root",
+            "conceptName": "C-ROOT",
+            "currentRecall": 0.9866253916598462,
+            "recallOnExamDay": 0.3542259497834755,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "daysSinceProbe": 0.1,
+            "daysSinceExposure": 0.1,
+            "priority": 0.2675786511671513,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-hub",
+            "conceptName": "C-HUB",
+            "currentRecall": 0.9866253916598462,
+            "recallOnExamDay": 0.3542259497834755,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "daysSinceProbe": 0.1,
+            "daysSinceExposure": 0.1,
+            "priority": 0.2035035760273348,
+            "intervention": "remediate"
+          },
+          {
+            "conceptId": "c-zero",
+            "conceptName": "C-ZERO",
+            "currentRecall": 0.9866253916598462,
+            "recallOnExamDay": 0.3542259497834755,
+            "confidence": 0.95,
+            "exposureCount": 20,
+            "daysSinceProbe": 0.1,
+            "daysSinceExposure": 0.1,
+            "priority": 0.042445131256107105,
+            "intervention": "remediate"
+          }
+        ],
+        "conceptClusters": {
+          "c-weak": "c-weak",
+          "c-new": "c-new",
+          "c-pristine": "c-pristine",
+          "c-strong": "cl-metab",
+          "c-prereq": "cl-renal",
+          "c-root": "c-root",
+          "c-hub": "c-hub",
+          "c-zero": "c-zero"
+        },
+        "sortedConceptIds": ["c-weak", "c-new", "c-root", "c-pristine", "c-prereq", "c-hub", "c-strong", "c-zero"],
+        "sortedPriorities": [
+          0.3039806490612792, 0.27159543793736074, 0.2437769464012227, 0.2360852833511052, 0.17008848559579598,
+          0.14858225812724513, 0.13281818678900853, 0.05387747447458269
+        ],
+        "pristineConceptIds": [],
+        "weakConceptIds": ["c-weak", "c-new", "c-root", "c-pristine", "c-prereq", "c-hub", "c-strong", "c-zero"],
+        "cardRatio": 0.7,
+        "quota": {
+          "targetCardCount": 14,
+          "targetQuestionCount": 6,
+          "coverageReservation": 2,
+          "targetWeakCardCount": 12
+        },
+        "clusterRoundRobin": ["c-weak", "c-new", "c-root", "c-pristine", "c-prereq", "c-hub", "c-strong", "c-zero"],
+        "unseenCardIds": [],
+        "crossSourceCardIds": [],
+        "crossSourceQuestionIds": [],
+        "maxCrossSourceItems": 0,
+        "maxNewCards": "Infinity",
+        "unknownItemRotation": "rot-main"
+      }
+    }
+  ],
+  "buildScripts": [
+    {
+      "name": "interference_cluster_variant_budget",
+      "script": {
+        "name": "interference_cluster_variant_budget",
+        "size": 10,
+        "minFirstSightItems": 0,
+        "maxNewCards": 1,
+        "maxCrossSourceItems": 0,
+        "unseenCardIds": ["n-1", "n-2"],
+        "crossSourceCardIds": ["x-1"],
+        "excludedCardIds": ["ex-1"],
+        "weakConcepts": [
+          {
+            "conceptId": "c-a",
+            "conceptName": "c-a",
+            "currentRecall": 0.6,
+            "recallOnExamDay": 0.6,
+            "confidence": 0.5,
+            "exposureCount": 3,
+            "daysSinceProbe": 1,
+            "daysSinceExposure": 1,
+            "priority": 1,
+            "intervention": "probe"
+          }
+        ],
+        "ops": [
+          {
+            "op": "pick",
+            "conceptId": "c-a",
+            "similarityThreshold": 0.85,
+            "maxPerCluster": 1,
+            "candidates": [
+              {
+                "id": "ex-1",
+                "clusterId": null,
+                "similarCards": null,
+                "variantGroupId": null,
+                "variantIndex": null,
+                "variantType": null
+              },
+              {
+                "id": "x-1",
+                "clusterId": null,
+                "similarCards": null,
+                "variantGroupId": null,
+                "variantIndex": null,
+                "variantType": null
+              },
+              {
+                "id": "n-1",
+                "clusterId": "k1",
+                "similarCards": [
+                  {
+                    "cardId": "z-9",
+                    "similarity": 0.95
+                  },
+                  {
+                    "cardId": 7
+                  },
+                  "junk"
+                ],
+                "variantGroupId": null,
+                "variantIndex": null,
+                "variantType": null
+              }
+            ]
+          },
+          {
+            "op": "pick",
+            "conceptId": "c-a",
+            "similarityThreshold": 0.85,
+            "maxPerCluster": 1,
+            "candidates": [
+              {
+                "id": "n-2",
+                "clusterId": null,
+                "similarCards": null,
+                "variantGroupId": null,
+                "variantIndex": null,
+                "variantType": null
+              },
+              {
+                "id": "k-1b",
+                "clusterId": "k1",
+                "similarCards": null,
+                "variantGroupId": null,
+                "variantIndex": null,
+                "variantType": null
+              },
+              {
+                "id": "z-9",
+                "clusterId": null,
+                "similarCards": null,
+                "variantGroupId": null,
+                "variantIndex": null,
+                "variantType": null
+              },
+              {
+                "id": "sim-1",
+                "clusterId": null,
+                "similarCards": [
+                  {
+                    "cardId": "n-1",
+                    "similarity": 0.9
+                  }
+                ],
+                "variantGroupId": null,
+                "variantIndex": null,
+                "variantType": null
+              },
+              {
+                "id": "v-1",
+                "clusterId": null,
+                "similarCards": null,
+                "variantGroupId": "g1",
+                "variantIndex": null,
+                "variantType": null
+              }
+            ]
+          },
+          {
+            "op": "pick",
+            "conceptId": "c-a",
+            "similarityThreshold": 0.95,
+            "maxPerCluster": 5,
+            "candidates": [
+              {
+                "id": "v-2",
+                "clusterId": null,
+                "similarCards": null,
+                "variantGroupId": "g1",
+                "variantIndex": null,
+                "variantType": null
+              },
+              {
+                "id": "z-9",
+                "clusterId": null,
+                "similarCards": null,
+                "variantGroupId": null,
+                "variantIndex": null,
+                "variantType": null
+              },
+              {
+                "id": "ok-1",
+                "clusterId": null,
+                "similarCards": null,
+                "variantGroupId": null,
+                "variantIndex": null,
+                "variantType": null
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "results": [
+          {
+            "op": "pick",
+            "picked": "n-1",
+            "added": true
+          },
+          {
+            "op": "pick",
+            "picked": "v-1",
+            "added": true
+          },
+          {
+            "op": "pick",
+            "picked": "z-9",
+            "added": true
+          }
+        ],
+        "selectedIds": ["card:n-1", "card:v-1", "card:z-9"],
+        "deferredForNovelty": [],
+        "selectedCardCount": 3,
+        "selectedQuestionCount": 0,
+        "newCardCount": 1,
+        "firstSightSelected": 1,
+        "selectedCrossSourceItems": 0,
+        "enforceFirstSightReservation": false,
+        "teachingCaps": {
+          "c-a": 3
+        },
+        "cardsPerConcept": {
+          "c-a": 3
+        },
+        "questionsPerConcept": {}
+      }
+    },
+    {
+      "name": "teaching_caps_and_synthetic",
+      "script": {
+        "name": "teaching_caps_and_synthetic",
+        "size": 12,
+        "minFirstSightItems": 0,
+        "maxNewCards": null,
+        "weakConcepts": [
+          {
+            "conceptId": "c-naive",
+            "conceptName": "c-naive",
+            "currentRecall": 0,
+            "recallOnExamDay": 0,
+            "confidence": 0,
+            "exposureCount": 0,
+            "daysSinceProbe": 1,
+            "daysSinceExposure": 1,
+            "priority": 1,
+            "intervention": "probe"
+          },
+          {
+            "conceptId": "c-mastered",
+            "conceptName": "c-mastered",
+            "currentRecall": 0.9,
+            "recallOnExamDay": 0.9,
+            "confidence": 0.8,
+            "exposureCount": 9,
+            "daysSinceProbe": 1,
+            "daysSinceExposure": 1,
+            "priority": 1,
+            "intervention": "probe"
+          },
+          {
+            "conceptId": "c-learning",
+            "conceptName": "c-learning",
+            "currentRecall": 0.3,
+            "recallOnExamDay": 0.3,
+            "confidence": 0.4,
+            "exposureCount": 4,
+            "daysSinceProbe": 1,
+            "daysSinceExposure": 1,
+            "priority": 1,
+            "intervention": "probe"
+          },
+          {
+            "conceptId": "c-consol",
+            "conceptName": "c-consol",
+            "currentRecall": 0.9,
+            "recallOnExamDay": 0.9,
+            "confidence": 0.5,
+            "exposureCount": 4,
+            "daysSinceProbe": 1,
+            "daysSinceExposure": 1,
+            "priority": 1,
+            "intervention": "probe"
+          }
+        ],
+        "questionFamiliarity": ["q-1", "q-2", "q-3", "q-4", "q-5", "q-6"],
+        "ops": [
+          {
+            "op": "add",
+            "item": {
+              "type": "card",
+              "id": "naive-a",
+              "conceptId": "c-naive",
+              "conceptName": "c-naive",
+              "priority": 1,
+              "interventionReason": "weak_recall"
+            }
+          },
+          {
+            "op": "add",
+            "item": {
+              "type": "card",
+              "id": "naive-b",
+              "conceptId": "c-naive",
+              "conceptName": "c-naive",
+              "priority": 1,
+              "interventionReason": "weak_recall"
+            }
+          },
+          {
+            "op": "add",
+            "item": {
+              "type": "card",
+              "id": "naive-c",
+              "conceptId": "c-naive",
+              "conceptName": "c-naive",
+              "priority": 1,
+              "interventionReason": "weak_recall"
+            }
+          },
+          {
+            "op": "add",
+            "item": {
+              "type": "question",
+              "id": "q-m-a",
+              "conceptId": "c-mastered",
+              "conceptName": "c-mastered",
+              "priority": 1,
+              "interventionReason": "weak_recall"
+            }
+          },
+          {
+            "op": "add",
+            "item": {
+              "type": "question",
+              "id": "q-m-b",
+              "conceptId": "c-mastered",
+              "conceptName": "c-mastered",
+              "priority": 1,
+              "interventionReason": "weak_recall"
+            }
+          },
+          {
+            "op": "add",
+            "item": {
+              "type": "video",
+              "id": "vid-1",
+              "conceptId": "c-mastered",
+              "conceptName": "c-mastered",
+              "priority": 1,
+              "interventionReason": "weak_recall"
+            }
+          },
+          {
+            "op": "add",
+            "item": {
+              "type": "question",
+              "id": "q-1",
+              "conceptId": "c-learning",
+              "conceptName": "c-learning",
+              "priority": 1,
+              "interventionReason": "weak_recall",
+              "variantGroupId": "vg",
+              "variantType": "near-duplicate"
+            }
+          },
+          {
+            "op": "add",
+            "item": {
+              "type": "question",
+              "id": "q-2",
+              "conceptId": "c-learning",
+              "conceptName": "c-learning",
+              "priority": 1,
+              "interventionReason": "weak_recall",
+              "variantGroupId": "vg",
+              "variantType": "paraphrase"
+            }
+          },
+          {
+            "op": "add",
+            "item": {
+              "type": "question",
+              "id": "q-3",
+              "conceptId": "c-learning",
+              "conceptName": "c-learning",
+              "priority": 1,
+              "interventionReason": "weak_recall",
+              "variantGroupId": "vg",
+              "variantType": "paraphrase"
+            }
+          },
+          {
+            "op": "add",
+            "item": {
+              "type": "question",
+              "id": "q-4",
+              "conceptId": "c-learning",
+              "conceptName": "c-learning",
+              "priority": 1,
+              "interventionReason": "weak_recall",
+              "variantGroupId": "vg",
+              "variantType": "paraphrase"
+            }
+          },
+          {
+            "op": "add",
+            "item": {
+              "type": "card",
+              "id": "orphan-1",
+              "conceptId": "_unattached",
+              "conceptName": "_unattached",
+              "priority": 1,
+              "interventionReason": "weak_recall"
+            }
+          },
+          {
+            "op": "add",
+            "item": {
+              "type": "card",
+              "id": "rot-1",
+              "conceptId": "rotation:rot-main",
+              "conceptName": "rotation:rot-main",
+              "priority": 1,
+              "interventionReason": "weak_recall"
+            }
+          },
+          {
+            "op": "add",
+            "item": {
+              "type": "card",
+              "id": "other-1",
+              "conceptId": "c-unknown",
+              "conceptName": "c-unknown",
+              "priority": 1,
+              "interventionReason": "weak_recall"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "results": [
+          {
+            "op": "add",
+            "id": "naive-a",
+            "added": true
+          },
+          {
+            "op": "add",
+            "id": "naive-b",
+            "added": true
+          },
+          {
+            "op": "add",
+            "id": "naive-c",
+            "added": false
+          },
+          {
+            "op": "add",
+            "id": "q-m-a",
+            "added": true
+          },
+          {
+            "op": "add",
+            "id": "q-m-b",
+            "added": false
+          },
+          {
+            "op": "add",
+            "id": "vid-1",
+            "added": true
+          },
+          {
+            "op": "add",
+            "id": "q-1",
+            "added": true
+          },
+          {
+            "op": "add",
+            "id": "q-2",
+            "added": true
+          },
+          {
+            "op": "add",
+            "id": "q-3",
+            "added": true
+          },
+          {
+            "op": "add",
+            "id": "q-4",
+            "added": false
+          },
+          {
+            "op": "add",
+            "id": "orphan-1",
+            "added": true
+          },
+          {
+            "op": "add",
+            "id": "rot-1",
+            "added": true
+          },
+          {
+            "op": "add",
+            "id": "other-1",
+            "added": true
+          }
+        ],
+        "selectedIds": [
+          "card:naive-a",
+          "card:naive-b",
+          "question:q-m-a",
+          "video:vid-1",
+          "question:q-1",
+          "question:q-2",
+          "question:q-3",
+          "card:orphan-1",
+          "card:rot-1",
+          "card:other-1"
+        ],
+        "deferredForNovelty": [],
+        "selectedCardCount": 5,
+        "selectedQuestionCount": 4,
+        "newCardCount": 0,
+        "firstSightSelected": 1,
+        "selectedCrossSourceItems": 0,
+        "enforceFirstSightReservation": false,
+        "teachingCaps": {
+          "c-naive": 2,
+          "c-mastered": 1,
+          "c-learning": 3,
+          "c-consol": 3
+        },
+        "cardsPerConcept": {
+          "c-naive": 2,
+          "_unattached": 1,
+          "rotation:rot-main": 1,
+          "c-unknown": 1
+        },
+        "questionsPerConcept": {
+          "c-mastered": 1,
+          "c-learning": 3
+        }
+      }
+    },
+    {
+      "name": "first_sight_reservation_release",
+      "script": {
+        "name": "first_sight_reservation_release",
+        "size": 5,
+        "minFirstSightItems": 3,
+        "maxNewCards": null,
+        "unseenCardIds": ["new-1", "new-2"],
+        "questionFamiliarity": ["q-seen-1", "q-seen-2", "q-seen-3"],
+        "weakConcepts": [
+          {
+            "conceptId": "c-a",
+            "conceptName": "c-a",
+            "currentRecall": 0.4,
+            "recallOnExamDay": 0.4,
+            "confidence": 0.5,
+            "exposureCount": 3,
+            "daysSinceProbe": 1,
+            "daysSinceExposure": 1,
+            "priority": 1,
+            "intervention": "probe"
+          },
+          {
+            "conceptId": "c-b",
+            "conceptName": "c-b",
+            "currentRecall": 0.4,
+            "recallOnExamDay": 0.4,
+            "confidence": 0.5,
+            "exposureCount": 3,
+            "daysSinceProbe": 1,
+            "daysSinceExposure": 1,
+            "priority": 1,
+            "intervention": "probe"
+          },
+          {
+            "conceptId": "c-c",
+            "conceptName": "c-c",
+            "currentRecall": 0.4,
+            "recallOnExamDay": 0.4,
+            "confidence": 0.5,
+            "exposureCount": 3,
+            "daysSinceProbe": 1,
+            "daysSinceExposure": 1,
+            "priority": 1,
+            "intervention": "probe"
+          }
+        ],
+        "ops": [
+          {
+            "op": "add",
+            "item": {
+              "type": "card",
+              "id": "seen-1",
+              "conceptId": "c-a",
+              "conceptName": "c-a",
+              "priority": 1,
+              "interventionReason": "weak_recall"
+            }
+          },
+          {
+            "op": "add",
+            "item": {
+              "type": "question",
+              "id": "q-seen-1",
+              "conceptId": "c-b",
+              "conceptName": "c-b",
+              "priority": 1,
+              "interventionReason": "weak_recall"
+            }
+          },
+          {
+            "op": "add",
+            "item": {
+              "type": "question",
+              "id": "q-seen-2",
+              "conceptId": "c-c",
+              "conceptName": "c-c",
+              "priority": 1,
+              "interventionReason": "weak_recall"
+            }
+          },
+          {
+            "op": "add",
+            "item": {
+              "type": "question",
+              "id": "q-seen-3",
+              "conceptId": "c-c",
+              "conceptName": "c-c",
+              "priority": 1,
+              "interventionReason": "weak_recall"
+            },
+            "bypassNoveltyReservation": true
+          },
+          {
+            "op": "add",
+            "item": {
+              "type": "card",
+              "id": "new-1",
+              "conceptId": "c-a",
+              "conceptName": "c-a",
+              "priority": 1,
+              "interventionReason": "weak_recall"
+            }
+          },
+          {
+            "op": "add",
+            "item": {
+              "type": "card",
+              "id": "seen-2",
+              "conceptId": "c-b",
+              "conceptName": "c-b",
+              "priority": 1,
+              "interventionReason": "weak_recall"
+            }
+          },
+          {
+            "op": "release"
+          },
+          {
+            "op": "add",
+            "item": {
+              "type": "card",
+              "id": "new-2",
+              "conceptId": "c-a",
+              "conceptName": "c-a",
+              "priority": 1,
+              "interventionReason": "weak_recall"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "results": [
+          {
+            "op": "add",
+            "id": "seen-1",
+            "added": true
+          },
+          {
+            "op": "add",
+            "id": "q-seen-1",
+            "added": true
+          },
+          {
+            "op": "add",
+            "id": "q-seen-2",
+            "added": false
+          },
+          {
+            "op": "add",
+            "id": "q-seen-3",
+            "added": true
+          },
+          {
+            "op": "add",
+            "id": "new-1",
+            "added": true
+          },
+          {
+            "op": "add",
+            "id": "seen-2",
+            "added": false
+          },
+          {
+            "op": "release"
+          },
+          {
+            "op": "add",
+            "id": "new-2",
+            "added": false
+          }
+        ],
+        "selectedIds": ["card:seen-1", "question:q-seen-1", "question:q-seen-3", "card:new-1", "question:q-seen-2"],
+        "deferredForNovelty": ["question:q-seen-2", "card:seen-2"],
+        "selectedCardCount": 2,
+        "selectedQuestionCount": 3,
+        "newCardCount": 1,
+        "firstSightSelected": 1,
+        "selectedCrossSourceItems": 0,
+        "enforceFirstSightReservation": false,
+        "teachingCaps": {
+          "c-a": 3,
+          "c-b": 3,
+          "c-c": 3
+        },
+        "cardsPerConcept": {
+          "c-a": 2
+        },
+        "questionsPerConcept": {
+          "c-b": 1,
+          "c-c": 2
+        }
+      }
+    },
+    {
+      "name": "cross_source_cap_and_session_full",
+      "script": {
+        "name": "cross_source_cap_and_session_full",
+        "size": 3,
+        "minFirstSightItems": 0,
+        "maxNewCards": null,
+        "maxCrossSourceItems": 1,
+        "crossSourceCardIds": ["x-1", "x-2"],
+        "crossSourceQuestionIds": ["xq-1"],
+        "questionFamiliarity": ["xq-1"],
+        "weakConcepts": [
+          {
+            "conceptId": "c-a",
+            "conceptName": "c-a",
+            "currentRecall": 0.4,
+            "recallOnExamDay": 0.4,
+            "confidence": 0.5,
+            "exposureCount": 3,
+            "daysSinceProbe": 1,
+            "daysSinceExposure": 1,
+            "priority": 1,
+            "intervention": "probe"
+          }
+        ],
+        "ops": [
+          {
+            "op": "add",
+            "item": {
+              "type": "card",
+              "id": "x-1",
+              "conceptId": "rotation:rot-cross",
+              "conceptName": "rotation:rot-cross",
+              "priority": 1,
+              "interventionReason": "weak_recall"
+            }
+          },
+          {
+            "op": "add",
+            "item": {
+              "type": "question",
+              "id": "xq-1",
+              "conceptId": "rotation:rot-cross",
+              "conceptName": "rotation:rot-cross",
+              "priority": 1,
+              "interventionReason": "weak_recall"
+            }
+          },
+          {
+            "op": "pick",
+            "conceptId": "c-a",
+            "similarityThreshold": 0.85,
+            "maxPerCluster": 3,
+            "candidates": [
+              {
+                "id": "x-2",
+                "clusterId": null,
+                "similarCards": null,
+                "variantGroupId": null,
+                "variantIndex": null,
+                "variantType": null
+              },
+              {
+                "id": "plain-1",
+                "clusterId": null,
+                "similarCards": null,
+                "variantGroupId": null,
+                "variantIndex": null,
+                "variantType": null
+              }
+            ]
+          },
+          {
+            "op": "add",
+            "item": {
+              "type": "card",
+              "id": "plain-2",
+              "conceptId": "_unattached",
+              "conceptName": "_unattached",
+              "priority": 1,
+              "interventionReason": "weak_recall"
+            }
+          },
+          {
+            "op": "add",
+            "item": {
+              "type": "card",
+              "id": "plain-3",
+              "conceptId": "_unattached",
+              "conceptName": "_unattached",
+              "priority": 1,
+              "interventionReason": "weak_recall"
+            }
+          },
+          {
+            "op": "release"
+          }
+        ]
+      },
+      "expected": {
+        "results": [
+          {
+            "op": "add",
+            "id": "x-1",
+            "added": true
+          },
+          {
+            "op": "add",
+            "id": "xq-1",
+            "added": false
+          },
+          {
+            "op": "pick",
+            "picked": "plain-1",
+            "added": true
+          },
+          {
+            "op": "add",
+            "id": "plain-2",
+            "added": true
+          },
+          {
+            "op": "add",
+            "id": "plain-3",
+            "added": false
+          },
+          {
+            "op": "release"
+          }
+        ],
+        "selectedIds": ["card:x-1", "card:plain-1", "card:plain-2"],
+        "deferredForNovelty": [],
+        "selectedCardCount": 3,
+        "selectedQuestionCount": 0,
+        "newCardCount": 0,
+        "firstSightSelected": 0,
+        "selectedCrossSourceItems": 1,
+        "enforceFirstSightReservation": false,
+        "teachingCaps": {
+          "c-a": 3
+        },
+        "cardsPerConcept": {
+          "rotation:rot-cross": 1,
+          "c-a": 1,
+          "_unattached": 1
+        },
+        "questionsPerConcept": {}
+      }
+    },
+    {
+      "name": "empty_script",
+      "script": {
+        "name": "empty_script",
+        "size": 0,
+        "minFirstSightItems": 0,
+        "maxNewCards": 0,
+        "weakConcepts": [],
+        "ops": [
+          {
+            "op": "add",
+            "item": {
+              "type": "card",
+              "id": "c-1",
+              "conceptId": "c-a",
+              "conceptName": "c-a",
+              "priority": 1,
+              "interventionReason": "weak_recall"
+            }
+          },
+          {
+            "op": "release"
+          }
+        ]
+      },
+      "expected": {
+        "results": [
+          {
+            "op": "add",
+            "id": "c-1",
+            "added": false
+          },
+          {
+            "op": "release"
+          }
+        ],
+        "selectedIds": [],
+        "deferredForNovelty": [],
+        "selectedCardCount": 0,
+        "selectedQuestionCount": 0,
+        "newCardCount": 0,
+        "firstSightSelected": 0,
+        "selectedCrossSourceItems": 0,
+        "enforceFirstSightReservation": false,
+        "teachingCaps": {},
+        "cardsPerConcept": {},
+        "questionsPerConcept": {}
+      }
+    }
+  ],
+  "units": {
+    "stableTargetRandom": [
+      {
+        "key": "c-weak",
+        "value": 0.7642819168977439
+      },
+      {
+        "key": "c-new",
+        "value": 0.6872517492156476
+      },
+      {
+        "key": "",
+        "value": 0.22919000475667417
+      },
+      {
+        "key": "unicode-é",
+        "value": 0.9346034382469952
+      },
+      {
+        "key": "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk",
+        "value": 0.4165810728445649
+      }
+    ],
+    "examPressure": [
+      {
+        "daysToExam": -5,
+        "value": 0.9801596942659225
+      },
+      {
+        "daysToExam": 0,
+        "value": 0.958908721799535
+      },
+      {
+        "daysToExam": 7,
+        "value": 0.8909031788043871
+      },
+      {
+        "daysToExam": 21,
+        "value": 0.5
+      },
+      {
+        "daysToExam": 30,
+        "value": 0.20587037180094736
+      },
+      {
+        "daysToExam": 120,
+        "value": 3.5540766457441055e-7
+      }
+    ],
+    "resolveMaxNewCards": [
+      {
+        "explicit": 4,
+        "mode": "crunch",
+        "value": 4
+      },
+      {
+        "explicit": null,
+        "mode": "crunch",
+        "value": 0
+      },
+      {
+        "explicit": null,
+        "mode": "standard",
+        "value": "Infinity"
+      },
+      {
+        "explicit": 0,
+        "mode": null,
+        "value": 0
+      }
+    ],
+    "recallSoftPenalty": [
+      {
+        "recall": 0.95,
+        "confidence": 0.9,
+        "chronic": false,
+        "value": 0.4
+      },
+      {
+        "recall": 0.95,
+        "confidence": 0.9,
+        "chronic": true,
+        "value": 1
+      },
+      {
+        "recall": 0.9,
+        "confidence": 0.9,
+        "chronic": false,
+        "value": 1
+      },
+      {
+        "recall": 0.95,
+        "confidence": 0.39,
+        "chronic": false,
+        "value": 1
+      },
+      {
+        "recall": 1,
+        "confidence": 0.4,
+        "chronic": false,
+        "value": 0.4
+      }
+    ],
+    "clusterDampening": [
+      {
+        "count": 0,
+        "value": 1
+      },
+      {
+        "count": 3,
+        "value": 1
+      },
+      {
+        "count": 4,
+        "value": 1
+      },
+      {
+        "count": 5,
+        "value": 0.82
+      },
+      {
+        "count": 8,
+        "value": 0.4521217599999999
+      },
+      {
+        "count": 11,
+        "value": 0.25
+      },
+      {
+        "count": 12,
+        "value": 0.25
+      },
+      {
+        "count": 50,
+        "value": 0.25
+      }
+    ],
+    "calibratedReviewItem": [
+      {
+        "type": "question",
+        "complexity": null,
+        "value": true
+      },
+      {
+        "type": "card",
+        "complexity": 1,
+        "value": false
+      },
+      {
+        "type": "card",
+        "complexity": 2,
+        "value": true
+      },
+      {
+        "type": "card",
+        "complexity": null,
+        "value": true
+      },
+      {
+        "type": "video",
+        "complexity": 3,
+        "value": false
+      }
+    ],
+    "teachingCaps": {
+      "items": [
+        {
+          "type": "card",
+          "id": "k-1",
+          "conceptId": "c-a",
+          "conceptName": "c-a",
+          "priority": 1,
+          "interventionReason": "weak_recall"
+        },
+        {
+          "type": "question",
+          "id": "k-2",
+          "conceptId": "c-a",
+          "conceptName": "c-a",
+          "priority": 1,
+          "interventionReason": "weak_recall",
+          "struggleIntervention": {
+            "isScaffold": true,
+            "targetCardId": "k-4"
+          }
+        },
+        {
+          "type": "card",
+          "id": "k-3",
+          "conceptId": "c-a",
+          "conceptName": "c-a",
+          "priority": 1,
+          "interventionReason": "weak_recall",
+          "examTargetMasteryStage": "scheduled-atomic-core"
+        },
+        {
+          "type": "card",
+          "id": "k-4",
+          "conceptId": "c-a",
+          "conceptName": "c-a",
+          "priority": 1,
+          "interventionReason": "weak_recall"
+        },
+        {
+          "type": "card",
+          "id": "k-5",
+          "conceptId": "c-a",
+          "conceptName": "c-a",
+          "priority": 1,
+          "interventionReason": "weak_recall"
+        },
+        {
+          "type": "card",
+          "id": "k-6",
+          "conceptId": "c-b",
+          "conceptName": "c-b",
+          "priority": 1,
+          "interventionReason": "weak_recall"
+        },
+        {
+          "type": "card",
+          "id": "k-7",
+          "conceptId": "_unattached",
+          "conceptName": "_unattached",
+          "priority": 1,
+          "interventionReason": "weak_recall"
+        },
+        {
+          "type": "card",
+          "id": "k-8",
+          "conceptId": "c-b",
+          "conceptName": "c-b",
+          "priority": 1,
+          "interventionReason": "weak_recall"
+        },
+        {
+          "type": "card",
+          "id": "k-9",
+          "conceptId": "question:abc",
+          "conceptName": "question:abc",
+          "priority": 1,
+          "interventionReason": "weak_recall"
+        },
+        {
+          "type": "card",
+          "id": "k-10",
+          "conceptId": "c-c",
+          "conceptName": "c-c",
+          "priority": 1,
+          "interventionReason": "weak_recall"
+        }
+      ],
+      "caps": {
+        "c-a": 2,
+        "c-b": 1.9,
+        "c-c": -1
+      },
+      "variants": [
+        {
+          "capA": 0,
+          "result": ["k-6", "k-7", "k-9"]
+        },
+        {
+          "capA": 1,
+          "result": ["k-3", "k-6", "k-7", "k-9"]
+        },
+        {
+          "capA": 2,
+          "result": ["k-3", "k-4", "k-6", "k-7", "k-9"]
+        },
+        {
+          "capA": 3,
+          "result": ["k-2", "k-3", "k-4", "k-6", "k-7", "k-9"]
+        }
+      ]
+    },
+    "clusterRoundRobin": {
+      "concepts": [
+        {
+          "conceptId": "r-1",
+          "conceptName": "r-1",
+          "currentRecall": 0,
+          "recallOnExamDay": 0,
+          "confidence": 0,
+          "exposureCount": 1,
+          "daysSinceProbe": 1,
+          "daysSinceExposure": 1,
+          "priority": 0.5,
+          "intervention": "probe"
+        },
+        {
+          "conceptId": "r-2",
+          "conceptName": "r-2",
+          "currentRecall": 0,
+          "recallOnExamDay": 0,
+          "confidence": 0,
+          "exposureCount": 1,
+          "daysSinceProbe": 1,
+          "daysSinceExposure": 1,
+          "priority": 0.9,
+          "intervention": "probe"
+        },
+        {
+          "conceptId": "r-3",
+          "conceptName": "r-3",
+          "currentRecall": 0,
+          "recallOnExamDay": 0,
+          "confidence": 0,
+          "exposureCount": 1,
+          "daysSinceProbe": 1,
+          "daysSinceExposure": 1,
+          "priority": 0.7,
+          "intervention": "probe"
+        },
+        {
+          "conceptId": "r-4",
+          "conceptName": "r-4",
+          "currentRecall": 0,
+          "recallOnExamDay": 0,
+          "confidence": 0,
+          "exposureCount": 1,
+          "daysSinceProbe": 1,
+          "daysSinceExposure": 1,
+          "priority": 0.2,
+          "intervention": "probe"
+        },
+        {
+          "conceptId": "r-5",
+          "conceptName": "r-5",
+          "currentRecall": 0,
+          "recallOnExamDay": 0,
+          "confidence": 0,
+          "exposureCount": 1,
+          "daysSinceProbe": 1,
+          "daysSinceExposure": 1,
+          "priority": 0.95,
+          "intervention": "probe"
+        },
+        {
+          "conceptId": "r-6",
+          "conceptName": "r-6",
+          "currentRecall": 0,
+          "recallOnExamDay": 0,
+          "confidence": 0,
+          "exposureCount": 1,
+          "daysSinceProbe": 1,
+          "daysSinceExposure": 1,
+          "priority": 0.6,
+          "intervention": "probe"
+        }
+      ],
+      "clusters": {
+        "r-1": "A",
+        "r-2": "B",
+        "r-3": "A",
+        "r-4": "C",
+        "r-5": "A",
+        "r-6": "B"
+      },
+      "ranks": {
+        "r-1": 2,
+        "r-2": 1,
+        "r-4": null,
+        "r-5": 0,
+        "r-3": 5,
+        "r-6": 1
+      },
+      "byPriority": ["r-2", "r-1", "r-4", "r-6", "r-3", "r-5"],
+      "byRank": ["r-2", "r-1", "r-4", "r-6", "r-3", "r-5"]
+    },
+    "difficultyPlan": [
+      {
+        "pattern": ["hard", "easy"],
+        "length": 5,
+        "value": ["hard", "easy", "hard", "easy", "hard"]
+      },
+      {
+        "pattern": ["bogus"],
+        "length": 3,
+        "value": ["medium", "medium", "medium"]
+      },
+      {
+        "pattern": [],
+        "length": 2,
+        "value": ["medium", "medium"]
+      },
+      {
+        "pattern": ["medium", "x", "hard"],
+        "length": 4,
+        "value": ["medium", "hard", "medium", "hard"]
+      },
+      {
+        "pattern": ["easy"],
+        "length": 0,
+        "value": []
+      }
+    ],
+    "normalizeDifficulty": [
+      {
+        "input": " Easy ",
+        "value": "easy"
+      },
+      {
+        "input": "HARD",
+        "value": "hard"
+      },
+      {
+        "input": "extreme",
+        "value": "medium"
+      },
+      {
+        "input": "",
+        "value": "medium"
+      },
+      {
+        "input": null,
+        "value": "medium"
+      },
+      {
+        "input": 3,
+        "value": "medium"
+      },
+      {
+        "input": "\tmedium ",
+        "value": "medium"
+      }
+    ],
+    "effectiveDifficulty": [
+      {
+        "difficulty": " HARD ",
+        "facilityIndex": null,
+        "totalAttempts": null,
+        "value": "hard"
+      },
+      {
+        "difficulty": "Extreme",
+        "facilityIndex": null,
+        "totalAttempts": null,
+        "value": "medium"
+      },
+      {
+        "difficulty": 5,
+        "facilityIndex": null,
+        "totalAttempts": null,
+        "value": "medium"
+      },
+      {
+        "difficulty": null,
+        "facilityIndex": 0.9,
+        "totalAttempts": 19,
+        "value": "medium"
+      },
+      {
+        "difficulty": "easy",
+        "facilityIndex": 0.7,
+        "totalAttempts": 20,
+        "value": "easy"
+      },
+      {
+        "difficulty": "easy",
+        "facilityIndex": 0.4,
+        "totalAttempts": 50,
+        "value": "medium"
+      },
+      {
+        "difficulty": "easy",
+        "facilityIndex": 0.39,
+        "totalAttempts": 20,
+        "value": "hard"
+      },
+      {
+        "difficulty": "hard",
+        "facilityIndex": 0.69999,
+        "totalAttempts": 20.5,
+        "value": "medium"
+      },
+      {
+        "difficulty": " medium\n",
+        "facilityIndex": "0.9",
+        "totalAttempts": 100,
+        "value": "medium"
+      }
+    ],
+    "attribution": {
+      "concepts": [
+        {
+          "id": "a-1",
+          "name": "A-1",
+          "topics": ["Renal Physiology", ""],
+          "prerequisiteIds": [],
+          "examWeight": 3
+        },
+        {
+          "id": "a-2",
+          "name": "A-2",
+          "topics": ["renal_physiology", "Shared"],
+          "prerequisiteIds": [],
+          "examWeight": 3
+        },
+        {
+          "id": "a-3",
+          "name": "A-3",
+          "topics": ["Shared", "Cardiac"],
+          "prerequisiteIds": [],
+          "examWeight": 3
+        }
+      ],
+      "currentConceptIds": ["a-1", "a-3"],
+      "cards": [
+        {
+          "conceptId": "a-3",
+          "topics": ["Shared"],
+          "value": "a-3"
+        },
+        {
+          "conceptId": "a-2",
+          "topics": ["Cardiac"],
+          "value": "a-3"
+        },
+        {
+          "conceptId": null,
+          "topics": ["Renal-Physiology!"],
+          "value": null
+        },
+        {
+          "conceptId": null,
+          "topics": ["Cardiac", "cardiac"],
+          "value": "a-3"
+        },
+        {
+          "conceptId": null,
+          "topics": ["nothing", "***"],
+          "value": null
+        },
+        {
+          "conceptId": "zz",
+          "topics": ["Shared"],
+          "value": null
+        }
+      ]
+    },
+    "interventionReason": [
+      {
+        "conceptId": "c-f",
+        "recall": 0.9,
+        "base": "weak_recall",
+        "value": "failure_escalation"
+      },
+      {
+        "conceptId": "c-p",
+        "recall": 0.8,
+        "base": "reinforcement",
+        "value": "strong_pristine"
+      },
+      {
+        "conceptId": "c-p",
+        "recall": 0.79,
+        "base": "reinforcement",
+        "value": "reinforcement"
+      },
+      {
+        "conceptId": "c-x",
+        "recall": 0.95,
+        "base": "needs_retest",
+        "value": "needs_retest"
+      }
+    ],
+    "teachingState": [
+      {
+        "exposureCount": 0,
+        "recall": 0.9,
+        "confidence": 0.9,
+        "value": "naive"
+      },
+      {
+        "exposureCount": 1,
+        "recall": 0.49,
+        "confidence": 0.9,
+        "value": "learning"
+      },
+      {
+        "exposureCount": 1,
+        "recall": 0.5,
+        "confidence": 0.9,
+        "value": "consolidating"
+      },
+      {
+        "exposureCount": 1,
+        "recall": 0.85,
+        "confidence": 0.69,
+        "value": "consolidating"
+      },
+      {
+        "exposureCount": 1,
+        "recall": 0.85,
+        "confidence": 0.7,
+        "value": "mastered"
+      }
+    ],
+    "topics": [
+      {
+        "input": "Renal Physiology",
+        "normalized": "renal physiology",
+        "expanded": ["Renal Physiology", "renal physiology"]
+      },
+      {
+        "input": "  acid_base--balance ",
+        "normalized": "acid base balance",
+        "expanded": ["acid_base--balance", "acid base balance", "Acid Base Balance"]
+      },
+      {
+        "input": "TBI",
+        "normalized": "tbi",
+        "expanded": ["TBI", "tbi"]
+      },
+      {
+        "input": "bls",
+        "normalized": "bls",
+        "expanded": ["bls", "BLS"]
+      },
+      {
+        "input": "Café au lait",
+        "normalized": "café au lait",
+        "expanded": ["Café au lait", "café au lait", "Café AU Lait", "café AU lait"]
+      },
+      {
+        "input": "and the of",
+        "normalized": "and the of",
+        "expanded": ["and the of", "And The Of", "and the OF"]
+      },
+      {
+        "input": "vs ECG",
+        "normalized": "vs ecg",
+        "expanded": ["vs ECG", "vs ecg", "Vs ECG", "VS ECG"]
+      },
+      {
+        "input": "α-Thalassemia",
+        "normalized": "α thalassemia",
+        "expanded": ["α-Thalassemia", "α thalassemia", "Α Thalassemia", "Α thalassemia"]
+      },
+      {
+        "input": "***",
+        "normalized": "",
+        "expanded": ["***"]
+      },
+      {
+        "input": "ab cd ef",
+        "normalized": "ab cd ef",
+        "expanded": ["ab cd ef", "AB CD EF"]
+      }
+    ]
+  }
+}
