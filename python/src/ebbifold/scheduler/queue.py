@@ -448,8 +448,10 @@ def inject_preemptive_scaffolds(items: list[dict[str, Any]], bulk: dict[str, Any
     if not step_down_concept_ids:
         return items
     max_pairings = _default_scaffold_pairing_limit(items, max_pairings)
+    if max_pairings <= 0 or not items:
+        return items
     candidates = _preemptive_scaffold_candidates(bulk, rotation_seed, excluded_card_ids)
-    if max_pairings <= 0 or not items or not candidates:
+    if not candidates:
         return items
     insertions = _collect_preemptive_insertions(items, candidates, step_down_concept_ids, max_pairings, bulk["rotation"])
     return _insert_scaffolds(items, insertions) if insertions else items
