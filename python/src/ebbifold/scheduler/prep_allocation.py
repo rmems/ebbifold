@@ -5,37 +5,50 @@ from __future__ import annotations
 from typing import Any, Callable
 
 
-def order_prep_keys(keys: list[str], plan: dict[str, Any]) -> list[str]:
+def _interleave_keys(pool: list[str], weak: set[str], unseen: set[str], share: float) -> list[str]:
+    weak_pool = [key for key in pool if key in weak]
+    unseen_pool = [key for key in pool if key in unseen]
+    out: list[str] = []
+    for index in range(max(len(weak_pool), len(unseen_pool))):
+        if share < 0.25 and index < len(unseen_pool):
+            out.append(unseen_pool[index])
+        if index < len(weak_pool):
+            out.append(weak_pool[index])
+        if share >= 0.25 and index < len(unseen_pool):
+            out.append(unseen_pool[index])
+    return out + [key for key in pool if key not in weak and key not in unseen]
+
+
+def _prep_interleaver(plan: dict[str, Any]):
     weak = set(plan.get("weakItemIds") or [])
     unseen = set(plan.get("unseenItemIds") or [])
+    share = float(plan.get("share") or 0)
+    return lambda pool: _interleave_keys(pool, weak, unseen, share)
 
-    def interleave(pool: list[str]) -> list[str]:
-        weak_pool = [key for key in pool if key in weak]
-        unseen_pool = [key for key in pool if key in unseen]
-        out: list[str] = []
-        share = float(plan.get("share") or 0)
-        for index in range(max(len(weak_pool), len(unseen_pool))):
-            if share < 0.25 and index < len(unseen_pool):
-                out.append(unseen_pool[index])
-            if index < len(weak_pool):
-                out.append(weak_pool[index])
-            if share >= 0.25 and index < len(unseen_pool):
-                out.append(unseen_pool[index])
-        return out + [key for key in pool if key not in weak and key not in unseen]
 
+def _session_queues(keys: list[str], sessions: list[dict[str, Any]], interleave) -> list[dict[str, Any]]:
+    return [
+        {"share": float(session["share"]), "taken": 0, "keys": interleave([k for k in keys if k in set(session.get("itemIds") or [])])}
+        for session in sessions
+    ]
+
+
+def _drop_used_heads(queues: list[dict[str, Any]], used: set[str]) -> None:
+    for queue in queues:
+        while queue["keys"] and queue["keys"][0] in used:
+            queue["keys"].pop(0)
+
+
+def order_prep_keys(keys: list[str], plan: dict[str, Any]) -> list[str]:
+    interleave = _prep_interleaver(plan)
     sessions = [s for s in (plan.get("sessions") or []) if float(s.get("share") or 0) > 0]
     if len(sessions) < 2:
         return interleave(keys)
-    queues = []
-    for session in sessions:
-        ids = set(session.get("itemIds") or [])
-        queues.append({"share": float(session["share"]), "taken": 0, "keys": interleave([k for k in keys if k in ids])})
+    queues = _session_queues(keys, sessions, interleave)
     used: set[str] = set()
     out: list[str] = []
     while True:
-        for queue in queues:
-            while queue["keys"] and queue["keys"][0] in used:
-                queue["keys"].pop(0)
+        _drop_used_heads(queues, used)
         available = [queue for queue in queues if queue["keys"]]
         if not available:
             break
@@ -58,35 +71,29 @@ def prep_modality_budgets(share: float, card_seats: int, question_seats: int, ca
     return {"cards": cards, "questions": questions}
 
 
-def order_session_prep_candidates(
-    items: list[dict[str, Any]], plan: dict[str, Any] | None, *, size: int,
-    key: Callable[[dict[str, Any]], str], protected: Callable[[dict[str, Any]], bool] | None = None,
-    prep_seats: int | None = None,
-) -> list[dict[str, Any]]:
-    if not plan or not isinstance(plan.get("share"), (int, float)) or plan["share"] <= 0:
-        return items
+def _partition_prep_items(items, plan, key, protected):
+    groups = {"protected": [], "ordinary": [], "weak": [], "unseen": [], "other": []}
     prep_keys = set(plan.get("itemIds") or [])
     weak_keys = set(plan.get("weakItemIds") or [])
     unseen_keys = set(plan.get("unseenItemIds") or [])
-    protected_items: list[dict[str, Any]] = []
-    ordinary: list[dict[str, Any]] = []
-    weak: list[dict[str, Any]] = []
-    unseen: list[dict[str, Any]] = []
-    other_prep: list[dict[str, Any]] = []
     for item in items:
         item_key = key(item)
         if protected and protected(item):
-            protected_items.append(item)
+            groups["protected"].append(item)
         elif item_key not in prep_keys:
-            ordinary.append(item)
+            groups["ordinary"].append(item)
         elif item_key in weak_keys:
-            weak.append(item)
+            groups["weak"].append(item)
         elif item_key in unseen_keys:
-            unseen.append(item)
+            groups["unseen"].append(item)
         else:
-            other_prep.append(item)
+            groups["other"].append(item)
+    return groups
+
+
+def _ordered_prep_items(groups: dict[str, list[dict[str, Any]]], share: float) -> list[dict[str, Any]]:
     prep: list[dict[str, Any]] = []
-    share = float(plan["share"])
+    weak, unseen = groups["weak"], groups["unseen"]
     for index in range(max(len(weak), len(unseen))):
         if share < 0.25 and index < len(unseen):
             prep.append(unseen[index])
@@ -94,12 +101,17 @@ def order_session_prep_candidates(
             prep.append(weak[index])
         if share >= 0.25 and index < len(unseen):
             prep.append(unseen[index])
-    prep.extend(other_prep)
-    if len(plan.get("sessions") or []) > 1:
-        by_key = {key(item): item for item in prep}
-        prep = [by_key[item_key] for item_key in order_prep_keys([key(item) for item in prep], plan)]
-    seats = max(0, int(size) - len(protected_items))
-    wanted = min(len(prep), seats, max(0, int(prep_seats if prep_seats is not None else seats * min(0.5, share))))
+    return prep + groups["other"]
+
+
+def _session_order_prep(prep: list[dict[str, Any]], plan: dict[str, Any], key) -> list[dict[str, Any]]:
+    if len(plan.get("sessions") or []) <= 1:
+        return prep
+    by_key = {key(item): item for item in prep}
+    return [by_key[item_key] for item_key in order_prep_keys([key(item) for item in prep], plan)]
+
+
+def _spread_prep(protected_items, ordinary, prep, seats, wanted):
     prefix = list(protected_items)
     prep_at = ordinary_at = 0
     for slot in range(seats):
@@ -112,4 +124,22 @@ def order_session_prep_candidates(
             ordinary_at += 1
         else:
             break
+    return prefix, ordinary_at, prep_at
+
+
+def order_session_prep_candidates(
+    items: list[dict[str, Any]], plan: dict[str, Any] | None, *, size: int,
+    key: Callable[[dict[str, Any]], str], protected: Callable[[dict[str, Any]], bool] | None = None,
+    prep_seats: int | None = None,
+) -> list[dict[str, Any]]:
+    if not plan or not isinstance(plan.get("share"), (int, float)) or plan["share"] <= 0:
+        return items
+    groups = _partition_prep_items(items, plan, key, protected)
+    share = float(plan["share"])
+    prep = _session_order_prep(_ordered_prep_items(groups, share), plan, key)
+    ordinary = groups["ordinary"]
+    seats = max(0, int(size) - len(groups["protected"]))
+    default_prep_seats = seats * min(0.5, share)
+    wanted = min(len(prep), seats, max(0, int(prep_seats if prep_seats is not None else default_prep_seats)))
+    prefix, ordinary_at, prep_at = _spread_prep(groups["protected"], ordinary, prep, seats, wanted)
     return prefix + ordinary[ordinary_at:] + prep[prep_at:]

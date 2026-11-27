@@ -405,8 +405,6 @@ def get_questions_from_bulk(
     difficulty_plan: list[str] | None = None,
     recent_formats_by_concept: Mapping[str, Any] | None = None,
     concept_thread_anchors: list[Any] | None = None,
-    concept_thread_now_ms: float | None = None,
-    concept_thread_matcher: Any | None = None,
     exam_target_scores: Mapping[str, float] | None = None,
     exam_target_max_rank_move: float | None = None,
     mastered_reentry_counter: dict[str, int] | None = None,
@@ -465,11 +463,7 @@ def get_questions_from_bulk(
                 c for c in rows if c.get("format") and c["format"] in seen_formats
             ]
     thread_matches: dict[str, dict[str, Any]] = {}
-    matcher = concept_thread_matcher
-    if matcher is None and concept_thread_anchors and concept_thread_now_ms is not None:
-        from .concept_thread import prepare_concept_thread_matcher
-
-        matcher = prepare_concept_thread_matcher(concept_thread_anchors, concept_thread_now_ms)
+    matcher = bulk.get("conceptThreadMatcher")
     if matcher is not None and matcher.anchor_count:
         for rows in by_difficulty.values():
             for candidate in rows:
@@ -517,13 +511,17 @@ def get_questions_from_bulk(
             pref.sort(key=lambda r: (r[0], r[1]))
             it = iter(pref)
             by_difficulty[d] = [c if c["id"] in familiarity else next(it)[2] for c in rows]
-    return _take_questions(
+    selected = _take_questions(
         by_difficulty, endpoint_plan, limit, familiarity, selected_question_ids, selected_question_variant_groups,
-        mastered_reentry_counter, review_challenge, challenge_slot_index, thread_matches,
+        mastered_reentry_counter, review_challenge, challenge_slot_index,
     )
+    for picked in selected:
+        if picked["id"] in thread_matches:
+            picked["conceptThreadMatch"] = thread_matches[picked["id"]]
+    return selected
 
 
-def _take_questions(by_difficulty, endpoint_plan, limit, familiarity, selected_ids, selected_groups, counter, level, slot, thread_matches=None):
+def _take_questions(by_difficulty, endpoint_plan, limit, familiarity, selected_ids, selected_groups, counter, level, slot):
     def take_next(difficulty: str, unseen_only: bool = False) -> dict[str, Any] | None:
         rows = by_difficulty.get(difficulty)
         if not rows:
@@ -546,10 +544,7 @@ def _take_questions(by_difficulty, endpoint_plan, limit, familiarity, selected_i
             selected_ids.add(cand["id"])
             if key:
                 selected_groups.add(key)
-            picked = {"id": cand["id"], "variantGroupId": cand.get("variantGroupId"), "variantType": cand.get("variantType")}
-            if thread_matches and cand["id"] in thread_matches:
-                picked["conceptThreadMatch"] = thread_matches[cand["id"]]
-            return picked
+            return {"id": cand["id"], "variantGroupId": cand.get("variantGroupId"), "variantType": cand.get("variantType")}
         return None
 
     selected: list[dict[str, Any]] = []

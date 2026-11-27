@@ -58,7 +58,6 @@ class SessionBuildState:
         excluded_video_ids: Iterable[str] = (),
         weak_concepts: Sequence[Any] = (),
         concept_thread_anchors: Sequence[Any] = (),
-        now_ms: float = 0,
     ) -> None:
         from .concept_thread import prepare_concept_thread_matcher
 
@@ -92,7 +91,7 @@ class SessionBuildState:
         self.enforce_first_sight_reservation = min_first_sight_items > 0
         self.deferred_for_novelty: dict[str, dict[str, Any]] = {}
         self.concept_thread_followup_selected = False
-        self.prepared_concept_thread_matcher = prepare_concept_thread_matcher(list(concept_thread_anchors), now_ms)
+        self.prepared_concept_thread_matcher = prepare_concept_thread_matcher(list(concept_thread_anchors), 0)
         self.trace: list[dict[str, Any]] = []
         for cs in weak_concepts:
             state = classify_teaching_state(cs.exposureCount, cs.recallOnExamDay, cs.confidence)

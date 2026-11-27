@@ -21,13 +21,9 @@ def _basename(source_file: str | None) -> str:
 def _matches(identity: dict[str, Any], strand: dict[str, Any]) -> bool:
     rotations = strand.get("matchRotations") or strand.get("rotations") or []
     prefixes = strand.get("matchSourcePrefixes") or strand.get("sourceFilePrefixes") or []
-    matched = False
-    if identity.get("rotation") in rotations:
-        matched = True
+    matched = identity.get("rotation") in rotations
     basename = _basename(identity.get("sourceFile"))
-    if any(basename.startswith(prefix) for prefix in prefixes):
-        matched = True
-    return matched or (not rotations and not prefixes)
+    return matched or any(basename.startswith(prefix) for prefix in prefixes) or (not rotations and not prefixes)
 
 
 def deck_strand_of(mix: dict[str, Any], identity: dict[str, Any]) -> str:
@@ -36,6 +32,53 @@ def deck_strand_of(mix: dict[str, Any], identity: dict[str, Any]) -> str:
             return strand["id"]
     strands = mix.get("strands") or []
     return strands[-1]["id"] if strands else "default"
+
+
+def _strand_units(items, mix, identify, keep_with_previous):
+    units = []
+    for item in items:
+        if units and keep_with_previous and keep_with_previous(item):
+            units[-1]["items"].append(item)
+        else:
+            units.append({"strand": deck_strand_of(mix, identify(item)), "items": [item]})
+    return units
+
+
+def _queues(strands, units):
+    queues = {strand["id"]: [] for strand in strands}
+    for unit in units:
+        queues.setdefault(unit["strand"], []).append(unit)
+    return queues
+
+
+def _present_counts(strands, units):
+    present = {strand["id"]: 0 for strand in strands}
+    for unit in units:
+        present[unit["strand"]] = present.get(unit["strand"], 0) + len(unit["items"])
+    return present
+
+
+def _choose_strand(strands, shares, emitted, total, available):
+    best, best_score = None, float("-inf")
+    for strand in strands:
+        sid = strand["id"]
+        if not available(sid):
+            continue
+        score = shares(sid) * (total + 1) - emitted.get(sid, 0)
+        if score > best_score + 1e-9:
+            best, best_score = sid, score
+    return best
+
+
+def _apply_phase(strands, shares, emitted, seed):
+    total = 0
+    for _ in range(hash_string(f"{seed}\0deck-strand-phase") % 10):
+        strand = _choose_strand(strands, shares, emitted, total, lambda _sid: True)
+        if strand is None:
+            break
+        emitted[strand] = emitted.get(strand, 0) + 1
+        total += 1
+    return total
 
 
 def order_by_deck_strands(
@@ -47,51 +90,27 @@ def order_by_deck_strands(
     strands = (mix or {}).get("strands") or []
     if len(items) < 2 or not strands:
         return items
-    units: list[dict[str, Any]] = []
-    for item in items:
-        if units and keep_with_previous and keep_with_previous(item):
-            units[-1]["items"].append(item)
-        else:
-            units.append({"strand": deck_strand_of(mix, identify(item)), "items": [item]})
-    queues = {strand["id"]: [] for strand in strands}
-    for unit in units:
-        queues.setdefault(unit["strand"], []).append(unit)
+    units = _strand_units(items, mix, identify, keep_with_previous)
+    queues = _queues(strands, units)
     if sum(1 for queue in queues.values() if queue) < 2:
         return items
-
-    present = {strand["id"]: 0 for strand in strands}
-    for unit in units:
-        present[unit["strand"]] = present.get(unit["strand"], 0) + len(unit["items"])
+    present = _present_counts(strands, units)
     emitted = {strand["id"]: 0 for strand in strands}
-    total = 0
 
-    def share_of(strand: dict[str, Any]) -> float:
+    def shares(sid: str) -> float:
         if share_basis == "present":
-            return present.get(strand["id"], 0) / len(items)
+            return present.get(sid, 0) / len(items)
+        strand = next(s for s in strands if s["id"] == sid)
         return float(strand.get("share") or 0)
 
-    def choose(available) -> str | None:
-        best, best_score = None, float("-inf")
-        for strand in strands:
-            sid = strand["id"]
-            if not available(sid):
-                continue
-            score = share_of(strand) * (total + 1) - emitted.get(sid, 0)
-            if score > best_score + 1e-9:
-                best, best_score = sid, score
-        return best
-
-    for _ in range(hash_string(f"{seed}\0deck-strand-phase") % 10):
-        strand = choose(lambda _sid: True)
-        if strand is None:
-            break
-        emitted[strand] = emitted.get(strand, 0) + 1
-        total += 1
-
+    total = _apply_phase(strands, shares, emitted, seed)
     out: list[dict[str, Any]] = []
     cursor = {strand["id"]: 0 for strand in strands}
+    def available(sid: str) -> bool:
+        return cursor.get(sid, 0) < len(queues.get(sid, []))
+
     while len(out) < len(items):
-        strand = choose(lambda sid: cursor.get(sid, 0) < len(queues.get(sid, [])))
+        strand = _choose_strand(strands, shares, emitted, total, available)
         if strand is None:
             break
         pos = cursor.get(strand, 0)

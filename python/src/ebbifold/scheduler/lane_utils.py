@@ -97,8 +97,12 @@ def question_pool(request: QuestionPoolRequest) -> list[dict[str, Any]]:
     if inputs.get("applyExamTarget"):
         active = active_targets(inputs)
         exam = {"exam_target_scores": active["question"], "exam_target_max_rank_move": active["rankMove"]}
+    bulk = dict(inputs["bulk"])
+    matcher = request.build.available_concept_thread_matcher() if request.allow_concept_thread else None
+    if matcher is not None:
+        bulk["conceptThreadMatcher"] = matcher
     return get_questions_from_bulk(
-        request.concept_id, request.concept, 1, inputs["bulk"],
+        request.concept_id, request.concept, 1, bulk,
         selected_question_ids=request.build.selected_question_ids,
         selected_question_variant_groups=request.build.selected_question_variant_groups,
         difficulty_plan=[request.difficulty],
@@ -110,7 +114,6 @@ def question_pool(request: QuestionPoolRequest) -> list[dict[str, Any]]:
         topic_recency_days=options.get("topicRecencyDays"),
         mastered_reentry_counter=request.build.mastered_reentry_counter,
         recent_formats_by_concept=inputs.get("recentFormatsByConcept"),
-        concept_thread_matcher=(request.build.available_concept_thread_matcher() if request.allow_concept_thread else None),
         **exam,
     )
 
@@ -160,7 +163,6 @@ def _initial_build_state(inputs: dict[str, Any], plan: dict[str, Any], size: int
         question_familiarity=bulk["questionFamiliarity"].keys(), excluded_card_ids=inputs["excludedCardIds"],
         excluded_question_ids=inputs["excludedQuestionIds"], excluded_video_ids=inputs["excludedVideoIds"],
         weak_concepts=plan["weakConcepts"], concept_thread_anchors=inputs.get("conceptThreadAnchors") or [],
-        now_ms=inputs["nowMs"],
     )
 
 
@@ -175,6 +177,12 @@ def _missing_required_mastery_evidence(inputs: dict[str, Any], requirement: int)
 def create_session_build(inputs: dict[str, Any], plan: dict[str, Any]) -> SessionBuildState:
     size, bulk = inputs["size"], inputs["bulk"]
     build = _initial_build_state(inputs, plan, size, bulk)
+    if inputs.get("conceptThreadAnchors"):
+        from .concept_thread import prepare_concept_thread_matcher
+
+        build.prepared_concept_thread_matcher = prepare_concept_thread_matcher(
+            list(inputs["conceptThreadAnchors"]), inputs["nowMs"]
+        )
     build.mastered_reentry_counter = {"masteredServed": 0}
     build.selected_core_target_seats = 0
     build.selected_surplus_target_seats = 0

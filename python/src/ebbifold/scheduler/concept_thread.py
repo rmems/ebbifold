@@ -84,7 +84,7 @@ def _infer_facet(question_type: str, text: str) -> str:
         return "cause_mechanism"
     if re.search(r"\b(clinical features|presents with|presentation|signs and symptoms|what does .* look like)\b", text):
         return "presentation"
-    if re.search(r"\b(diagnos(?:is|e|ed|tic|tics)?|investigat(?:e|ed|ion|ions|ive)?|test confirms|most likely diagnosis|differentiat(?:e|es|ing|ion)|criteria)\b", text):
+    if re.search(r"\b(diagnos\w*|investigat\w*|differentiat\w*|criteria|test confirms)\b", text):
         return "diagnosis_investigation"
     if re.search(r"\b(complication|complications|prognosis|outcome|sequela|sequelae|adverse effect)\b", text):
         return "complications_prognosis"

@@ -31,25 +31,30 @@ def _restricted(inputs: dict[str, Any]) -> bool:
     return bool(options.get("media") or options.get("crossSourceRotations") or inputs.get("week") is not None or options.get("week") is not None)
 
 
+def _rotation_eligible(inputs: dict[str, Any], row: dict[str, Any]) -> bool:
+    rotations = [inputs["rotation"], *(inputs["options"].get("crossSourceRotations") or [])]
+    return len(rotations) == 1 or row.get("rotation") in rotations
+
+
+def _week_eligible(inputs: dict[str, Any], row: dict[str, Any]) -> bool:
+    week = inputs.get("week", inputs["options"].get("week"))
+    return week is None or row.get("week") == week
+
+
+def _media_eligible(media: str | None, row: dict[str, Any]) -> bool:
+    if not media:
+        return True
+    image = bool((row.get("imageUrl") or "").strip())
+    video = bool((row.get("clipId") or "").strip() or (row.get("clip") or {}).get("url"))
+    return (media == "image" and image) or (media == "video" and video) or (media == "any" and (image or video))
+
+
 def _eligible_row(inputs: dict[str, Any], row: dict[str, Any]) -> bool:
-    options = inputs["options"]
-    rotations = [inputs["rotation"], *(options.get("crossSourceRotations") or [])]
-    if len(rotations) > 1 and row.get("rotation") not in rotations:
-        return False
-    week = inputs.get("week", options.get("week"))
-    if week is not None and row.get("week") != week:
-        return False
-    media = options.get("media")
-    if media:
-        image = bool((row.get("imageUrl") or "").strip())
-        video = bool((row.get("clipId") or "").strip() or (row.get("clip") or {}).get("url"))
-        if media == "image" and not image:
-            return False
-        if media == "video" and not video:
-            return False
-        if media == "any" and not (image or video):
-            return False
-    return True
+    return (
+        _rotation_eligible(inputs, row)
+        and _week_eligible(inputs, row)
+        and _media_eligible(inputs["options"].get("media"), row)
+    )
 
 
 def _eligible_rows(inputs: dict[str, Any], rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
