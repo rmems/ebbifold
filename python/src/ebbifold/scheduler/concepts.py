@@ -57,10 +57,7 @@ def _json_number(value: Any) -> Any:
 
 def assert_supported(inputs: dict[str, Any]) -> None:
     """Fail closed on lanes Phase 3a does not port."""
-    options = inputs.get("options", {})
     assert_exam_target_supported(inputs)
-    if options.get("sessionPrepBlend"):
-        raise UnsupportedSchedulerInput("session prep blend is not ported in Phase 3a")
 
 
 @dataclass
