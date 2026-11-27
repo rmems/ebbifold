@@ -20,7 +20,6 @@ def find_thread_matches(by_difficulty: dict[str, list[dict[str, Any]]], matcher:
                 "variantGroupId": candidate.get("variantGroupId"),
             })
             if match:
-                candidate["_conceptThreadMatch"] = match
                 matches[candidate["id"]] = match
     return matches
 

@@ -78,6 +78,7 @@ def test_concept_thread_reserves_inside_existing_freshness_tier() -> None:
     )
     assert picked[0]["id"] == "followup"
     assert picked[0]["conceptThreadMatch"]["anchorEventId"] == "event-anchor"
+    assert all("_conceptThreadMatch" not in row for row in bulk["rotationQuestions"])
 
 
 def test_session_marks_one_concept_followup_and_reserves_only_one() -> None:

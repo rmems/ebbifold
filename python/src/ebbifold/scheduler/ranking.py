@@ -489,12 +489,12 @@ def get_questions_from_bulk(
             by_difficulty[d] = [c if c["id"] in familiarity else next(it)[2] for c in rows]
     selected = _take_questions(
         by_difficulty, endpoint_plan, limit, familiarity, selected_question_ids, selected_question_variant_groups,
-        mastered_reentry_counter, review_challenge, challenge_slot_index,
+        mastered_reentry_counter, review_challenge, challenge_slot_index, thread_matches,
     )
     return attach_thread_matches(selected, thread_matches)
 
 
-def _take_questions(by_difficulty, endpoint_plan, limit, familiarity, selected_ids, selected_groups, counter, level, slot):
+def _take_questions(by_difficulty, endpoint_plan, limit, familiarity, selected_ids, selected_groups, counter, level, slot, thread_matches=None):
     def take_next(difficulty: str, unseen_only: bool = False) -> dict[str, Any] | None:
         rows = by_difficulty.get(difficulty)
         if not rows:
@@ -529,7 +529,10 @@ def _take_questions(by_difficulty, endpoint_plan, limit, familiarity, selected_i
             if c["id"] not in selected_ids and not ((g := _suppression_key(c)) and g in selected_groups)
         ), None)
         shifted = shift_question_difficulty(difficulty, level or 0, slot + len(selected))
-        may_shift = baseline is not None and baseline["id"] not in familiarity and not baseline.get("_conceptThreadMatch")
+        may_shift = (
+            baseline is not None and baseline["id"] not in familiarity
+            and baseline["id"] not in (thread_matches or {})
+        )
         if level == 2:
             picked = take_next(shifted, True) or take_next(shifted)
         elif may_shift and shifted != difficulty:
