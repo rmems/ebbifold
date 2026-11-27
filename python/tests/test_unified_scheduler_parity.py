@@ -1,9 +1,8 @@
 """Phase 3a parity: unified concept-space scheduler vs TypeScript golden fixtures.
 
-Fixtures come from python/tools/generate_unified_scheduler_fixtures.ts (run once
-against the TypeScript original, committed). These tests never execute
-TypeScript and fail, rather than skip, when the fixture file is missing,
-empty, or malformed.
+Fixtures were generated once against the TypeScript original and committed as
+self-contained JSON artifacts. These tests never execute TypeScript and fail,
+rather than skip, when the fixture file is missing, empty, or malformed.
 """
 
 from __future__ import annotations

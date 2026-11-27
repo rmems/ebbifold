@@ -1,10 +1,10 @@
 """Fixture-pipeline tests for Phase 0.
 
-The golden fixtures under tests/fixtures/ are generated once by
-python/tools/generate_step1_adaptive_fixtures.ts (a TypeScript script run
-against the upstream original) and committed. Python never executes
-TypeScript; these tests prove the committed artifacts are loadable and
-structurally sound, so Phase 1's parity tests can rely on them.
+The golden fixtures under tests/fixtures/ were generated once against the
+upstream TypeScript original and committed. The TypeScript implementation and
+generator have since been retired; the committed JSON artifacts are now the
+self-contained oracle. Python never executes TypeScript; these tests prove
+the committed artifacts are loadable and structurally sound.
 
 The invariants checked here hold of rankAdaptive's *output* regardless of
 implementation, so they stay true after the Python port exists.
@@ -30,11 +30,7 @@ def cases() -> list[dict]:
 
 
 def test_fixture_file_exists() -> None:
-    assert FIXTURE_PATH.is_file(), (
-        "fixtures missing — regenerate with "
-        "`node --import tsx python/tools/generate_step1_adaptive_fixtures.ts` "
-        "from the repository root"
-    )
+    assert FIXTURE_PATH.is_file(), "golden fixtures missing; restore the committed JSON artifact"
 
 
 def test_cases_are_present(cases: list[dict]) -> None:
