@@ -1,0 +1,31 @@
+name: Python CI
+
+on:
+  push:
+    paths:
+      - 'python/**'
+      - '.github/workflows/python-ci.yml'
+  pull_request:
+    paths:
+      - 'python/**'
+      - '.github/workflows/python-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          enable-cache: true
+      - name: Sync dependencies
+        working-directory: python
+        # --no-install-project: the scaffold's tests import ebbifold via
+        # pytest's pythonpath, so nothing needs building from source.
+        run: uv sync --locked --no-install-project --no-build
+      - name: Run pytest
+        working-directory: python
+        run: uv run --no-sync pytest -q
