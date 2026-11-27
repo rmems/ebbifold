@@ -161,10 +161,13 @@ class ClusterCardSelection:
         if not self.mix or not self.available_strands:
             return False
         extra = _redistribute_seats(self.mix, self.available_strands, self.target_cards - len(self.selected_items))
-        self.seats = {
+        seats = {
             str(strand.get("id")): self.strand_counts.get(str(strand.get("id")), 0) + extra.get(str(strand.get("id")), 0)
             for strand in self.mix.get("strands", [])
         }
+        if seats == self.seats:
+            return False
+        self.seats = seats
         return True
 
     def run(self) -> None:
