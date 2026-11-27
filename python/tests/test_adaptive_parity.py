@@ -79,6 +79,9 @@ def test_rank_adaptive_matches_typescript(case: dict) -> None:
         ("", "medium"),
         (None, "medium"),
         ("nonsense", "medium"),  # unrecognised lands in the middle
+        ("\ufeffeasy", "easy"),  # U+FEFF strips, matching ECMAScript trim
+        ("\u00a0easy\u00a0", "easy"),  # U+00A0 strips
+        ("        ("\u0085easy", "medium"),  # U+0085 does NOT strip in JS, unlike Python
     ],
 )
 def test_normalise_difficulty(raw: str | None, expected: str) -> None:
