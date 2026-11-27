@@ -69,28 +69,33 @@ def _concepts_compatible(anchor: set[str], candidate: set[str]) -> bool:
     return bool(anchor & candidate)
 
 
+_QUESTION_TYPE_FACETS = {
+    "management": "management", "next step": "management", "treatment": "management", "therapy": "management",
+    "complication": "complications_prognosis", "complications": "complications_prognosis",
+    "prognosis": "complications_prognosis", "adverse effect": "complications_prognosis", "outcome": "complications_prognosis",
+    "clinical features": "presentation", "presentation": "presentation",
+    "diagnosis": "diagnosis_investigation", "investigation": "diagnosis_investigation",
+    "interpretation": "diagnosis_investigation", "image interpretation": "diagnosis_investigation",
+    "clinical reasoning": "diagnosis_investigation", "discrimination": "diagnosis_investigation",
+    "mechanism": "cause_mechanism", "basic science": "cause_mechanism", "pathophysiology": "cause_mechanism",
+    "risk factors": "cause_mechanism", "epidemiology": "cause_mechanism", "physiology": "cause_mechanism",
+    "aetiology": "cause_mechanism", "etiology": "cause_mechanism",
+}
+
+_TEXT_FACETS = (
+    ("cause_mechanism", r"\b(causative|caused by|cause of|causes of|organism|aetiolog|etiolog|mechanism|pathophysiolog|risk factor)\b"),
+    ("presentation", r"\b(clinical features|presents with|presentation|signs and symptoms|what does .* look like)\b"),
+    ("diagnosis_investigation", r"\b(diagnos\w*|investigat\w*|differentiat\w*|criteria|test confirms)\b"),
+    ("complications_prognosis", r"\b(complication|complications|prognosis|outcome|sequela|sequelae|adverse effect)\b"),
+    ("management", r"\b(manage|management|treat|treatment|therapy|first line|next best step|definitive management)\b"),
+)
+
+
 def _infer_facet(question_type: str, text: str) -> str:
-    if question_type in {"management", "next step", "treatment", "therapy"}:
-        return "management"
-    if question_type in {"complication", "complications", "prognosis", "adverse effect", "outcome"}:
-        return "complications_prognosis"
-    if question_type in {"clinical features", "presentation"}:
-        return "presentation"
-    if question_type in {"diagnosis", "investigation", "interpretation", "image interpretation", "clinical reasoning", "discrimination"}:
-        return "diagnosis_investigation"
-    if question_type in {"mechanism", "basic science", "pathophysiology", "risk factors", "epidemiology", "physiology", "aetiology", "etiology"}:
-        return "cause_mechanism"
-    if re.search(r"\b(causative|caused by|cause of|causes of|organism|aetiolog|etiolog|mechanism|pathophysiolog|risk factor)\b", text):
-        return "cause_mechanism"
-    if re.search(r"\b(clinical features|presents with|presentation|signs and symptoms|what does .* look like)\b", text):
-        return "presentation"
-    if re.search(r"\b(diagnos\w*|investigat\w*|differentiat\w*|criteria|test confirms)\b", text):
-        return "diagnosis_investigation"
-    if re.search(r"\b(complication|complications|prognosis|outcome|sequela|sequelae|adverse effect)\b", text):
-        return "complications_prognosis"
-    if re.search(r"\b(manage|management|treat|treatment|therapy|first line|next best step|definitive management)\b", text):
-        return "management"
-    return "unknown"
+    typed = _QUESTION_TYPE_FACETS.get(question_type)
+    if typed:
+        return typed
+    return next((facet for facet, pattern in _TEXT_FACETS if re.search(pattern, text)), "unknown")
 
 
 def infer_clinical_facet(item: dict[str, Any]) -> str:
@@ -138,18 +143,19 @@ def _prepare_item(item: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _topic_matches(source_topics: set[str], other_topics: set[str], other_text: str) -> set[str]:
+    return {
+        topic for topic in source_topics
+        if topic in other_topics or (" " in topic and _text_contains_topic(other_text, topic))
+    }
+
+
 def _shared_topic(anchor: dict[str, Any], candidate: dict[str, Any]) -> str | None:
     if not _concepts_compatible(anchor["conceptIds"], candidate["conceptIds"]):
         return None
-    matches: set[str] = set()
-    for topic in candidate["specificTopics"]:
-        if topic in anchor["specificTopics"] or (" " in topic and _text_contains_topic(anchor["normalizedText"], topic)):
-            matches.add(topic)
-    for topic in anchor["specificTopics"]:
-        if topic in candidate["specificTopics"] or (" " in topic and _text_contains_topic(candidate["normalizedText"], topic)):
-            matches.add(topic)
-    if not matches:
-        matches = candidate["textPhrases"] & anchor["textPhrases"]
+    matches = _topic_matches(candidate["specificTopics"], anchor["specificTopics"], anchor["normalizedText"])
+    matches |= _topic_matches(anchor["specificTopics"], candidate["specificTopics"], candidate["normalizedText"])
+    matches = matches or candidate["textPhrases"] & anchor["textPhrases"]
     if not matches:
         return None
     return sorted(matches, key=lambda x: (-len(x.split(" ")), -len(x), x))[0]
